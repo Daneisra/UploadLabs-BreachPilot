@@ -1,0 +1,49 @@
+{
+	"name": "SmartAutomation",
+	"namespace": "Daneisra",
+	"version_number": "0.1.0",
+	"description": "Modular QoL automation. This version only observes Breach attacks and writes logs; it changes nothing in the game.",
+	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
+	"dependencies": [],
+	"extra": {
+		"godot": {
+			"authors": ["Daneisra"],
+			"compatible_game_version": ["3.0.12"],
+			"compatible_mod_loader_version": ["7.0.1"],
+			"config_schema": {
+				"type": "object",
+				"properties": {
+					"threat_observer_enabled": {
+						"type": "boolean",
+						"default": true
+					},
+					"log_level": {
+						"type": "string",
+						"enum": ["debug", "info", "warning"],
+						"default": "info"
+					},
+					"starvation_ratio": {
+						"type": "number",
+						"minimum": 0.05,
+						"maximum": 1.0,
+						"default": 0.25
+					},
+					"api_dump": {
+						"type": "boolean",
+						"default": false
+					},
+					"debug_toggle_hotkey": {
+						"type": "boolean",
+						"default": false
+					}
+				}
+			},
+			"description_rich": "",
+			"image": null,
+			"incompatibilities": [],
+			"load_before": [],
+			"optional_dependencies": [],
+			"tags": ["qol"]
+		}
+	}
+}

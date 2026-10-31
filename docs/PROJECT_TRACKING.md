@@ -5,8 +5,8 @@
 | Phase | État |
 |---|---|
 | 1. Analyse | Terminée, revue externe favorable |
-| 2. Structure du projet | En cours |
-| 3. Prototype d'observation (0.1.0) | En cours, aucun test en jeu |
+| 2. Structure du projet | Dépôt local créé, dépôt GitHub en attente de l'authentification |
+| 3. Prototype d'observation (0.1.0) | Code écrit, tests simulés réussis, **aucun test en jeu** |
 | 4. Auto Data Lab Supply (0.2.0) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -32,6 +32,19 @@
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
 - Test 14 (initialisation tardive) : couverture **partielle**. Le mod se charge avant le bureau ; le test passe par une désactivation puis réactivation, ce qui n'équivaut pas à un vrai chargement tardif.
 - Test 16 (vitesse de simulation) : à simuler s'il n'existe pas de moyen de l'exercer en jeu sans triche.
+
+## Commandes de développement
+
+```powershell
+# Première fois seulement : enregistre les classes de remplacement du chargeur
+Godot_console.exe --headless --path . --import
+# Tests simulés
+Godot_console.exe --headless --path . --script res://tests/run_tests.gd
+# Construction du zip dans build/
+python tools/build_zip.py
+```
+
+Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu : ils ne remplacent pas les tests en jeu.
 
 ## Validation de la 0.1.0
 

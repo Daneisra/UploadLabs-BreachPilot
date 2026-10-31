@@ -1,0 +1,8 @@
+; Minimal project used only to run the simulated tests with Godot headless.
+; It is not part of the mod package.
+config_version=5
+
+[application]
+
+config/name="Smart Automation (dev)"
+config/features=PackedStringArray("4.7")
