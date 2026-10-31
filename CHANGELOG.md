@@ -1,8 +1,14 @@
 # Changelog
 
-## 0.2.0-alpha.1 – en cours : mesures
+## 0.2.0-alpha.1 – 2026-10-31 : mesures
 
-Observation uniquement. **Aucun changement automatique du niveau de menace.**
+Observation uniquement. **Aucun changement automatique du niveau de menace.** Pré-version validée, sur la branche `dev/0.2.0-alpha.1`.
+
+### Limites
+
+- Infection : mesurée en jeu sur une seule configuration. Le simulateur intégré ne la couvre pas et marque ces attaques non fiables. Le modèle à pile n'existe qu'en prototype hors du jeu, et une attaque à 4,90 s sort de sa plage (2,90 à 3,70 s).
+- Attaques furtives et vulnérabilité : **non mesurées**, faute de déblocage dans la partie.
+- Niveaux élite : 5 observé, le passage de 5 à 6 reste à voir.
 
 ### Ajouté
 
