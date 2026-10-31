@@ -1,0 +1,28 @@
+# Godot
+.godot/
+*.import
+*.tmp
+
+# Build outputs
+build/
+*.zip
+
+# Editors and tools
+.vscode/
+.claude/
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Never commit: player data, secrets, or anything extracted from the game
+*.dat
+*.dat.bak
+*.pck
+*.gdc
+savegame*
+token
+.env
+extracted/
+decoded/
