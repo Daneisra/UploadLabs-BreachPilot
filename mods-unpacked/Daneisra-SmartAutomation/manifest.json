@@ -1,8 +1,8 @@
 {
 	"name": "SmartAutomation",
 	"namespace": "Daneisra",
-	"version_number": "0.1.0",
-	"description": "Modular QoL automation. This version only observes Breach attacks and writes logs; it changes nothing in the game.",
+	"version_number": "0.2.0",
+	"description": "Modular QoL automation. Pre-release 0.2.0-alpha.1: it only observes Breach attacks and writes logs; it changes nothing in the game.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
 	"dependencies": [],
 	"extra": {

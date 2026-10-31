@@ -3,7 +3,7 @@ extends RefCounted
 const SIGNALS := ["tick", "breached", "window_created", "window_initialized", "window_deleted", "desktop_ready", "setting_set"]
 const BREACH_PROPERTIES := [
 	"window", "data", "time", "max_time", "detected", "firewall", "max_firewall",
-	"breached", "max_breach", "paused", "breach_damage", "vulnerability",
+	"breached", "max_breach", "paused", "breach_damage", "infection_damage", "vulnerability",
 ]
 
 

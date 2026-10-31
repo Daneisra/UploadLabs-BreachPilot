@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0-alpha.1 – en cours : mesures
+
+Observation uniquement. **Aucun changement automatique du niveau de menace.**
+
+### Ajouté
+
+- Observation d'Infiltrer Gouvernement.
+- Inventaire à l'exécution : méthodes natives, variantes de dégâts, recherches et nœuds de hacking disponibles.
+- Mesures de l'infection, des variantes de dégâts et de la vulnérabilité.
+- Simulateur probabiliste borné, comparé aux salves observées (`distribution_check`).
+- Valeurs exactes du niveau suivant par les accesseurs natifs (`next_source`), et résumé de fiabilité du classificateur (`reliability_check`).
+
+### Modifié
+
+- Le zip porte la version complète. Le manifeste garde `0.2.0`, le format major.minor.patch documenté par le chargeur.
+
 ## 0.1.0 – 2026-10-31 : Observateur
 
 Version d'observation uniquement, **sans régulation automatique**. Le mod ne modifie ni le niveau de menace ni aucune autre valeur du jeu.

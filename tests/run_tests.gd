@@ -6,6 +6,7 @@ extends SceneTree
 const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/"
 const Classifier := preload(MOD + "features/threat_manager/breach_classifier.gd")
 const Prediction := preload(MOD + "features/threat_manager/breach_prediction.gd")
+const Simulator := preload(MOD + "features/threat_manager/breach_simulator.gd")
 const Observer := preload(MOD + "features/threat_manager/threat_observer.gd")
 const ApiGuard := preload(MOD + "core/api_guard.gd")
 const SaLog := preload(MOD + "core/sa_log.gd")
@@ -46,6 +47,7 @@ class FakeDesktop extends Node:
 class FakeResource:
 	var production := 100.0
 	var count := 0.0
+	var variation := 0
 
 
 class FakeBreach extends Node:
@@ -60,6 +62,43 @@ class FakeBreach extends Node:
 	var max_breach := 50.0
 	var paused := false
 	var breach_damage := FakeResource.new()
+	var infection_damage := FakeResource.new()
+	var vulnerability := FakeResource.new()
+	var forbidden_calls := 0
+
+	func get_max_firewall(level: int) -> float:
+		return 50.0 * pow(1.5, level - 3)
+
+	func get_max_breach(level: int) -> float:
+		return 50.0 * pow(1.5, level - 3)
+
+	func get_max_time(level: int) -> float:
+		return 20.0 if is_elite(level) else 10.0
+
+	func is_elite(level: int) -> bool:
+		return level > 0 and level % 5 == 0
+
+	func level_up(_times: int) -> void:
+		forbidden_calls += 1
+
+	func level_down(_times: int) -> void:
+		forbidden_calls += 1
+
+
+## A window of a type the mod watches, without the game's getters.
+class FakeGetterless extends Node:
+	var window := "breach_government"
+	var data := {"level": 1.0, "max_level": 2.0}
+	var time := 10.0
+	var max_time := 10.0
+	var detected := false
+	var firewall := 50.0
+	var max_firewall := 50.0
+	var breached := 0.0
+	var max_breach := 50.0
+	var paused := false
+	var breach_damage := FakeResource.new()
+	var infection_damage := FakeResource.new()
 	var vulnerability := FakeResource.new()
 
 
@@ -68,7 +107,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	for script: GDScript in [Classifier, Prediction, Observer, ApiGuard, SaLog, ModMain]:
+	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain]:
 		_check(script.can_instantiate(), "compiles: %s" % script.resource_path)
 	if _failures > 0:
 		print("%d checks, %d failures" % [_checks, _failures])
@@ -90,8 +129,12 @@ func _run() -> void:
 	_test_native_auto_level()
 	_test_prediction()
 	_test_volley_model()
+	_test_simulator()
+	_test_infection_measures()
 	_test_guard()
+	_test_no_level_change_in_source()
 	await _test_observer()
+	await _test_government_and_native_values()
 	await _test_mod_main()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -102,6 +145,7 @@ func _sample(overrides: Dictionary = {}) -> Dictionary:
 		"instance_id": 1, "level": 3, "max_level": 5, "time": 10.0, "max_time": 10.0,
 		"detected": false, "paused": false, "firewall": 50.0, "max_firewall": 50.0,
 		"breached": 0.0, "max_breach": 50.0, "damage_rate": 100.0, "vulnerability": 0.0,
+		"breach_variation": 0, "infection_count": 0.0, "infection_variation": 0,
 		"tick_speed": TICK, "now_usec": 0,
 	}
 	sample.merge(overrides, true)
@@ -393,6 +437,189 @@ func _test_volley_model() -> void:
 	_check(events[0].volleys == 4, "volleys are counted, including the last one")
 
 
+func _test_simulator() -> void:
+	# Measured in the game over 430 attacks: 5 volleys 85.8%, 6 volleys 14.0%, 7 volleys 0.2%.
+	var measured := Simulator.simulate(40.4, 161.6, 6.0, 1.0, 40.865)
+	_check(measured.ok and absf(measured.distribution[5] - 0.8574) < 0.001, "5 volleys matches the measured share")
+	_check(absf(measured.distribution[6] - 0.1414) < 0.001, "6 volleys matches the measured share")
+	_check(absf(measured.distribution[7] - 0.0012) < 0.0005, "7 volleys matches the measured share")
+	_check(measured.best == 5 and measured.worst == 7, "best and worst cases")
+	_check(absf(measured.p_success - 0.9988) < 0.001, "a tie with the timer counts as a failure")
+
+	var total := 0.0
+	for key: int in measured.distribution:
+		total += measured.distribution[key]
+	_check(is_equal_approx(total, 1.0), "probabilities add up to 1")
+
+	var level_3 := Simulator.simulate(27.0, 108.0, 5.0, 1.0, 25.8)
+	_check(level_3.worst == 7 and level_3.best == 7, "level 3 at 25.8 needs 7 volleys either way")
+	_check(is_zero_approx(level_3.p_success), "level 3 at 25.8 always fails, as seen in the game")
+	var level_3_up := Simulator.simulate(27.0, 108.0, 5.0, 1.0, 30.959)
+	_check(is_equal_approx(level_3_up.p_success, 1.0) and level_3_up.worst == 5, "level 3 at 30.96 always succeeds, as seen in the game")
+	var level_4_up := Simulator.simulate(40.4, 161.6, 5.0, 1.0, 30.959)
+	_check(is_zero_approx(level_4_up.p_success), "level 4 at 30.96 always fails, as seen in the game")
+	var elite := Simulator.simulate(303.0, 1212.0, 10.0, 1.0, 61.917)
+	_check(is_zero_approx(elite.p_success), "elite level 5 at 61.9 always fails, as seen in the game")
+
+	var whole := Simulator.simulate(18.0, 72.0, 5.0, 1.0, 26.0)
+	_check(whole.distribution.size() == 1 and whole.distribution[4] == 1.0, "a whole hit gives one outcome")
+	var bonus := Simulator.simulate(0.0, 100.0, 10.0, 1.0, 20.0, 1.5)
+	_check(bonus.distribution.has(4), "vulnerability multiplies the hits")
+	var stealth := Simulator.simulate(1000.0, 60.0, 10.0, 1.0, 20.0, 1.0, true)
+	_check(stealth.distribution.has(3), "stealth hits ignore the firewall")
+	var loud := Simulator.simulate(10.0, 60.0, 10.0, 1.0, 20.0)
+	_check(loud.distribution.has(4), "a firewall hit is not carried over to the breach bar")
+
+	_check(not Simulator.simulate(10.0, 10.0, 5.0, 1.0, 0.0).ok, "no damage gives no result")
+	_check(not Simulator.simulate(10.0, 10.0, 5.0, 0.0, 5.0).ok, "no interval gives no result")
+	_check(Simulator.simulate(10.0, 10.0, 5.0, 1.0, 5.5).low_hit, "small hits are flagged")
+
+	var huge := Simulator.simulate(1e9, 1e12, 10.0, 1.0, 40.5)
+	_check(huge.truncated and huge.worst == -1, "an unreachable target stops at the volley limit")
+	_check(is_zero_approx(huge.p_success), "the unfinished share counts as failed")
+	var started := Time.get_ticks_usec()
+	for i: int in 100:
+		Simulator.simulate(1000.0 + i, 60000.0, 100.0, 1.0, 1000.5)
+	var extreme := (Time.get_ticks_usec() - started) / 100.0
+	started = Time.get_ticks_usec()
+	for i: int in 100:
+		Simulator.simulate(40.4 + i, 161.6, 12.0, 1.0, 40.865)
+	var typical := (Time.get_ticks_usec() - started) / 100.0
+	print("simulator: %.0f us at the volley limit, %.0f us for a typical attack" % [extreme, typical])
+	_check(extreme < 16000.0, "the extreme case stays under one frame")
+	_check(typical < 1000.0, "a typical attack costs under 1 ms")
+	var beyond := Simulator.simulate(40.4, 161.6, 2.0, 1.0, 40.865)
+	_check(beyond.distribution.is_empty() and is_equal_approx(beyond.beyond_limit, 1.0), "volleys past the timer are not explored")
+	_check(beyond.best == 5 and beyond.worst == 7, "best and worst cases stay known past the timer")
+	_check(not beyond.truncated, "running out of time is not a truncation")
+	_check(Simulator.format_distribution({6: 0.25, 5: 0.75}) == "5:0.7500,6:0.2500", "distribution text is sorted")
+
+
+func _test_infection_measures() -> void:
+	var c := Classifier.new()
+	c.observe(_sample())
+	var breached := 0.0
+	var time := 10.0
+	var count := 20.0
+	for tick: int in 40:
+		time -= TICK
+		breached += count * TICK
+		if tick % 20 == 0:
+			breached += 30.0
+		c.observe(_sample({"time": time, "detected": true, "firewall": 0.0, "breached": breached, "infection_count": count, "infection_variation": 2}))
+	var events := c.on_breached(_sample({"time": time, "detected": true, "firewall": 0.0, "breached": breached + 30.0 + count * TICK, "infection_count": count, "infection_variation": 2}))
+	var success := events[0]
+	_check(success.volleys == 3, "infection ticks are not counted as volleys, got %d" % success.volleys)
+	_check(absf(success.max_hit - 30.0) < 0.01, "a hit is measured without the infection of its tick")
+	_check(absf(success.infection_integral - 39.0) < 2.0, "infection over time is summed")
+	_check(success.infection_variation == 2, "infection variation is recorded")
+	_check(success.has("dealt_total"), "total damage is recorded for comparison")
+
+	var plain := Classifier.new()
+	_attack(plain, 7.0)
+	var plain_event := plain.on_breached(_sample({"time": 7.0, "detected": true}))[0]
+	_check(not plain_event.has("infection_integral"), "no infection fields without infection")
+	_check(not plain_event.has("breach_variation"), "no variation field without a variation")
+
+	var flagged := Classifier.new()
+	flagged.observe(_sample())
+	flagged.observe(_sample({"time": 9.95, "detected": true, "firewall": 40.0, "breach_variation": 4}))
+	_check(flagged.on_breached(_sample({"time": 9.9, "detected": true, "firewall": 30.0, "breach_variation": 4}))[0].breach_variation == 4, "stealth variation is recorded")
+
+
+## This version must stay read-only, whatever else changes.
+func _test_no_level_change_in_source() -> void:
+	var forbidden := RegEx.create_from_string("\\.level_(up|down)\\(|\\bdata\\.(level|max_level) *[-+*/]?= |auto_level_breach *= |set_setting\\(")
+	var pending: Array[String] = [MOD]
+	var scanned := 0
+	while not pending.is_empty():
+		var folder: String = pending.pop_back()
+		for sub: String in DirAccess.get_directories_at(folder):
+			pending.append(folder.path_join(sub))
+		for file: String in DirAccess.get_files_at(folder):
+			if file.ends_with(".gd"):
+				scanned += 1
+				var source := FileAccess.get_file_as_string(folder.path_join(file))
+				_check(forbidden.search(source) == null, "no level change in %s" % file)
+	_check(scanned >= 7, "the source scan found the mod's scripts")
+
+
+func _test_government_and_native_values() -> void:
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var corps := FakeBreach.new()
+	var government := FakeBreach.new()
+	government.window = "breach_government"
+	var other := FakeBreach.new()
+	other.window = "breach_bank"
+	game.desktop.windows.add_child(corps)
+	game.desktop.windows.add_child(government)
+	game.desktop.windows.add_child(other)
+
+	var observer := Observer.new()
+	observer.configure(SaLog.new("info"), 0.25, false)
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	_check(_count("bind result=ok type=breach_corps") == 1, "Corps is observed")
+	_check(_count("bind result=ok type=breach_government") == 1, "Government is observed")
+	_check(_count("type=breach_bank") == 0, "other Breach types stay out of scope")
+
+	corps.breach_damage.production = 30.0
+	game.Signals.tick.emit()
+	for step: Array in [[9.95, 20.0, 0.0], [8.95, 0.0, 0.0], [7.95, 0.0, 30.0]]:
+		corps.detected = true
+		corps.time = step[0]
+		corps.firewall = step[1]
+		corps.breached = step[2]
+		game.Signals.tick.emit()
+	corps.time = 6.95
+	corps.breached = 60.0
+	game.Signals.breached.emit(corps)
+	_check(_count("event=success type=breach_corps") == 1, "a Corps success is reported under its own type")
+	_check(_count("next_source=native") == 1, "the next level comes from the game's getters")
+	_check(_count("native_matches=true") == 1, "the getters match the current level")
+	_check(_count("sim_next_p=") == 1, "the simulation of the next level is logged")
+	_check(_count("event=success type=breach_government") == 0, "Government is not credited with it")
+	_check(corps.forbidden_calls == 0 and government.forbidden_calls == 0, "level_up and level_down are never called")
+	_check(corps.data.level == 3.0 and government.data.level == 3.0, "no level changed")
+
+	observer.stop()
+	_check(_count("reliability_check type=breach_corps") == 1, "reliability is summarized at stop")
+	_check(_count("distribution_check type=breach_corps") == 1, "the distribution is compared at stop")
+
+	var bare := FakeGetterless.new()
+	game.desktop.windows.add_child(bare)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	_check(_count("absent=get_max_firewall") == 1, "a window without getters binds and reports them missing")
+	bare.breach_damage.production = 30.0
+	game.Signals.tick.emit()
+	bare.detected = true
+	bare.time = 9.95
+	game.Signals.tick.emit()
+	bare.firewall = 20.0
+	bare.time = 8.95
+	game.Signals.tick.emit()
+	bare.firewall = 0.0
+	bare.time = 7.95
+	game.Signals.tick.emit()
+	bare.time = 6.95
+	bare.breached = 30.0
+	game.Signals.tick.emit()
+	ModLoaderLog.messages.clear()
+	bare.time = 5.95
+	bare.breached = 60.0
+	game.Signals.breached.emit(bare)
+	_check(_count("event=success type=breach_government") == 1, "observation works without getters")
+	_check(_count("next_source=formula") == 1, "the next level falls back on the formula, labeled as such")
+	_check(_count("next_source=native") == 0, "no native value is claimed without getters")
+
+	observer.stop()
+	observer.queue_free()
+	await _remove_fake_game(game)
+
+
 func _test_guard() -> void:
 	var empty := Node.new()
 	root.add_child(empty)
@@ -441,7 +668,8 @@ func _test_observer() -> void:
 	ModLoaderLog.messages.clear()
 	observer.start()
 	_check(_count("bind result=ok") == 1, "an existing desktop is bound at once")
-	_check(_count("api_dump") == 2, "api dump logs properties and signals")
+	_check(_count("api_dump") == 3, "api dump logs properties, signals and methods")
+	_check(_count("native_methods type=breach_corps") == 1, "native methods are reported")
 
 	observer.start()
 	game.Signals.desktop_ready.emit()
@@ -456,6 +684,7 @@ func _test_observer() -> void:
 	_check(_count("next_ratio=") == 1, "the prediction is logged")
 	_check(_count(" level=3 ") >= 1, "the game's float levels are logged as integers")
 	_check(breach.data.level == 3 and breach.data.max_level == 5, "the observer changes nothing")
+	_check(breach.forbidden_calls == 0, "the observer never calls level_up or level_down")
 
 	observer.stop()
 	observer.stop()

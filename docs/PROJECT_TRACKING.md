@@ -7,7 +7,9 @@
 | 1. Analyse | Terminée, revue externe favorable |
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
-| Auto Threat Manager (0.2.0) | Plan en revue, implémentation non commencée |
+| Auto Threat Manager, `0.2.0-alpha.1` (mesures) | En cours sur `dev/0.2.0-alpha.1`, observation uniquement |
+| Auto Threat Manager, `0.2.0-alpha.2` (simulation des décisions) | Non autorisée pour l'instant |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Non autorisée pour l'instant |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -22,6 +24,31 @@
 | Option native `auto_level_breach` | Journalisée en 0.1.0 ; la régulation refusera de s'activer tant qu'elle est active |
 | Data Lab | Observateur d'abord ; répartiteur seulement après preuve de sauvegarde, rechargement et retrait propres |
 | Analyse du jeu | Plus de décodage de scripts ; inspection à l'exécution uniquement |
+
+## Décisions pour la régulation (0.2.0)
+
+Validées par Jérémy après revue. **Aucune n'est implémentée à ce stade.**
+
+| Sujet | Décision |
+|---|---|
+| Étapes | `0.2.0-alpha.1` mesures, `0.2.0-alpha.2` simulation des décisions, `0.2.0-beta.1` premières actions, `0.2.0` validée. Chaque étape est testée et validée avant la suivante |
+| Modes | Conservateur : 100 % de réussite théorique, marge 20 %. Équilibré : 99 %, marge 10 %. Agressif : 95 %, marge 0 %. 90 % éventuellement en paramètre avancé, après validation expérimentale |
+| Baisse | Le seuil doit tenir compte de la probabilité d'échec attendue, pas d'une règle fixe |
+| Prédiction | Méthodes natives d'abord, modèle probabiliste par salves. Formules de remplacement pour une décision active seulement si leur fiabilité est démontrée. Montée interdite si le modèle n'est pas assez fiable |
+| Classificateur incertain | Mise en sécurité de la régulation |
+| Baisse manuelle | Définit un **plafond durable**, levé explicitement par le joueur dans les paramètres |
+| Interface | ModManager et journaux. Petit indicateur discret seulement quand la régulation sera active |
+| Sécurité | Désactivée par défaut, refus si `auto_level_breach` est actif, arrêt d'urgence, méthodes natives uniquement, aucune écriture directe du niveau, vérification après chaque action |
+
+**À démontrer avant `0.2.0-beta.1` :**
+
+1. Un changement automatique peut intervenir entre deux attaques sans en interrompre une. `call_deferred()` ne suffit pas à le garantir.
+2. Les échecs par manque de puissance sont distingués des coupures d'alimentation.
+3. Aucune baisse sur `failure_starved` ni `reset_unknown`.
+4. Les conditions de fiabilité du classificateur sont définies précisément.
+5. Les calculs probabilistes sont bornés.
+6. Les unités des délais, blocages et budgets d'actions sont définies.
+7. La documentation indique que les changements de niveau faits par le mod sont enregistrés normalement dans les sauvegardes du jeu.
 
 ## Points ouverts
 

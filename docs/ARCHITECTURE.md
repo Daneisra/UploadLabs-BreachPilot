@@ -20,7 +20,8 @@ mods-unpacked/Daneisra-SmartAutomation/
 └── features/threat_manager/
     ├── breach_classifier.gd      # machine à états pure
     ├── breach_prediction.gd      # calculs purs
-    └── threat_observer.gd        # adaptateur vers le jeu
+    ├── breach_simulator.gd       # distribution exacte des salves, calcul pur et borné
+    └── threat_observer.gd        # adaptateur vers le jeu, en lecture seule
 tests/                            # tests simulés (Godot sans interface)
 tools/build_zip.py                # construit le zip du mod
 ```
@@ -38,6 +39,14 @@ tools/build_zip.py                # construit le zip du mod
 - Un échec n'émet **aucun signal**. `failure_power` est donc une **déduction**, à réévaluer avant toute régulation.
 - Raise et Lower réinitialisent l'attaque en cours.
 - Le minuteur démarre aux premiers dégâts.
+
+## Méthodes natives
+
+L'observateur inspecte les méthodes du nœud à l'exécution (`get_script_method_list()`), sans aucun décodage. Il n'appelle que des accesseurs de lecture à un argument, après en avoir vérifié la forme : `get_max_firewall`, `get_max_breach`, `get_max_time`, `is_elite`. Il signale `level_up` et `level_down` sans jamais les appeler, ce qu'un test vérifie dans le code source.
+
+## Simulateur
+
+`breach_simulator.gd` calcule la distribution exacte des salves à partir des coups entiers aléatoires, et compte une égalité avec le minuteur comme un échec. Le calcul se limite aux salves que le minuteur autorise, 64 au plus, avec 2048 états par salve et un cache par conditions. Il n'est lancé qu'en fin d'attaque complète. Il ne couvre pas encore les dégâts d'infection : une attaque qui en reçoit est marquée non fiable (`sim_trusted=false`).
 
 ## Machine à états
 

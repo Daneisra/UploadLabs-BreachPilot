@@ -1,6 +1,8 @@
 extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
+## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
+const BUILD := "0.2.0-alpha.1"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
@@ -13,7 +15,7 @@ var _hotkey_enabled := false
 func _init() -> void:
 	# The game's autoloads load after the mod loader, so they cannot be used here.
 	set_process_input(false)
-	ModLoaderLog.info("Loaded", MOD_ID)
+	ModLoaderLog.info("Loaded build=%s" % BUILD, MOD_ID)
 
 
 func _ready() -> void:
