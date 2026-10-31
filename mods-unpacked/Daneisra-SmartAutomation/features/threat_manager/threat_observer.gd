@@ -101,7 +101,7 @@ func _bind_window(window: Variant) -> void:
 		_rejected[id] = true
 		_log.error("bind result=failed type=%s missing=%s" % [window.window, ",".join(missing)])
 		return
-	_trackers[id] = {"window": window, "classifier": BreachClassifier.new(_starvation_ratio)}
+	_trackers[id] = {"window": window, "type": window.window, "classifier": BreachClassifier.new(_starvation_ratio)}
 	_log.info("bind result=ok type=%s level=%d max_level=%d" % [window.window, window.data.level, window.data.max_level])
 	if _api_dump:
 		_dump_api(window)
@@ -145,7 +145,7 @@ func _drop_tracker(id: int, reason: String) -> void:
 	if tracker.is_empty():
 		return
 	_trackers.erase(id)
-	_report("unknown", tracker.classifier.invalidate(reason))
+	_report(tracker.type, tracker.classifier.invalidate(reason))
 
 
 func _sample(window: Node) -> Dictionary:

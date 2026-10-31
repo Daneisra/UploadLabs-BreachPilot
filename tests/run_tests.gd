@@ -437,7 +437,7 @@ func _test_observer() -> void:
 	breach.detected = true
 	game.Signals.tick.emit()
 	game.Signals.window_deleted.emit(breach)
-	_check(_count("event=invalidated") == 1, "deleting the window invalidates its cycle")
+	_check(_count("event=invalidated type=breach_corps") == 1, "deleting the window invalidates its cycle")
 	game.Signals.tick.emit()
 
 	var fresh := FakeBreach.new()
