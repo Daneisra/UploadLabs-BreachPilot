@@ -240,6 +240,26 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 
 **Deuxième essai, autorisé le 2026-10-31 :** baisse de Gouvernement de 5 à 4, une seule action, profil conservateur, même protection qu'au premier essai, nouveau marqueur `trial_2_used.json`. Le niveau 4 n'est annoncé fiable que sans marge (5,0 s sur 6 s, pour une limite de 4,8 s avec 20 %), ce qui a été présenté à Jérémy avec les mesures.
 
+**Deuxième essai réel, 2026-10-31, build `0.2.0-beta.1-trial.2` : réussi.** Gouvernement passe de 5 à 4 à 23:51:48, 52 s après la liaison du nœud, à 35,31 dégâts.
+
+| Critère | Résultat |
+|---|---|
+| Un seul appel à `level_down()` | `actions=1`, une seule baisse d'un niveau |
+| De 5 à 4 exactement | Relu à 4 juste après l'appel, 4/5 à l'écran, 4 au redémarrage suivant |
+| Entreprises inchangé | `breach_corps:6` avant et après, 6/7 à l'écran |
+| Aucune attaque interrompue | État avant l'appel : `detected:false`, minuteur 12,0 sur 12,0, aucun dégât |
+| Aucune réinitialisation due à l'action | 0 `level_changed_reset`. Le seul `reset_unknown` date du chargement, 48 s plus tôt |
+| Origine du mod, aucun plafond | `origin=mod`, 0 `manual_ceiling` dans cette session |
+| Attaques suivantes conformes | `outcome=verified`. 19 attaques complètes au niveau 4, toutes en 5,0 s et 6 salves, 1 s restante à l'écran |
+| Arrêt automatique | `regulation_stopped reason=action_limit_reached actions=1` dans la même seconde |
+| Aucune erreur du mod | Aucune au journal |
+
+- **Avant la décision :** 4 échecs complets (2 de stabilisation, 2 comptés), après une attaque partielle au chargement écartée.
+- **Fenêtres manquées :** 0 (`deferred_no_safe_window=0`), une seule tentative.
+- **Moment :** tick 1022, image 7682, au tick où l'échec est déduit. L'attaque suivante apparaît au même numéro de tick et d'image. L'action a donc eu lieu dans une fenêtre d'un tick, sans image libre entre les deux. Le niveau 4 s'applique dès la première salve : 6 salves et 5,0 s.
+- **État juste après l'appel :** pare-feu 101 sur 101, minuteur 6,0 sur 6,0. Le changement est immédiat, dans le même appel.
+- **Limite :** une seule action dans une fenêtre d'un tick. Cela montre que c'est possible, pas que c'est toujours sûr. Le chemin de report n'a pas été exercé en jeu.
+
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
