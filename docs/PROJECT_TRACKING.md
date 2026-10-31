@@ -211,6 +211,14 @@ Conditions fixées par Jérémy : sauvegarde de test avec copie de sécurité, e
 
 Réussite : un seul appel natif, niveau final de 3, aucune attaque interrompue, aucune réinitialisation inattendue, aucun autre nœud modifié, changement identifié comme venant du mod, aucun plafond créé, attaques suivantes normales, arrêt automatique, aucune erreur du mod. En cas d'anomalie, aucune nouvelle action.
 
+**Contrôle préalable du 2026-10-31, build `dev.2` sans action possible :**
+
+- `level_up(times:int)` et `level_down(times:int)`, sans valeur par défaut. `AddButton` mène à `_on_add_button_pressed()` et `ReduceButton` à `_on_reduce_button_pressed()`, sans argument. Ce que ces deux méthodes font d'autre reste inconnu.
+- `action_would_apply` de 2 à 3 sur `breach_government`, 32 s après la liaison, prévision fiable, 3,0 s au maximum sur 6 s, ce qui implique le fil principal.
+- Aucune méthode nommée `undo`, `redo` ou `history` dans les autoloads. Le mécanisme de `Ctrl+Z` reste inconnu.
+- `Ctrl+Alt+F10` : arrêt confirmé. Le journal montre 2 lignes dans la même seconde, sans effet puisque l'arrêt est idempotent. La cause n'est pas établie (deux appuis ou événement reçu deux fois).
+- La partie lancée vient de la sauvegarde automatique : le niveau 2 s'y trouve, alors que les emplacements locaux 1 et 9 datent d'avant ce changement.
+
 Ensuite, si l'essai réussit : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
