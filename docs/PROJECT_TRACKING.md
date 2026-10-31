@@ -8,8 +8,8 @@
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
-| Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | Sessions réelles faites, en attente de validation sur `dev/0.2.0-alpha.2`, aucun changement de niveau |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Non autorisée pour l'instant |
+| Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Préparation sur `dev/0.2.0-beta.1`, limitée à la mesure de la fenêtre entre deux attaques. **Actionneur, mode `active` et appels à `level_up()` ou `level_down()` non autorisés** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -53,6 +53,17 @@ Validées par Jérémy après revue. **Les changements automatiques de niveau ne
 5. Les calculs probabilistes sont bornés.
 6. Les unités des délais, blocages et budgets d'actions sont définies.
 7. La documentation indique que les changements de niveau faits par le mod sont enregistrés normalement dans les sauvegardes du jeu.
+
+**Si aucune fenêtre fiable n'est démontrée entre deux attaques, l'architecture sera revue avant de poursuivre.** Le rapport sur cette mesure décidera si le développement de l'actionneur peut commencer.
+
+**Exigences pour la revue de l'actionneur, décidées par Jérémy le 2026-10-31.** Ce n'est pas une autorisation de le développer.
+
+1. **Baisse :** jamais sur une prévision seule. Il faut une prévision fiable, des échecs réellement observés, une puissance stable et un seuil statistique suffisant. Les interruptions et les échecs de classement incertain sont exclus.
+2. **Anti-oscillation :** documenter les résultats du seuil de 0,1 % : inversions après correction, baisses injustifiées, temps passé au niveau optimal.
+3. **Interventions manuelles :** distinguer les vrais changements du joueur des réinitialisations liées au chargement ou au système. Un `Ctrl+Z` qui modifie réellement le niveau est pris en compte.
+4. **Sécurité :** arrêt d'urgence, nombre limité d'actions, vérification du niveau après chaque action, arrêt immédiat en cas d'incohérence.
+5. **Traçabilité :** chaque action journalise le niveau avant et après, sa justification, la fiabilité de la prévision, la marge de sécurité et les observations qui l'ont motivée.
+6. **Essais :** d'abord avec le profil conservateur, sur une sauvegarde de test, avant d'envisager le profil équilibré.
 
 ## Points ouverts
 
