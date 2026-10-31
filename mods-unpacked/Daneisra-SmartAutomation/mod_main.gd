@@ -2,7 +2,7 @@ extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.2.0-beta.1-dev.1"
+const BUILD := "0.2.0-beta.1-dev.2"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
@@ -32,7 +32,9 @@ func _ready() -> void:
 	_observer = ThreatObserver.new()
 	_observer.name = "ThreatObserver"
 	_observer.configure(_log, settings.starvation_ratio, settings.api_dump, {
-		"mode": settings.regulation_mode,
+		# Whatever the file says: the only way to active is the trial option, in a trial archive.
+		"mode": "dry_run" if settings.regulation_mode == "dry_run" else "off",
+		"active_trial": settings.active_trial,
 		"profile": settings.regulation_profile,
 		"max_allowed_level": int(settings.max_allowed_level),
 		"min_level": int(settings.min_level),
@@ -73,6 +75,7 @@ func _read_settings() -> Dictionary:
 		"max_allowed_level": -1,
 		"min_level": 0,
 		"gap_probe": false,
+		"active_trial": false,
 	}
 	var config: Variant = ModLoaderConfig.get_current_config(MOD_ID)
 	if config != null:

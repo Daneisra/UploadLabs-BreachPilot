@@ -2,7 +2,7 @@
 	"name": "SmartAutomation",
 	"namespace": "Daneisra",
 	"version_number": "0.2.0",
-	"description": "Modular QoL automation. Pre-release 0.2.0-beta.1-dev.1: it observes Breach attacks, can log the decisions it would take and measure the time between attacks; it changes nothing in the game.",
+	"description": "Modular QoL automation. Pre-release 0.2.0-beta.1: it observes Breach attacks, can log the decisions it would take and measure the time between attacks; it changes a threat level only in an archive built for an authorized trial, with its option turned on.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
 	"dependencies": [],
 	"extra": {
@@ -50,6 +50,10 @@
 						"type": "integer",
 						"minimum": -1,
 						"default": -1
+					},
+					"active_trial": {
+						"type": "boolean",
+						"default": false
 					},
 					"gap_probe": {
 						"type": "boolean",

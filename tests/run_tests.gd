@@ -116,10 +116,37 @@ class ArmedActuator extends Actuator:
 	func _build_allows_actions() -> bool:
 		return true
 
+	func _trial_refusal(_pending: Dictionary) -> String:
+		return ""
+
+	func _consume_trial() -> bool:
+		return true
+
+
+## Only the build's lock is opened: the trial's own limits stay real.
+class TrialActuator extends Actuator:
+	func _build_allows_actions() -> bool:
+		return true
+
+
+class TrialObserver extends Observer:
+	func _actions_allowed() -> bool:
+		return true
+
+	func _new_actuator(armed: bool) -> Observer.ThreatActuator:
+		return TrialActuator.new(armed, {"attributes": _attributes, "data": _data}, {
+			"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
+			"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
+			"verify_attacks": Observer.Policy.TRIAL_VERIFY_ATTACKS, "marker_path": "user://smart_automation_test/observer_trial_used.json",
+		})
+
 
 ## Only the tests open both locks.
 class ArmedObserver extends Observer:
 	func _actions_allowed() -> bool:
+		return true
+
+	func _accepts_active_without_trial() -> bool:
 		return true
 
 	func _new_actuator(armed: bool) -> Observer.ThreatActuator:
@@ -194,6 +221,7 @@ func _run() -> void:
 	await _test_gap_probe_in_observer()
 	ActuatorTests.new().run(_check)
 	await _test_actions_in_observer()
+	await _test_trial_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -626,6 +654,8 @@ func _test_no_level_change_in_source() -> void:
 	var outside := actuator_source.substr(0, entry_start) + actuator_source.substr(entry_end)
 	_check(native_call.search(outside) == null, "both calls are inside its single entry point")
 	_check(outside.count("_call_native(") == 1, "which has a single caller")
+	var main_source := FileAccess.get_file_as_string(MOD + "mod_main.gd")
+	_check(main_source.contains("\"mode\": \"dry_run\" if settings.regulation_mode == \"dry_run\" else \"off\""), "the options cannot ask for the active mode directly")
 	while not pending.is_empty():
 		var folder: String = pending.pop_back()
 		for sub: String in DirAccess.get_directories_at(folder):
@@ -1135,6 +1165,75 @@ func _test_actions_in_observer() -> void:
 	native.stop()
 	native.queue_free()
 	await process_frame
+	await _remove_fake_game(game)
+
+
+## The first real test, from start to finish, on the fake game.
+func _test_trial_in_observer() -> void:
+	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
+	DirAccess.remove_absolute(MARKER_PATH)
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var government := ActingBreach.new()
+	government.window = "breach_government"
+	var corps := ActingBreach.new()
+	game.desktop.windows.add_child(government)
+	game.desktop.windows.add_child(corps)
+	for window: ActingBreach in [government, corps]:
+		window.breach_damage.production = 30.0
+		window.infection_damage.production = 0.0
+	government.data.level = 2.0
+	government._rearm()
+
+	for old: Dictionary in [{"mode": "active"}, {"mode": "dry_run", "action_type": "breach_government"}, {"active_trial": "true"}, {"active_trial": 1}, {"active_trial": false}]:
+		var forgotten := TrialObserver.new()
+		forgotten.configure(SaLog.new("info"), 0.25, false, old)
+		_check(forgotten.regulation_mode() != "active", "no active mode from an old or odd configuration: %s" % str(old))
+		forgotten.free()
+
+	var observer := TrialObserver.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 9, "action_type": "breach_corps", "max_allowed_level": 40})
+	_check(observer.regulation_mode() == "active", "the trial needs its own option")
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	_check(_count("regulation_mode=active profile=conservative") == 1, "the trial sets its own profile, whatever the options say")
+	game.Signals.tick.emit()
+	for attack: int in 20:
+		await _play_attack(game, government, true)
+		await _play_attack(game, corps, true)
+	_check(government.calls == ["up:1"], "one call on Government: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	_check(government.data.level == 3.0, "the level is exactly 3")
+	_check(corps.calls.is_empty() and corps.data.level == 3.0, "the other node is untouched")
+	_check(_count("levels_before=") == 1 and _last("levels_before=").contains("breach_corps:3"), "the log shows the other node's level around the action")
+	_check(_count("level_origin type=breach_government level=3 origin=mod") == 1, "the change is the mod's")
+	_check(_count("manual_ceiling") == 0, "no ceiling is created")
+	_check(_count("regulation_stopped reason=action_limit_reached actions=1") == 1, "the regulation stops right after")
+	_check(_count("action_verification type=breach_government from=2 to=3 outcome=verified") == 1, "the next attacks verify it: %s" % _last("action_verification"))
+	_check(_count("level_changed_reset") == 0 and _count("reset_unknown") == 0, "no attack is reset")
+	_check(_count("decision=raise") == 1 or _count("hypothetical=false") >= 1, "the real decision is marked as such")
+	observer.stop()
+	observer.queue_free()
+	await process_frame
+
+	# The game restarts, with the level put back by hand: the marker still says no.
+	government.calls.clear()
+	government.data.level = 2.0
+	government._rearm()
+	var again := TrialObserver.new()
+	again.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
+	root.add_child(again)
+	ModLoaderLog.messages.clear()
+	again.start()
+	game.Signals.tick.emit()
+	for attack: int in 12:
+		await _play_attack(game, government, true)
+	_check(government.calls.is_empty(), "the trial never acts a second time")
+	_check(_count("action_refused type=breach_government direction=raise reason=trial_already_used") == 1, "and says why: %s" % _last("action_"))
+	again.stop()
+	again.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(MARKER_PATH)
 	await _remove_fake_game(game)
 
 

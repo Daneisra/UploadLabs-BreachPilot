@@ -1,11 +1,13 @@
 extends RefCounted
 ## The only script allowed to change a threat level, through _call_native and nothing else.
 ##
-## This build cannot act: _build_allows_actions returns false, so a would-be action only ends up in
-## the log. All other checks run the same, which lets the dry run show what they would have decided.
+## Unless action_policy.gd says otherwise, it cannot act: a would-be action only ends up in the log.
+## All other checks run the same, which lets the dry run show what they would have decided.
 ##
 ## An action is safe because the state is read right before it, in one synchronous call: never
 ## because some time has passed. A window that cannot be proven free means no action, not a forced one.
+
+const Policy := preload("action_policy.gd")
 
 const NORMAL_TICK_SPEED := 0.05
 const SPEED_TOLERANCE := 1e-6
@@ -29,6 +31,8 @@ var _attributes: Object
 var _data: Object
 var _min_level: int
 var _max_allowed: int
+var _verify_attacks: int
+var _marker_path: String
 var _pending: Dictionary = {}
 var _claim: Dictionary = {}
 var _verifying: Dictionary = {}
@@ -37,7 +41,8 @@ var _in_call := false
 var _halt_reported := true
 
 
-## game holds the attributes and data nodes. options: action_limit, action_type, min_level, max_allowed.
+## game holds the attributes and data nodes. options: action_limit, action_type, min_level, max_allowed,
+## verify_attacks, marker_path.
 func _init(armed: bool, game: Dictionary, options: Dictionary = {}) -> void:
 	_armed = armed
 	_attributes = game.get("attributes")
@@ -46,15 +51,44 @@ func _init(armed: bool, game: Dictionary, options: Dictionary = {}) -> void:
 	action_type = options.get("action_type", "")
 	_min_level = options.get("min_level", 0)
 	_max_allowed = options.get("max_allowed", -1)
+	_verify_attacks = options.get("verify_attacks", 1)
+	_marker_path = options.get("marker_path", Policy.TRIAL_MARKER)
 
 
 ## The lock of this build. Changing it needs a new build, after a validation by the project's owner.
 func _build_allows_actions() -> bool:
-	return false
+	return Policy.ACTIONS_ENABLED
+
+
+## An action outside what the authorized trial allows, whatever the regulator proposed.
+func _trial_refusal(pending: Dictionary) -> String:
+	if pending.type != Policy.TRIAL_TYPE or pending.direction != Policy.TRIAL_DIRECTION or pending.from != Policy.TRIAL_FROM or pending.to != Policy.TRIAL_TO:
+		return "outside_trial"
+	if actions_done >= Policy.TRIAL_MAX_ACTIONS:
+		return "action_limit"
+	if FileAccess.file_exists(_marker_path):
+		return "trial_already_used"
+	return ""
+
+
+## Written before the call, so that a crash or a restart cannot lead to a second action.
+func _consume_trial() -> bool:
+	DirAccess.make_dir_recursive_absolute(_marker_path.get_base_dir())
+	var file := FileAccess.open(_marker_path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify({"trial": Policy.TRIAL_ID, "unix_time": Time.get_unix_time_from_system()}))
+	file.close()
+	return FileAccess.file_exists(_marker_path)
 
 
 func is_armed() -> bool:
 	return _armed and _build_allows_actions()
+
+
+## Armed and not stopped: a decision taken now could really be applied.
+func can_act() -> bool:
+	return is_armed() and halt_reason.is_empty()
 
 
 func has_pending(type: String) -> bool:
@@ -197,6 +231,10 @@ func _refusal(window: Variant, pending: Dictionary, cycle_key: String, nodes_of_
 		return "action_in_progress"
 	if is_armed() and actions_done >= action_limit:
 		return "action_limit"
+	if is_armed():
+		var outside := _trial_refusal(pending)
+		if not outside.is_empty():
+			return outside
 	if not is_instance_valid(window):
 		return "window_gone"
 	if window is Node and window.process_thread_group == Node.PROCESS_THREAD_GROUP_SUB_THREAD:
@@ -245,6 +283,13 @@ func _busy_reason(window: Variant) -> String:
 
 
 func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionary:
+	if not _consume_trial():
+		halt("trial_marker_unwritable")
+		return {"outcome": "refused", "reason": "trial_marker_unwritable", "pending": pending}
+	# The last read: nothing but this comparison stands between the state and the call.
+	if int(window.data.level) != pending.from or not _busy_reason(window).is_empty():
+		halt("state_moved_before_call")
+		return {"outcome": "refused", "reason": "state_moved_before_call", "pending": pending}
 	_in_call = true
 	_last_cycle = cycle_key
 	actions_done += 1
@@ -261,7 +306,7 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 		halt("state_disturbed_by_action")
 	else:
 		_claim = {"type": pending.type, "to": pending.to}
-		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0}
+		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0, "remaining": _verify_attacks}
 	if actions_done >= action_limit:
 		halt("action_limit_reached")
 	return result
@@ -290,9 +335,14 @@ func _judge_next_attack(event: Dictionary) -> Dictionary:
 		var high: float = expected.get("used_max", -1.0)
 		if (low >= 0.0 and used < low - FORECAST_TOLERANCE) or (high >= 0.0 and used > high + FORECAST_TOLERANCE):
 			return _end_verification("failed", "duration_out_of_range", event)
-		return _end_verification("verified", "next_attack_normal", event)
+	_verifying.remaining -= 1
+	_verifying.waited = 0.0
+	if event.event == "failure_power" and not expected.get("may_fail", true):
+		_verifying.refuted = true
+	if _verifying.remaining > 0:
+		return {}
 	# A failure is a normal attack: it can prove the forecast wrong, not the action.
-	return _end_verification("verified", "next_attack_failed_normally" if expected.get("may_fail", true) else "forecast_refuted", event)
+	return _end_verification("verified", "forecast_refuted" if _verifying.get("refuted", false) else "next_attacks_normal", event)
 
 
 func _end_verification(outcome: String, reason: String, event: Dictionary) -> Dictionary:

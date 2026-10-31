@@ -14,6 +14,18 @@ class ArmedActuator extends Actuator:
 	func _build_allows_actions() -> bool:
 		return true
 
+	func _trial_refusal(_pending: Dictionary) -> String:
+		return ""
+
+	func _consume_trial() -> bool:
+		return true
+
+
+## Only the build's lock is opened: the trial's own limits stay real.
+class TrialActuator extends Actuator:
+	func _build_allows_actions() -> bool:
+		return true
+
 
 class FakeResource:
 	var production := 30.0
@@ -70,6 +82,7 @@ func run(check: Callable) -> void:
 	_test_incoherence()
 	_test_verification()
 	_test_stop_rules()
+	_test_trial_limits()
 	_test_regulator_support()
 	_test_closed_loop()
 
@@ -117,10 +130,9 @@ func _test_shipped_build_cannot_act() -> void:
 	_check(result.outcome == "would_act" and window.calls.is_empty(), "all checks can pass and still nothing is called")
 	shipped._call_native(window, "raise")
 	_check(window.calls.is_empty() and shipped.halt_reason == "native_call_without_arming", "a direct call stops everything instead of acting")
-	var source := FileAccess.get_file_as_string(MOD + "features/threat_manager/threat_actuator.gd")
-	_check(source.contains("func _build_allows_actions() -> bool:\n\treturn false") or source.contains("func _build_allows_actions() -> bool:\r\n\treturn false"), "the build's lock is closed in the source")
-	var observer_source := FileAccess.get_file_as_string(MOD + "features/threat_manager/threat_observer.gd")
-	_check(observer_source.contains("func _actions_allowed() -> bool:\n\treturn false") or observer_source.contains("func _actions_allowed() -> bool:\r\n\treturn false"), "the observer's lock is closed in the source")
+	_check(not Actuator.Policy.ACTIONS_ENABLED, "the repository's policy keeps actions closed")
+	var policy_source := FileAccess.get_file_as_string(MOD + "features/threat_manager/action_policy.gd")
+	_check(policy_source.count("const ACTIONS_ENABLED := false") == 1, "the lock is closed in the source")
 	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(MOD + "manifest.json"))
 	var modes: Array = manifest.extra.godot.config_schema.properties.regulation_mode.enum
 	_check(modes == ["off", "dry_run"], "the options offer no active mode")
@@ -329,6 +341,7 @@ func _test_stop_rules() -> void:
 	stopped.actuator.halt("emergency_stop")
 	_check(not stopped.actuator.has_pending("breach_corps"), "the emergency stop drops the waiting action")
 	_check(_attempt(stopped).is_empty() and _request(stopped) == "halted" and stopped.window.calls.is_empty(), "nothing can act after it")
+	_check(not stopped.actuator.can_act() and stopped.actuator.is_armed(), "a stopped actuator cannot act")
 	_free(stopped)
 
 	var cancelled := _setup()
@@ -339,6 +352,77 @@ func _test_stop_rules() -> void:
 	_free(cancelled)
 	var summary: String = _setup_summary()
 	_check(summary.contains("deferred_no_safe_window=1") and summary.contains("armed=true"), "the summary counts the reports")
+
+
+const MARKER := "user://smart_automation_test/trial_used.json"
+
+
+func _trial(window_level: float) -> Dictionary:
+	var settings := FakeSettings.new()
+	var window := FakeWindow.new()
+	window.data.level = window_level
+	var actuator := TrialActuator.new(true, {"attributes": settings, "data": settings}, {
+		"action_limit": 1, "action_type": Actuator.Policy.TRIAL_TYPE, "marker_path": MARKER, "verify_attacks": 3,
+	})
+	return {"actuator": actuator, "window": window, "settings": settings}
+
+
+func _trial_attempt(setup: Dictionary, type: String, direction: String, level: int) -> Dictionary:
+	var power := {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}
+	setup.actuator.action_type = type
+	setup.actuator.request(type, direction, level, power, {}, {"reason": "conditions_met"})
+	return setup.actuator.attempt(type, setup.window, "1|1", 1, true, true, -1)
+
+
+func _test_trial_limits() -> void:
+	DirAccess.remove_absolute(MARKER)
+	for entry: Array in [["breach_corps", "raise", 2.0, 2], ["breach_government", "lower", 2.0, 2], ["breach_government", "raise", 1.0, 1], ["breach_government", "raise", 3.0, 3], ["breach_government", "raise", 4.0, 4]]:
+		var outside := _trial(entry[2])
+		var result := _trial_attempt(outside, entry[0], entry[1], entry[3])
+		_check(result.reason == "outside_trial" and outside.window.calls.is_empty(), "the trial refuses %s %s from %d" % [entry[0], entry[1], entry[3]])
+		_check(not FileAccess.file_exists(MARKER), "a refusal does not use up the trial")
+		_free(outside)
+
+	var busy := _trial(2.0)
+	busy.window.detected = true
+	_check(_trial_attempt(busy, "breach_government", "raise", 2).outcome == "deferred", "the trial waits for a safe window")
+	_check(busy.window.calls.is_empty() and not FileAccess.file_exists(MARKER), "waiting does not use up the trial")
+	_free(busy)
+
+	var first := _trial(2.0)
+	var done := _trial_attempt(first, "breach_government", "raise", 2)
+	_check(done.outcome == "acted" and first.window.calls == ["up:1"] and first.window.data.level == 3.0, "the trial's one change is made")
+	_check(FileAccess.file_exists(MARKER), "and it is marked as used")
+	_check(first.actuator.halt_reason == "action_limit_reached", "and the regulation stops at once")
+	first.actuator.claims_level_change("breach_government", 3)
+	for attack: int in 2:
+		_check(first.actuator.note_event("breach_government", _attack(3), false).is_empty(), "the verification follows several attacks: %d" % attack)
+	_check(first.actuator.note_event("breach_government", _attack(3), false).outcome == "verified", "and concludes after 3")
+	_free(first)
+
+	var disturbed := _trial(2.0)
+	DirAccess.remove_absolute(MARKER)
+	_trial_attempt(disturbed, "breach_government", "raise", 2)
+	disturbed.actuator.note_event("breach_government", _attack(3), false)
+	_check(disturbed.actuator.note_event("breach_government", {"event": "reset_unknown", "level": 3}, false).outcome == "failed", "any of those attacks can fail it")
+	_free(disturbed)
+
+	var restarted := _trial(2.0)
+	_check(_trial_attempt(restarted, "breach_government", "raise", 2).reason == "trial_already_used", "a new session cannot act again")
+	_check(restarted.window.calls.is_empty() and restarted.window.data.level == 2.0, "and nothing moves")
+	_free(restarted)
+	DirAccess.remove_absolute(MARKER)
+
+	var unwritable := _trial(2.0)
+	unwritable.actuator._marker_path = "user://smart_automation_test/trial_used.json/not_a_folder/marker.json"
+	DirAccess.make_dir_recursive_absolute("user://smart_automation_test")
+	var marker_file := FileAccess.open(MARKER, FileAccess.WRITE)
+	marker_file.close()
+	var refused := _trial_attempt(unwritable, "breach_government", "raise", 2)
+	_check(refused.reason == "trial_marker_unwritable" and unwritable.window.calls.is_empty(), "no marker, no action")
+	_check(unwritable.actuator.halt_reason == "trial_marker_unwritable", "and it stops")
+	_free(unwritable)
+	DirAccess.remove_absolute(MARKER)
 
 
 func _setup_summary() -> String:

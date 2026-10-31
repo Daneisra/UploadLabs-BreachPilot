@@ -1,6 +1,6 @@
 extends Node
-## Connects the classifier to the game. It reads the game: only threat_actuator.gd could ever change
-## a threat level, and neither that script nor this one allows it in this build.
+## Connects the classifier to the game. It reads the game: only threat_actuator.gd can change a threat
+## level, and only in an archive built for an authorized trial (see action_policy.gd).
 
 const ApiGuard := preload("../../core/api_guard.gd")
 const SaLog := preload("../../core/sa_log.gd")
@@ -14,6 +14,7 @@ const ThreatRegulator := preload("threat_regulator.gd")
 const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
 const ThreatActuator := preload("threat_actuator.gd")
+const Policy := preload("action_policy.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
@@ -101,8 +102,13 @@ var _probe_ticks_this_frame := 0
 var _probe_ticks_per_frame_max := 0
 
 
-## This build's first lock. Whatever the configuration says, active falls back to off.
+## This build's first lock. Without it, the configuration cannot lead to anything but off or dry_run.
 func _actions_allowed() -> bool:
+	return Policy.ACTIONS_ENABLED
+
+
+## Whether mode active can come without the trial's own settings. Only the tests can answer yes.
+func _accepts_active_without_trial() -> bool:
 	return false
 
 
@@ -110,18 +116,33 @@ func _new_actuator(armed: bool) -> ThreatActuator:
 	return ThreatActuator.new(armed, {"attributes": _attributes, "data": _data}, {
 		"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
 		"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
+		"verify_attacks": Policy.TRIAL_VERIFY_ATTACKS,
 	})
 
 
-## regulation.mode can only be off or dry_run: nothing in this version can apply a decision.
+## The trial sets everything itself: nothing in the options can widen what it is allowed to do.
+func _apply_trial() -> void:
+	_regulation.mode = "active"
+	_regulation.profile = Policy.TRIAL_PROFILE
+	_regulation.action_type = Policy.TRIAL_TYPE
+	_regulation.action_limit = Policy.TRIAL_MAX_ACTIONS
+	_regulation.max_allowed_level = Policy.TRIAL_TO
+	_regulation.min_level = Policy.TRIAL_FROM
+
+
+## regulation.mode can only be off or dry_run, unless this archive and the explicit trial option both
+## allow the trial. An old configuration has no such option.
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio
 	_api_dump = api_dump
 	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
-	if _regulation.mode != "dry_run" and not (_regulation.mode == "active" and _actions_allowed()):
+	var active_allowed := _actions_allowed() and _accepts_active_without_trial()
+	if _regulation.mode != "dry_run" and not (_regulation.mode == "active" and active_allowed):
 		_regulation.mode = "off"
+	if _actions_allowed() and typeof(regulation.get("active_trial")) == TYPE_BOOL and regulation.active_trial:
+		_apply_trial()
 
 
 func regulation_mode() -> String:
@@ -596,7 +617,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	if decision.decision == "lower":
 		var lower_target := _native_values(tracker, event.level - 1)
 		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, regulator.margin())
-	decision.hypothetical = not _actuator.is_armed()
+	decision.hypothetical = not _actuator.can_act()
 	_log_decision(type, decision, next, assumed)
 	_handle_action(tracker, event, decision, assumed)
 
@@ -637,6 +658,7 @@ func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
 		if other.type == type and is_instance_valid(other.window):
 			nodes += 1
 	var regulator := _regulator_for(type)
+	var levels_before := _levels_text()
 	var result := _actuator.attempt(type, tracker.window, cycle_key, nodes, not regulator.is_unsafe(), tracker.native_usable, _state.ceiling(type))
 	if result.is_empty():
 		return
@@ -646,7 +668,7 @@ func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
 		"would_act":
 			_log.info("action_would_apply type=%s %s" % [type, trace])
 		"acted":
-			_log.info("action_applied type=%s %s level_after=%d detected_after=%s time_after=%s max_time_after=%s problem=%s" % [type, trace, result.level_after, result.detected_after, _format_value(result.time_after), _format_value(result.max_time_after), result.get("reason", "none")])
+			_log.info("action_applied type=%s %s level_after=%d detected_after=%s time_after=%s max_time_after=%s problem=%s levels_before=%s levels_after=%s" % [type, trace, result.level_after, result.detected_after, _format_value(result.time_after), _format_value(result.max_time_after), result.get("reason", "none"), levels_before, _levels_text()])
 		"deferred":
 			_log.info("action_deferred_no_safe_window type=%s %s attempts=%d state=%s total=%d" % [type, trace, pending.attempts, result.reason, _actuator.deferred_total])
 			if result.starving:
@@ -655,6 +677,15 @@ func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
 			regulator.cancel_last_action()
 			_log_refusal(type, pending.direction, result.reason)
 	_log_new_halt()
+
+
+## The level of every watched node, to see that an action touched only its own.
+func _levels_text() -> String:
+	var levels := PackedStringArray()
+	for tracker: Dictionary in _trackers.values():
+		if is_instance_valid(tracker.window):
+			levels.append("%s:%d" % [tracker.type, int(tracker.window.data.level)])
+	return ",".join(levels)
 
 
 ## Everything that motivated an action, on one line.

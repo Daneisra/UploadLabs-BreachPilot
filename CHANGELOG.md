@@ -1,10 +1,16 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.1 – en cours : actionneur verrouillé
+## 0.2.0-beta.1-dev.2 – en cours : actionneur et préparation du premier essai actif
 
-**Aucun changement automatique du niveau de menace : le mode `active` n'est pas accessible et ce build ne peut appeler aucune méthode de niveau.** Ce n'est pas encore la `0.2.0-beta.1`.
+**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, une seule fois, de 2 à 3 sur Gouvernement, avec son option activée. Ce n'est pas encore la `0.2.0-beta.1`.
 
 ### Ajouté
+
+- `action_policy.gd` : verrou unique du dépôt et limites de l'essai.
+- Option `active_trial`, désactivée par défaut, sans effet hors d'une archive d'essai.
+- Marqueur d'essai écrit avant l'appel, qui empêche toute seconde action.
+- `tools/build_zip.py --trial` : archive d'essai, avec refus du code réservé aux tests.
+- Vérification de l'action sur 3 attaques, et niveaux de tous les nœuds journalisés autour de l'action.
 
 - `threat_actuator.gd` : point d'entrée unique, contrôles immédiats, report sans action forcée (`action_deferred_no_safe_window`), vérification de l'attaque suivante, limite d'actions. Fermé par deux verrous dans le code, et testé sur un faux jeu seulement.
 - Arrêt d'urgence `Ctrl+Alt+F10`.

@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Actionneur développé et verrouillé sur `dev/0.2.0-beta.1`, testé sur un faux jeu. **Mode `active` inaccessible, aucun appel réel, tag non autorisé** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Actionneur prêt sur `dev/0.2.0-beta.1`, testé sur un faux jeu. Premier essai autorisé le 2026-10-31 : Gouvernement de 2 à 3, une seule action, après contrôle des signatures en jeu. **Tag, fusion, actions multiples et régulation permanente non autorisés** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -205,9 +205,13 @@ Décisions appliquées à un jeu simulé, 5 tirages de 20 000 attaques (environ 
 
 Avec une prévision fausse, le niveau réfuté est retenté une fois à chaque changement de puissance, soit 3 essais par tirage dans ce scénario.
 
-## Premier essai actif, à valider
+## Premier essai actif, autorisé le 2026-10-31
 
-Conditions fixées par Jérémy : sauvegarde de test copiée, un seul type de nœud, vitesse normale, profil conservateur, une seule action, arrêt de la régulation juste après, analyse du niveau, des réinitialisations et de l'attaque suivante. Aucun tag avant validation.
+Conditions fixées par Jérémy : sauvegarde de test avec copie de sécurité, emplacement secondaire de préférence, `breach_government` de 2 à 3, une seule montée, profil conservateur, vitesse normale, option native désactivée, arrêt de la régulation juste après.
+
+Réussite : un seul appel natif, niveau final de 3, aucune attaque interrompue, aucune réinitialisation inattendue, aucun autre nœud modifié, changement identifié comme venant du mod, aucun plafond créé, attaques suivantes normales, arrêt automatique, aucune erreur du mod. En cas d'anomalie, aucune nouvelle action.
+
+Ensuite, si l'essai réussit : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
 
