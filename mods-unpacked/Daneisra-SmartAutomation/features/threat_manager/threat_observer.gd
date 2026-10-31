@@ -790,6 +790,26 @@ func _log_native_actions(window: Node) -> void:
 			targets.append("%s.%s" % ["self" if target.get_object() == window else str(target.get_object()), target.get_method()])
 		buttons.append("%s>%s" % [button.name, "+".join(targets)])
 	_log.info("native_actions type=%s methods=%s buttons=%s" % [window.window, ";".join(methods), ";".join(buttons)])
+	_log_window_layout(window)
+
+
+## How the node's interface is built around its level buttons, to know where a control could fit.
+## It only reads names and sizes: nothing is added or moved.
+func _log_window_layout(window: Node) -> void:
+	var button := window.find_child("AddButton", true, false) as Control
+	if button == null:
+		return
+	var chain := PackedStringArray()
+	var node: Node = button
+	while node != null and node != window.get_parent():
+		var children := PackedStringArray()
+		for child: Node in node.get_children():
+			children.append("%s:%s" % [child.name, child.get_class()])
+		var size_text := "%s min=%s" % [(node as Control).size, (node as Control).custom_minimum_size] if node is Control else "no_size"
+		chain.append("%s:%s[%s] children=%s" % [node.name, node.get_class(), size_text, ",".join(children)])
+		node = node.get_parent()
+	_log.info("ui_layout type=%s chain=%s" % [window.window, " < ".join(chain)])
+	_log.info("ui_layout type=%s button text=%s variation=%s flags=%d,%d font_size=%d" % [window.window, button.text if button is BaseButton else "", button.theme_type_variation, button.size_flags_horizontal, button.size_flags_vertical, button.get_theme_font_size("font_size")])
 
 
 func _regulator_for(type: String) -> ThreatRegulator:
