@@ -219,6 +219,25 @@ Réussite : un seul appel natif, niveau final de 3, aucune attaque interrompue, 
 - `Ctrl+Alt+F10` : arrêt confirmé. Le journal montre 2 lignes dans la même seconde, sans effet puisque l'arrêt est idempotent. La cause n'est pas établie (deux appuis ou événement reçu deux fois).
 - La partie lancée vient de la sauvegarde automatique : le niveau 2 s'y trouve, alors que les emplacements locaux 1 et 9 datent d'avant ce changement.
 
+**Premier essai réel, 2026-10-31, build `0.2.0-beta.1-trial.1` : réussi.** Gouvernement passe de 2 à 3 à 23:15:58, après une réussite complète, en profil conservateur, à 35,31 dégâts.
+
+| Critère | Résultat |
+|---|---|
+| Un seul appel natif | `actions=1`, une seule hausse d'un niveau, marqueur écrit une fois |
+| Niveau final de 3 | Relu à 3 juste après l'appel, 3/5 à l'écran, 3 au redémarrage suivant |
+| Aucune attaque interrompue | L'attaque en cours était terminée, `detected_after=false`, minuteur à 6,0 sur 6,0 |
+| Aucune réinitialisation inattendue | 0 `level_changed_reset`, 0 `reset_unknown`, `level_changed` simple |
+| Aucun autre nœud modifié | `breach_corps:6` avant et après, 6/7 à l'écran |
+| Origine du mod | `level_origin ... origin=mod` |
+| Aucun plafond | 0 `manual_ceiling` |
+| Attaques suivantes normales | `action_verification outcome=verified`. 58 attaques complètes au niveau 3, toutes en 3,0 s et 4 salves, comme prévu, 3 s restantes à l'écran |
+| Arrêt automatique | `regulation_stopped reason=action_limit_reached actions=1` dans la même seconde |
+| Aucune erreur du mod | Aucune au journal |
+
+Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré normalement. Il n'y a eu aucun report (`deferred_no_safe_window=0`), car la fenêtre après cette réussite était d'environ 1 s. L'essai ne dit donc rien de la fenêtre d'un tick.
+
+**Non couvert :** baisse, fenêtre d'un tick, plusieurs actions, `Ctrl+Z` après une action du mod, Entreprises avec infection. Le marqueur `trial_used.json` reste en place. L'archive d'essai a été retirée du jeu.
+
 Ensuite, si l'essai réussit : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
