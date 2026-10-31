@@ -143,6 +143,7 @@ func _on_desktop_ready() -> void:
 	_state.set_slot("")
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.set_ceiling(-1)
+	_log_save_candidates()
 	_scan_desktop()
 
 
