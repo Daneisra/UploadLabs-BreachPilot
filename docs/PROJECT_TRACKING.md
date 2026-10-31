@@ -6,9 +6,12 @@
 |---|---|
 | 1. Analyse | Terminée, revue externe favorable |
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
-| 3. Prototype d'observation (0.1.0) | Scénarios en jeu terminés, en attente de la revue finale |
-| 4. Auto Data Lab Supply (0.2.0) | Non commencée |
+| 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
+| Auto Threat Manager (0.2.0) | Plan en revue, implémentation non commencée |
+| 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
+
+**La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
 ## Décisions
 
@@ -22,7 +25,7 @@
 
 ## Points ouverts
 
-- Réponse d'EnigmaDev Studios sur l'automatisation et l'inspection des API.
+- Publication : les conditions applicables seront réexaminées à la préparation d'une version publique. Le jeu a un support officiel du modding et un Workshop ; aucun contact avec les développeurs n'est prévu ni bloquant à ce stade.
 - Fiabilité de `failure_power`, à réévaluer avant toute régulation.
 - Validité du seuil de détection sur de vrais échecs.
 - Justesse du modèle par salves, notamment sur les niveaux élite et les attaques furtives.
@@ -70,9 +73,24 @@ Limite pour la régulation : une entrée de dégâts d'infection est apparue sur
 
 ## Limites connues
 
-- `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
-- Test 14 (initialisation tardive) : couverture **partielle**. Le mod se charge avant le bureau ; le test passe par une désactivation puis réactivation, ce qui n'équivaut pas à un vrai chargement tardif.
-- Test 16 (vitesse de simulation) : à simuler s'il n'existe pas de moyen de l'exercer en jeu sans triche.
+- `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive ni dégâts d'infection.
+- Seul `breach_corps` est observé.
+- Les prédictions sont expérimentales. Le modèle par salves ne couvre ni les dégâts d'infection ni les attaques furtives. Les coups entiers aléatoires ne sont mesurés qu'à 40,865 dégâts par seconde.
+- La vitesse de minuteur × 5 observée n'est pas expliquée. Elle n'a pas gêné le mod.
+- Une attaque a réussi à égalité (6 s sur 6 s) : un seul cas, à ne pas considérer comme une règle.
+- Les `cycle_id` repartent de 1 après une reprise de l'observateur.
+- Tous les essais viennent d'une seule partie et d'une seule installation.
+
+### Scénarios partiellement validés
+
+| # | Scénario | Ce qui manque |
+|---|---|---|
+| 2 | Sans nœud | Nœud supprimé en cours de partie ; pas de partie lancée sans nœud |
+| 7 | Pause | Le nœud n'a pas de bouton de pause : simulé seulement |
+| 8 | Attaque interrompue | Vérifié après chargement et après `Ctrl+Z` ; le redémarrage ciblé n'a laissé aucune attaque en cours |
+| 10 | Option native | Journalisée ; montée native vue seulement en simulation |
+| 11 | Niveaux élite | 4 vers 5 vérifié ; 5 vers 6 impossible tant que le niveau 5 n'est pas franchi |
+| 14 | Chargement tardif | Vérifié par désactivation puis réactivation, ce qui n'équivaut pas à un vrai chargement tardif |
 
 ## Commandes de développement
 
@@ -85,11 +103,13 @@ Godot_console.exe --headless --path . --script res://tests/run_tests.gd
 python tools/build_zip.py
 ```
 
-Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu : ils ne remplacent pas les tests en jeu.
+Résultat à la clôture de la 0.1.0 : **106 vérifications, 0 échec**, sur Godot 4.7.2. Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu : ils ne remplacent pas les tests en jeu.
 
 ## Validation de la 0.1.0
 
 **Critère de sortie :** aucune modification du niveau par le mod et aucune erreur de classification constatée sur les scénarios ci-dessous. Cela ne prouve pas l'absence de faux positifs.
+
+**Validée le 2026-10-31.** Total en jeu : 1 485 réussites, 43 `failure_power`, 8 `level_changed_reset`, 1 `failure_starved`, 1 `reset_unknown`, 1 `invalidated`. Les événements de l'heure de jeu libre n'ont pas été comparés un à un à l'écran.
 
 | # | Scénario | Attendu | Résultat |
 |---|---|---|---|
