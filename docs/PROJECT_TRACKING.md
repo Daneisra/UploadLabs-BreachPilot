@@ -261,6 +261,19 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 - **État juste après l'appel :** pare-feu 101 sur 101, minuteur 6,0 sur 6,0. Le changement est immédiat, dans le même appel.
 - **Limite :** une seule action dans une fenêtre d'un tick. Cela montre que c'est possible, pas que c'est toujours sûr. Le chemin de report n'a pas été exercé en jeu.
 
+**Contrôle de la pause sur le nœud, 2026-11-01, build `dev.5` sans action possible, 3 sessions :** conforme.
+
+- **Pause :** par le bouton, ou par un changement de niveau du joueur, en moins d'une seconde, sans effet sur l'autre type.
+- **Reprise :** niveau inchangé. La première décision simulée arrive 61 s plus tard.
+- **Blocages :** option native et vitesse × 5 affichent `Auto : bloqué`, sans bouton, et se lèvent avec leur cause. La décision suivante repart de zéro.
+- **Cycle de vie :** pause conservée après le rechargement de la sauvegarde automatique, rangée unique après un redémarrage de l'observateur, après la suppression et la restauration du nœud, et après une relance du jeu.
+- **`Ctrl+Z` :** selon Jérémy, il ne fait pas remonter le niveau. Le journal montre toutefois une hausse `origin=player` de 2 à 3, 6 s après la baisse, dont l'origine exacte (clic ou `Ctrl+Z`) reste à confirmer à l'essai. La pause est restée dans tous les cas.
+- **Aspect :** taille du texte et de la rangée validée par Jérémy.
+
+**Sauvegardes :** Jérémy a enregistré par erreur dans le Slot 1 local et le Slot 2 cloud pendant ce contrôle. Rien n'a été restauré. Il reste l'ancien Slot 1 dans `2026-10-31_23-48-53_avant-essai-actif-2`, le Slot 9 intact, et l'état proche du Slot 2 cloud d'origine (21:51:13) dans `savegame.dat` de `2026-10-31_22-39-50_avant-controle-essai-actif` (21:51:16).
+
+**Troisième essai, autorisé le 2026-11-01 :** Gouvernement seul, de 0 à 4, 4 actions au plus, profil conservateur, 60 s au moins entre deux actions, vérification sur 3 attaques, nouveau marqueur `trial_3_used.json`.
+
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
