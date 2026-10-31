@@ -45,6 +45,15 @@ Deuxième essai du 2026-10-31, environ 3 min 50 d'observation, manipulations man
 - Arrêt et reprise de l'observateur : une seule observation par attaque ensuite. Les `cycle_id` repartent de 1 après une reprise.
 - Le nœud n'a pas de bouton de pause. `failure_paused` n'a pu être observé qu'en simulation.
 
+Troisième essai du 2026-10-31, deux sessions, 30,96 dégâts par salve :
+
+- Niveau 3 : 13 réussites, 1 s restante à l'écran comme au journal. `prediction_check observed=0.8000 volleys=0.8000 coefficient=0.9000` : le modèle par salves est exact.
+- Niveau 4 : échec confirmé à l'écran, comme annoncé par le modèle (8 salves, 7 s pour 5 s). 23 `failure_power`.
+- Après `Ctrl+Z` en pleine attaque : le premier échec, sur un cycle incomplet, reste `reset_unknown` (`partial_cycle`), comme prévu.
+- Suppression du nœud : `invalidated`, 15 s sans nœud sans erreur, puis nouvelle liaison.
+- Option native : ses deux changements sont journalisés. Aucune montée native n'a pu se produire, faute de réussite au niveau maximal.
+- Le redémarrage en pleine attaque n'a laissé aucune attaque en cours au rechargement : le chemin `partial` par rechargement n'a été vu qu'au premier essai, sur une réussite.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
@@ -71,15 +80,15 @@ Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu :
 | # | Scénario | Attendu | Résultat |
 |---|---|---|---|
 | 1 | Lancement avec le mod | Chargé, API validées, aucune nouvelle erreur | Réussi (2026-10-31) |
-| 2 | Avec et sans nœud Corps | Détection, ou attente sans erreur | Partiel : avec nœud seulement |
+| 2 | Avec et sans nœud Corps | Détection, ou attente sans erreur | Réussi : nœud supprimé en cours de partie, pas de partie sans nœud au lancement |
 | 3 | Attaque réussie | `success`, temps restant cohérent à l'écran | Réussi (2026-10-31) |
 | 4 | Niveau trop élevé | `failure_power` | Réussi (2026-10-31) |
 | 5 | Raise et Lower en pleine attaque | `level_changed_reset`, jamais d'échec | Réussi (2026-10-31) |
 | 6 | Lanceur débranché | `failure_starved` | Réussi (2026-10-31) |
 | 7 | Nœud en pause | `failure_paused`, ou correction de l'hypothèse | Non applicable en jeu : pas de bouton de pause. Simulation seulement |
-| 8 | Rechargement en pleine attaque | Cycle `partial` | Partiel : chargement observé, sans échec |
-| 9 | Suppression et recréation du nœud | `invalidated`, puis nouvelle liaison | À faire |
-| 10 | Option native active | Journalisée, changements bien classés | À faire |
+| 8 | Rechargement en pleine attaque | Cycle `partial` | Réussi par deux chemins : réussite après chargement, échec après `Ctrl+Z` |
+| 9 | Suppression et recréation du nœud | `invalidated`, puis nouvelle liaison | Réussi (2026-10-31) |
+| 10 | Option native active | Journalisée, changements bien classés | Partiel : journalisée, montée native non observée |
 | 11 | Passage de 4 à 5, puis de 5 à 6 | Écart de prédiction mesuré | À faire |
 | 12 | Tous les mods actifs | Aucun conflit | Partiel : aucun conflit en 3 min 45 |
 | 13 | Mod retiré | Sauvegarde intacte | À faire |
