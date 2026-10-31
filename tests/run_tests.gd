@@ -50,7 +50,7 @@ class FakeResource:
 
 class FakeBreach extends Node:
 	var window := "breach_corps"
-	var data := {"level": 3, "max_level": 5}
+	var data := {"level": 3.0, "max_level": 5.0}
 	var time := 10.0
 	var max_time := 10.0
 	var detected := false
@@ -89,6 +89,7 @@ func _run() -> void:
 	_test_simulation_speed()
 	_test_native_auto_level()
 	_test_prediction()
+	_test_volley_model()
 	_test_guard()
 	await _test_observer()
 	await _test_mod_main()
@@ -313,6 +314,48 @@ func _test_prediction() -> void:
 	_check(Prediction.incomparable_reason(a, b.merged({"max_firewall": 200.0}, true)) == "difficulty_changed", "difficulty changed")
 
 
+## Figures measured in the game on 2026-10-31: level 2, firewall 18, breach 72, 25.8 damage per second.
+func _measured_success(overrides: Dictionary = {}) -> Dictionary:
+	var success := {
+		"complete": true, "level": 2, "volleys": 4, "used": 3.0, "max_time": 5.0, "damage_rate": 25.8,
+		"vulnerability": 0.0, "max_firewall": 18.0, "max_breach": 72.0,
+	}
+	success.merge(overrides, true)
+	return success
+
+
+func _test_volley_model() -> void:
+	_check(Prediction.volleys_needed(18.0, 72.0, 25.8) == 4, "the firewall excess of a volley is lost")
+	_check(Prediction.volleys_needed(45.0, 45.0, 25.8) == 4, "the second node of the measured setup")
+	_check(Prediction.volleys_needed(0.0, 72.0, 25.8) == 3, "no firewall")
+
+	var model := Prediction.volley_model(_measured_success())
+	_check(model.model_volleys == 4, "the model reproduces the measured level")
+	_check(model.next_volleys == 7, "level 3 needs 7 volleys")
+	_check(is_equal_approx(model.next_used, 6.0), "level 3 needs 6 seconds")
+	_check(is_equal_approx(model.next_model_ratio, 1.2), "level 3 is predicted to fail")
+	_check(Prediction.next_ratio(0.6, 2) < 1.0, "while the coefficient alone predicts success")
+
+	var to_elite := Prediction.volley_model(_measured_success({"level": 4}))
+	_check(is_equal_approx(to_elite.next_max_time, 10.0), "an elite level doubles the time")
+	var from_elite := Prediction.volley_model(_measured_success({"level": 5, "max_time": 10.0}))
+	_check(is_equal_approx(from_elite.next_max_time, 5.0), "leaving an elite level halves the time")
+	_check(Prediction.volley_model(_measured_success({"complete": false})).is_empty(), "no model from a partial measure")
+	_check(Prediction.volley_model(_measured_success({"volleys": 1})).is_empty(), "no model without an interval")
+
+	var c := Classifier.new()
+	c.observe(_sample())
+	var time := 10.0
+	var firewall := 50.0
+	for tick: int in 60:
+		time -= TICK
+		if tick % 20 == 0:
+			firewall -= 5.0
+		c.observe(_sample({"time": time, "detected": true, "firewall": firewall}))
+	var events := c.on_breached(_sample({"time": time, "detected": true, "firewall": firewall - 5.0}))
+	_check(events[0].volleys == 4, "volleys are counted, including the last one")
+
+
 func _test_guard() -> void:
 	var empty := Node.new()
 	root.add_child(empty)
@@ -374,6 +417,7 @@ func _test_observer() -> void:
 	game.Signals.breached.emit(breach)
 	_check(_count("event=success") == 1, "one success per signal after a repeated start")
 	_check(_count("next_ratio=") == 1, "the prediction is logged")
+	_check(_count(" level=3 ") >= 1, "the game's float levels are logged as integers")
 	_check(breach.data.level == 3 and breach.data.max_level == 5, "the observer changes nothing")
 
 	observer.stop()

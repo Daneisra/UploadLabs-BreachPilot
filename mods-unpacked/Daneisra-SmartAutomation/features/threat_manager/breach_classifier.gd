@@ -62,6 +62,8 @@ func on_breached(sample: Dictionary) -> Array[Dictionary]:
 	if not observed_start:
 		_open_cycle(sample, true)
 		_cycle.observed_start = false
+	if _dealt(sample) > _cycle.last_progress:
+		_cycle.volleys += 1
 	var used: float = sample.max_time - sample.time
 	var event := _base_event("success", sample)
 	event.time_left = sample.time
@@ -150,6 +152,7 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"paused_seen": sample.paused,
 		"level_mismatch": false,
 		"progressed": false,
+		"volleys": 0,
 		"last_progress": _dealt(sample),
 		"last_progress_time": sample.time,
 		"max_step": 0.0,
@@ -159,6 +162,7 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 	}
 	if _dealt(sample) > 0.0:
 		_cycle.progressed = true
+		_cycle.volleys = 1
 	_next_cycle_id += 1
 
 
@@ -175,6 +179,7 @@ func _update_cycle(sample: Dictionary) -> void:
 	var dealt := _dealt(sample)
 	if dealt > _cycle.last_progress:
 		_cycle.progressed = true
+		_cycle.volleys += 1
 		_cycle.last_progress = dealt
 		_cycle.last_progress_time = sample.time
 
@@ -197,6 +202,7 @@ func _base_event(event_name: String, sample: Dictionary) -> Dictionary:
 		"vulnerability": sample.vulnerability,
 		"observed_start": _cycle.observed_start,
 		"complete": false,
+		"volleys": _cycle.volleys,
 		"steps": steps,
 		"max_step": _cycle.max_step,
 		"mean_step": _cycle.step_sum / steps if steps > 0 else 0.0,

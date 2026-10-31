@@ -10,6 +10,7 @@ const WATCHED_WINDOWS: Array[String] = ["breach_corps"]
 const RESCAN_TICKS := 100
 const EVENT_FIELDS: Array[String] = [
 	"cycle_id", "level", "level_after", "from", "to", "max_level", "time_left", "used", "ratio", "next_ratio",
+	"volleys", "model_volleys", "next_volleys", "next_used", "next_max_time", "next_model_ratio",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "complete", "observed_start",
 	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds",
 ]
@@ -150,8 +151,8 @@ func _drop_tracker(id: int, reason: String) -> void:
 func _sample(window: Node) -> Dictionary:
 	return {
 		"instance_id": window.get_instance_id(),
-		"level": window.data.level,
-		"max_level": window.data.max_level,
+		"level": int(window.data.level),
+		"max_level": int(window.data.max_level),
 		"time": window.time,
 		"max_time": window.max_time,
 		"detected": window.detected,
@@ -171,6 +172,7 @@ func _report(type: String, events: Array[Dictionary]) -> void:
 	for event: Dictionary in events:
 		if event.event == "success":
 			event.next_ratio = BreachPrediction.next_ratio(event.ratio, event.level)
+			event.merge(BreachPrediction.volley_model(event))
 		_log.info(_format(type, event))
 		if event.event == "success":
 			_check_prediction(type, event)
@@ -183,8 +185,7 @@ func _check_prediction(type: String, current: Dictionary) -> void:
 		return
 	var reason := BreachPrediction.incomparable_reason(previous, current)
 	if reason.is_empty():
-		var error: float = current.ratio / previous.next_ratio - 1.0 if previous.next_ratio > 0.0 else 0.0
-		_log.info("prediction_check type=%s level=%d predicted=%.4f observed=%.4f error=%.4f" % [type, current.level, previous.next_ratio, current.ratio, error])
+		_log.info("prediction_check type=%s level=%d observed=%.4f coefficient=%.4f volleys=%.4f" % [type, current.level, current.ratio, previous.next_ratio, previous.get("next_model_ratio", -1.0)])
 	else:
 		_log.debug("prediction_check type=%s level=%d skipped=%s" % [type, current.level, reason])
 
@@ -193,8 +194,14 @@ func _format(type: String, event: Dictionary) -> String:
 	var parts := PackedStringArray(["event=%s" % event.event, "type=%s" % type])
 	for field: String in EVENT_FIELDS:
 		if event.has(field):
-			parts.append("%s=%s" % [field, event[field]])
+			parts.append("%s=%s" % [field, _format_value(event[field])])
 	return " ".join(parts)
+
+
+func _format_value(value: Variant) -> String:
+	if value is float and absf(value) < 1e9:
+		return String.num(value, 3)
+	return str(value)
 
 
 func _dump_api(window: Node) -> void:

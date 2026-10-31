@@ -75,4 +75,10 @@ Avec `r = temps utilisé / temps maximal`, le rapport prévu au niveau suivant v
 | Normal vers élite | × 3,75 |
 | Élite vers normal | × 0,6 |
 
+**Ces coefficients ne suffisent pas.** Les dégâts arrivent par salves et une salve qui finit le pare-feu perd son excédent. Sur la première mesure en jeu (niveau 2, pare-feu 18, infiltration 72, 25,8 dégâts par salve), le coefficient annonce 0,9 au niveau 3, alors que le modèle par salves annonce 7 salves, soit 6 s pour 5 s disponibles :
+
+`salves = ⌈pare-feu / dégâts⌉ + ⌈infiltration / dégâts⌉` et `temps utilisé = (salves − 1) × intervalle`
+
+Le journal enregistre les deux prédictions. `model_volleys` rejoue le niveau courant : s'il diffère des salves observées, le modèle ne doit pas être utilisé. Il ignore pour l'instant les attaques furtives, qui ne touchent pas le pare-feu.
+
 La comparaison n'utilise que deux cycles complets, de niveaux consécutifs, dont les dégâts par seconde restent à ±5 % et dont les points de vie suivent la formule. Rien n'est calibré automatiquement.
