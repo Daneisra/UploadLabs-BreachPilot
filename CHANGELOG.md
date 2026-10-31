@@ -18,6 +18,10 @@
 - Une attaque où l'infection ou la vulnérabilité change n'est plus une mesure complète.
 - Le lanceur de tests échoue au lieu de rester bloqué si une erreur d'exécution l'interrompt.
 
+### Corrigé
+
+- Une baisse est maintenant proposée quand la prévision annonce l'échec du niveau courant. Ces échecs étaient jugés attendus.
+
 ## 0.2.0-alpha.1 – 2026-10-31 : mesures
 
 Observation uniquement. **Aucun changement automatique du niveau de menace.** Pré-version validée, sur la branche `dev/0.2.0-alpha.1`.

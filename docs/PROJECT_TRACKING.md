@@ -8,7 +8,7 @@
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
-| Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | En cours sur `dev/0.2.0-alpha.2`, aucun changement de niveau |
+| Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | Sessions réelles faites, en attente de validation sur `dev/0.2.0-alpha.2`, aucun changement de niveau |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Non autorisée pour l'instant |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
@@ -27,7 +27,7 @@
 
 ## Décisions pour la régulation (0.2.0)
 
-Validées par Jérémy après revue. **Aucune n'est implémentée à ce stade.**
+Validées par Jérémy après revue. **Les changements automatiques de niveau ne sont pas implémentés à ce stade** : seule la simulation à blanc existe.
 
 | Sujet | Décision |
 |---|---|
@@ -140,13 +140,25 @@ Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps ho
 - **Identifiant de sauvegarde :** seul `Data.files` ressort, sans valeur exploitable. La recherche est élargie.
 - **Limite trouvée :** à vitesse × 5 avec infection, les salves sont sous-comptées (8 à 9 au lieu de 11), car une salve se confond avec la pile. Le modèle d'infection n'utilise pas ce comptage.
 
+**Deuxième session à blanc, 2026-10-31, 1 h 40 en `dry_run`, profil équilibré, version corrigée :** 1 796 réussites, 422 `failure_power`, 1 `reset_unknown` expliqué au chargement, aucune erreur venant du mod. Niveau changé uniquement par le joueur, 2 fois.
+
+- **Baisse proposée :** Gouvernement 4 vers 3, 32 s après le début, avec une réussite annoncée au niveau 3. Le joueur a fait ce changement 49 min plus tard : 422 échecs sur 422 au niveau 4 avant, 734 réussites complètes sur 734 au niveau 3 après.
+- **Montée proposée :** Entreprises 5 vers 6, avec 4,3 s annoncées et 5,3 s au maximum sur 6 s. Faite par le joueur 22 min plus tard : 377 attaques de 4,25 à 4,35 s, moyenne 4,29 s, et 2 s restantes à l'écran.
+- **Passage de 5 à 6 :** le niveau 6 n'est pas élite (91 et 364 de points, 6 s), et le maximum d'Entreprises passe à 7.
+- **Distribution sans infection :** 6 salves annoncées et 64 observées sur 64 à 29,42 dégâts, 4 salves annoncées et 670 observées sur 670 à 35,31 dégâts.
+- **Prévision avec infection :** aucune comparaison hors plage sur 1 060 attaques complètes, 145 au niveau 5 et 915 au niveau 6, à deux puissances. Modèle `verified`. À 35,31 dégâts, 8 attaques durent 3,95 s en 4 salves : l'infection finit probablement l'attaque juste avant la cinquième salve.
+- **Plafonds :** 6 pour Entreprises et 3 pour Gouvernement, session uniquement. Après l'amélioration de l'Interface, le niveau 4 de Gouvernement est annoncé réussi et reste retenu (`at_manual_ceiling`). **Non vérifié en jeu.**
+- **Changement de puissance :** l'amélioration de l'Interface (107 à 128) est détectée sur les deux nœuds, les 2 attaques suivantes sont écartées, et l'attaque à cheval est marquée incomplète.
+- **Intervalle entre deux attaques, estimé par le rythme du journal :** environ 0,7 s à 1 s, à mesurer directement avant toute action.
+- **Identifiant de sauvegarde :** `Account.save_slots`, `Data.get_slot_path` et `Data.get_local_slot` existent, mais aucune valeur ne désigne l'emplacement en cours. Pas de changement d'emplacement essayé. Plafonds en session uniquement.
+- **Non couvert en jeu :** blocages, budget d'actions, gel et prévision réfutée. Une seule proposition par niveau et par puissance est apparue, car une simulation ne fait pas changer le niveau réel.
+- **Points mineurs :** `forecast_uncertain` a une raison vide quand le modèle n'est pas encore vérifié, `prediction_check` et les champs `next_*` des événements ignorent l'infection (la décision ne les utilise pas), et le journal grossit d'environ 1 Mo par heure.
+
 ## Limites connues
 
-- `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive ni dégâts d'infection.
-- Seul `breach_corps` est observé.
-- Les prédictions sont expérimentales. Le modèle par salves ne couvre ni les dégâts d'infection ni les attaques furtives. Les coups entiers aléatoires ne sont mesurés qu'à 40,865 dégâts par seconde.
-- La vitesse de minuteur × 5 observée vient très probablement du Temps de repos. Elle n'a pas gêné le mod.
-- Le simulateur intégré ne couvre pas l'infection : ces attaques sont marquées non fiables. Le modèle à pile n'existe que sous forme de prototype hors du jeu.
+- `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive.
+- Le modèle par salves ne couvre pas les attaques furtives. Les niveaux 7 et suivants n'ont jamais été joués.
+- Les décisions simulées ne sont vérifiées en jeu que sur 2 propositions, confirmées par les changements du joueur.
 - La vulnérabilité et les attaques furtives ne sont pas mesurées, faute de déblocage dans la partie.
 - Avec une très grosse pile (dégâts par tick de l'ordre du double d'un coup), une salve pourrait ne plus être distinguée de l'infection.
 - Une attaque a réussi à égalité (6 s sur 6 s) : un seul cas, à ne pas considérer comme une règle.
@@ -161,7 +173,6 @@ Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps ho
 | 7 | Pause | Le nœud n'a pas de bouton de pause : simulé seulement |
 | 8 | Attaque interrompue | Vérifié après chargement et après `Ctrl+Z` ; le redémarrage ciblé n'a laissé aucune attaque en cours |
 | 10 | Option native | Journalisée ; montée native vue seulement en simulation |
-| 11 | Niveaux élite | 4 vers 5 vérifié ; 5 vers 6 impossible tant que le niveau 5 n'est pas franchi |
 | 14 | Chargement tardif | Vérifié par désactivation puis réactivation, ce qui n'équivaut pas à un vrai chargement tardif |
 
 ## Commandes de développement
