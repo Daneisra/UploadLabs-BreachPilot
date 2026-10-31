@@ -2,7 +2,7 @@ extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.2.0-alpha.1"
+const BUILD := "0.2.0-alpha.2"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
@@ -31,7 +31,12 @@ func _ready() -> void:
 
 	_observer = ThreatObserver.new()
 	_observer.name = "ThreatObserver"
-	_observer.configure(_log, settings.starvation_ratio, settings.api_dump)
+	_observer.configure(_log, settings.starvation_ratio, settings.api_dump, {
+		"mode": settings.regulation_mode,
+		"profile": settings.regulation_profile,
+		"max_allowed_level": int(settings.max_allowed_level),
+		"min_level": int(settings.min_level),
+	})
 	add_child(_observer)
 	if settings.threat_observer_enabled:
 		_observer.start()
@@ -58,6 +63,10 @@ func _read_settings() -> Dictionary:
 		"starvation_ratio": 0.25,
 		"api_dump": false,
 		"debug_toggle_hotkey": false,
+		"regulation_mode": "off",
+		"regulation_profile": "balanced",
+		"max_allowed_level": -1,
+		"min_level": 0,
 	}
 	var config: Variant = ModLoaderConfig.get_current_config(MOD_ID)
 	if config != null:

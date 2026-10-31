@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0-alpha.2 – en cours : simulation à blanc
+
+**Aucun changement automatique du niveau de menace.** Le mod peut seulement journaliser les décisions qu'il aurait prises. `regulation_mode` n'accepte que `off` (par défaut) et `dry_run`.
+
+### Ajouté
+
+- `power_profile.gd` : signature de puissance, seules les attaques de même signature sont comparables.
+- `breach_forecast.gd` : prévision `reliable`, `uncertain` ou `invalid`, avec un encadrement déterministe pour l'infection.
+- `threat_regulator.gd` : décisions hypothétiques, profils, seuil statistique de baisse, anti-oscillation, stabilisation après un changement de puissance.
+- `regulation_state.gd` : plafonds manuels par type, conservés pendant la session tant qu'aucun identifiant de sauvegarde fiable n'est connu.
+- Comparaison des prévisions aux attaques réelles et signalement des résultats hors plage (`forecast_check`).
+- Recherche à l'exécution d'un identifiant de sauvegarde (`save_candidates`).
+
+### Modifié
+
+- Une attaque où l'infection ou la vulnérabilité change n'est plus une mesure complète.
+- Le lanceur de tests échoue au lieu de rester bloqué si une erreur d'exécution l'interrompt.
+
 ## 0.2.0-alpha.1 – 2026-10-31 : mesures
 
 Observation uniquement. **Aucun changement automatique du niveau de menace.** Pré-version validée, sur la branche `dev/0.2.0-alpha.1`.

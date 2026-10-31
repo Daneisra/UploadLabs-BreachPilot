@@ -7,8 +7,8 @@
 | 1. Analyse | Terminée, revue externe favorable |
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
-| Auto Threat Manager, `0.2.0-alpha.1` (mesures) | En cours sur `dev/0.2.0-alpha.1`, observation uniquement |
-| Auto Threat Manager, `0.2.0-alpha.2` (simulation des décisions) | Non autorisée pour l'instant |
+| Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
+| Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | En cours sur `dev/0.2.0-alpha.2`, aucun changement de niveau |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Non autorisée pour l'instant |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
@@ -36,7 +36,11 @@ Validées par Jérémy après revue. **Aucune n'est implémentée à ce stade.**
 | Baisse | Le seuil doit tenir compte de la probabilité d'échec attendue, pas d'une règle fixe |
 | Prédiction | Méthodes natives d'abord, modèle probabiliste par salves. Formules de remplacement pour une décision active seulement si leur fiabilité est démontrée. Montée interdite si le modèle n'est pas assez fiable |
 | Classificateur incertain | Mise en sécurité de la régulation |
-| Baisse manuelle | Définit un **plafond durable**, levé explicitement par le joueur dans les paramètres |
+| Plafond manuel | Tout changement manuel fixe un **plafond durable** au nouveau niveau, y compris une remontée. Suppression seulement par une action explicite |
+| Portée du plafond | Par emplacement de sauvegarde, avec un identifiant stable trouvé à l'exécution. Sinon, session uniquement : jamais de plafond global persistant |
+| Prévision avec infection | Encadrement déterministe. Non fiable tant que le modèle ne couvre pas les observations : aucune montée fondée sur lui |
+| Partage de puissance | Surveillance seulement : détecter, invalider les mesures, attendre la stabilisation. Ne jamais modifier les branchements |
+| Simulation à blanc | Séparer le niveau réel, la décision hypothétique et ses conséquences supposées. Ne pas répéter une même proposition |
 | Interface | ModManager et journaux. Petit indicateur discret seulement quand la régulation sera active |
 | Sécurité | Désactivée par défaut, refus si `auto_level_breach` est actif, arrêt d'urgence, méthodes natives uniquement, aucune écriture directe du niveau, vérification après chaque action |
 
@@ -118,6 +122,12 @@ Deuxième essai du 2026-10-31, 8 min, avec manipulations manuelles :
 - **Classement :** les 2 `reset_unknown` portent `damage_changed` et correspondent à de vrais changements de puissance.
 
 Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps hors ligne), selon le joueur. Le journal `tick_speed` n'a pas encore vu d'activation pour le confirmer.
+
+## Travaux de `0.2.0-alpha.2`
+
+**Attaque atypique à 4,90 s :** sa première pile n'apparaît que 2,55 s après le début de l'attaque, contre moins de 0,1 s d'habitude. Avec ce décalage, le modèle donne 4,90 s à 0,25 s près (test simulé), et les autres attaques mesurées restent couvertes. L'explication la plus probable est le branchement de l'infection en pleine attaque. Une telle attaque n'est plus une mesure complète, à confirmer en jeu.
+
+**Seuil statistique renforcé :** un seuil de 1 % provoquait 18 inversions en 22 h sur du pur hasard, car le test se répète à chaque attaque. Le seuil passe à 0,1 %, avec au moins 10 attaques si un risque est attendu. Échecs nécessaires sur 20 attaques : 2 sans risque attendu, 4 à 1 %, 5 à 3 %, 6 à 5 %.
 
 ## Limites connues
 

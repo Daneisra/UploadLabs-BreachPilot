@@ -6,6 +6,10 @@ const SaLog := preload("../../core/sa_log.gd")
 const BreachClassifier := preload("breach_classifier.gd")
 const BreachPrediction := preload("breach_prediction.gd")
 const BreachSimulator := preload("breach_simulator.gd")
+const BreachForecast := preload("breach_forecast.gd")
+const PowerProfile := preload("power_profile.gd")
+const RegulationState := preload("regulation_state.gd")
+const ThreatRegulator := preload("threat_regulator.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
@@ -20,10 +24,14 @@ const EVENT_FIELDS: Array[String] = [
 	"next_used", "next_max_time", "next_model_ratio", "next_model_ratio_worst",
 	"sim_dist", "sim_p", "sim_next_volleys", "sim_next_dist", "sim_next_p", "sim_trusted", "sim_reasons", "next_source", "formula_ok", "native_matches",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "breach_variation", "infection_variation",
+	"infection_rate", "infection_offset", "interval", "tick_speed",
 	"infection_start", "infection_end", "infection_integral", "dealt_total", "complete", "observed_start",
 	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "trace",
 ]
 const TRACED_EVENTS_PER_TYPE := 12
+const FORECAST_TOLERANCE := 0.15
+const FORECAST_CACHE_SIZE := 64
+const SAVE_CANDIDATE := "(?i)save|slot|profile|file"
 ## Read-only getters called with one level argument; each is checked before use.
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
@@ -47,12 +55,27 @@ var _stealth_mask := 0
 var _ticks_since_scan := 0
 var _last_tick_speed := -1.0
 var _traced_events: Dictionary = {}
+var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0}
+var _state: RegulationState = RegulationState.new()
+var _regulators: Dictionary = {}
+var _forecasts: Dictionary = {}
+var _last_intervals: Dictionary = {}
+var _last_signatures: Dictionary = {}
+var _last_hold_reason: Dictionary = {}
 
 
-func configure(logger: SaLog, starvation_ratio: float, api_dump: bool) -> void:
+## regulation.mode can only be off or dry_run: nothing in this version can apply a decision.
+func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio
 	_api_dump = api_dump
+	_regulation.merge(regulation, true)
+	if _regulation.mode != "dry_run":
+		_regulation.mode = "off"
+
+
+func regulation_mode() -> String:
+	return _regulation.mode
 
 
 func is_active() -> bool:
@@ -73,10 +96,11 @@ func start() -> void:
 	_signals.window_created.connect(_bind_window)
 	_signals.window_initialized.connect(_bind_window)
 	_signals.window_deleted.connect(_on_window_deleted)
-	_signals.desktop_ready.connect(_scan_desktop)
+	_signals.desktop_ready.connect(_on_desktop_ready)
 	_signals.setting_set.connect(_on_setting_set)
-	_log.info("observer state=started native_auto_level=%s" % _data.auto_level_breach)
+	_log.info("observer state=started native_auto_level=%s regulation_mode=%s profile=%s" % [_data.auto_level_breach, _regulation.mode, _regulation.profile])
 	_log_inventory(root)
+	_log_save_candidates()
 	# The desktop may already exist: desktop_ready would then never come.
 	_scan_desktop()
 
@@ -90,8 +114,9 @@ func stop() -> void:
 	_signals.window_created.disconnect(_bind_window)
 	_signals.window_initialized.disconnect(_bind_window)
 	_signals.window_deleted.disconnect(_on_window_deleted)
-	_signals.desktop_ready.disconnect(_scan_desktop)
+	_signals.desktop_ready.disconnect(_on_desktop_ready)
 	_signals.setting_set.disconnect(_on_setting_set)
+	_log_regulators()
 	for key: String in _distributions:
 		_log_distribution(key)
 	for type: String in _reliability:
@@ -103,11 +128,22 @@ func stop() -> void:
 	_simulations.clear()
 	_traced_events.clear()
 	_last_tick_speed = -1.0
+	_regulators.clear()
+	_forecasts.clear()
+	_last_hold_reason.clear()
 	_log.info("observer state=stopped")
 
 
 func _exit_tree() -> void:
 	stop()
+
+
+## A game was loaded. The slot is unknown, so ceilings must not follow the player into another save.
+func _on_desktop_ready() -> void:
+	_state.set_slot("")
+	for regulator: ThreatRegulator in _regulators.values():
+		regulator.set_ceiling(-1)
+	_scan_desktop()
 
 
 func _scan_desktop() -> void:
@@ -148,6 +184,8 @@ func _on_tick() -> void:
 	if _attributes.tick_speed != _last_tick_speed:
 		_log.info("tick_speed from=%s to=%s" % [_format_value(_last_tick_speed), _format_value(_attributes.tick_speed)])
 		_last_tick_speed = _attributes.tick_speed
+	for regulator: ThreatRegulator in _regulators.values():
+		regulator.advance(_attributes.tick_speed)
 	for id: int in _trackers.keys():
 		var tracker: Dictionary = _trackers[id]
 		if not is_instance_valid(tracker.window):
@@ -204,6 +242,7 @@ func _sample(window: Node) -> Dictionary:
 		"damage_rate": window.breach_damage.production,
 		"breach_variation": window.breach_damage.variation,
 		"infection_count": window.infection_damage.count,
+		"infection_rate": window.infection_damage.production,
 		"infection_variation": window.infection_damage.variation,
 		"vulnerability": window.vulnerability.count,
 		"tick_speed": _attributes.tick_speed,
@@ -226,6 +265,130 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 		if event.event == "success":
 			_check_prediction(type, event)
 			_record_distribution(type, event)
+		if _regulation.mode == "dry_run":
+			_simulate_regulation(tracker, event)
+
+
+## Dry run: logs what the regulator would decide. Nothing here can change the game.
+func _simulate_regulation(tracker: Dictionary, event: Dictionary) -> void:
+	var type: String = tracker.type
+	var regulator := _regulator_for(type)
+	regulator.set_native(_data.auto_level_breach)
+	regulator.note_event(event.event, event.get("clues", ""))
+	if event.event == "level_changed" or event.event == "level_changed_reset":
+		var level: int = event.get("to", event.get("level_after", -1))
+		regulator.on_level_changed(level)
+		if not _data.auto_level_breach:
+			_state.apply_manual(type, level)
+			regulator.set_ceiling(level)
+			_log.info("manual_ceiling type=%s ceiling=%d scope=%s" % [type, level, "slot" if _state.is_persistent() else "session"])
+		return
+	if not event.has("max_firewall") or not is_instance_valid(tracker.window):
+		return
+
+	var profile := PowerProfile.from_event(event, _last_intervals.get(type, 0.0))
+	if profile.interval > 0.0 and event.complete:
+		_last_intervals[type] = profile.interval
+	if _last_signatures.get(type, profile.signature) != profile.signature:
+		_log.info("power_change type=%s from=%s to=%s" % [type, _last_signatures[type], profile.signature])
+	_last_signatures[type] = profile.signature
+
+	var current := {}
+	var next := {"status": "invalid", "reasons": PackedStringArray(["no_native_values"])}
+	var current_target := _native_values(tracker, event.level)
+	if not current_target.is_empty():
+		current = _forecast_for(profile, current_target, 0.0)
+		_check_forecast(type, regulator, event, profile, current)
+	var next_target := _native_values(tracker, event.level + 1)
+	if not next_target.is_empty():
+		next = _forecast_for(profile, next_target, regulator.margin())
+	var decision := regulator.on_attack({
+		"event": event.event, "complete": event.complete, "level": event.level,
+		"max_level": event.max_level, "signature": profile.signature,
+	}, current, next)
+	_log_decision(type, decision, next)
+
+
+func _regulator_for(type: String) -> ThreatRegulator:
+	if not _regulators.has(type):
+		var regulator := ThreatRegulator.new(_regulation.profile, _regulation.max_allowed_level, _regulation.min_level)
+		regulator.set_ceiling(_state.ceiling(type))
+		_regulators[type] = regulator
+	return _regulators[type]
+
+
+func _forecast_for(profile: Dictionary, target: Dictionary, margin: float) -> Dictionary:
+	var key := "%s|%s|%s|%s|%s|%s|%s|%s" % [profile.signature, profile.interval, profile.tick_speed, profile.infection_offset, target.firewall, target.breach, target.time, margin]
+	if _forecasts.has(key):
+		return _forecasts[key]
+	if _forecasts.size() >= FORECAST_CACHE_SIZE:
+		_forecasts.clear()
+	var result := BreachForecast.forecast(profile, target, margin)
+	_forecasts[key] = result
+	return result
+
+
+## Compares what happened with what the forecast allowed. Anything outside is signaled for analysis.
+func _check_forecast(type: String, regulator: ThreatRegulator, event: Dictionary, profile: Dictionary, current: Dictionary) -> void:
+	if not event.complete or current.status == "invalid":
+		return
+	if event.event != "success" and event.event != "failure_power":
+		return
+	var in_range: bool
+	var observed: String
+	if event.event == "success":
+		observed = _format_value(event.used)
+		in_range = current.used_min >= 0.0 and event.used >= current.used_min - FORECAST_TOLERANCE
+		if current.used_max >= 0.0:
+			in_range = in_range and event.used <= current.used_max + FORECAST_TOLERANCE
+		elif not current.may_fail:
+			in_range = false
+	else:
+		observed = "failed"
+		in_range = current.may_fail
+	if PowerProfile.has_infection(profile):
+		regulator.note_forecast_check(in_range)
+	if not in_range:
+		_log.info("forecast_check type=%s level=%d result=out_of_range observed=%s used_min=%s used_max=%s may_fail=%s infection_offset=%s trust=%s" % [type, event.level, observed, _format_value(current.used_min), _format_value(current.used_max), current.may_fail, _format_value(event.get("infection_offset", -1.0)), regulator.model_trust()])
+	else:
+		_log.debug("forecast_check type=%s level=%d result=in_range observed=%s" % [type, event.level, observed])
+
+
+## Raises and lowers are always logged; a hold only when its reason changes.
+func _log_decision(type: String, decision: Dictionary, next: Dictionary) -> void:
+	if decision.decision == "hold":
+		if _last_hold_reason.get(type, "") == decision.reason:
+			return
+		_last_hold_reason[type] = decision.reason
+	else:
+		_last_hold_reason[type] = ""
+	var parts := PackedStringArray(["dry_run", "type=%s" % type])
+	for key: String in decision:
+		parts.append("%s=%s" % [key, _format_value(decision[key])])
+	parts.append("next_status=%s" % next.get("status", "none"))
+	parts.append("next_outcome=%s" % next.get("outcome", "none"))
+	parts.append("next_p=%s" % _format_value(next.get("p_success", -1.0)))
+	parts.append("next_used_max=%s" % _format_value(next.get("used_max", -1.0)))
+	_log.info(" ".join(parts))
+
+
+func _log_regulators() -> void:
+	for type: String in _regulators:
+		var regulator: ThreatRegulator = _regulators[type]
+		_log.info("regulator_summary type=%s profile=%s repeats_suppressed=%d model_trust=%s unsafe=%s ceiling=%d" % [type, regulator.profile_name, regulator.suppressed_repeats, regulator.model_trust(), regulator.is_unsafe(), _state.ceiling(type)])
+
+
+## Looks for what could identify a save slot. Only names and simple values are read.
+func _log_save_candidates() -> void:
+	var pattern := RegEx.create_from_string(SAVE_CANDIDATE)
+	for node: Node in [_data, _globals]:
+		var found := PackedStringArray()
+		for property: Dictionary in node.get_property_list():
+			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and pattern.search(property.name) != null:
+				var value: Variant = node.get(property.name)
+				var shown: String = str(value).left(40) if value is String or value is int or value is float or value is bool else type_string(typeof(value))
+				found.append("%s=%s" % [property.name, shown])
+		_log.info("inventory save_candidates node=%s %s" % [node.name, " ".join(found)])
 
 
 ## Traces are long, so only the first attacks of each type keep theirs.

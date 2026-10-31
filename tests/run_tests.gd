@@ -11,8 +11,10 @@ const Observer := preload(MOD + "features/threat_manager/threat_observer.gd")
 const ApiGuard := preload(MOD + "core/api_guard.gd")
 const SaLog := preload(MOD + "core/sa_log.gd")
 const ModMain := preload(MOD + "mod_main.gd")
+const RegulationTests := preload("regulation_tests.gd")
 
 const TICK := 0.05
+const TIME_LIMIT := 120
 
 var _failures := 0
 var _checks := 0
@@ -103,11 +105,19 @@ class FakeGetterless extends Node:
 
 
 func _initialize() -> void:
+	# A runtime error ends _run before it can quit: fail instead of hanging.
+	create_timer(TIME_LIMIT).timeout.connect(_on_time_limit)
 	_run.call_deferred()
 
 
+func _on_time_limit() -> void:
+	printerr("FAILED: the tests did not finish within %d s, a script error probably stopped them" % TIME_LIMIT)
+	print("%d checks, %d failures" % [_checks, _failures + 1])
+	quit(2)
+
+
 func _run() -> void:
-	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain]:
+	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain, RegulationTests]:
 		_check(script.can_instantiate(), "compiles: %s" % script.resource_path)
 	if _failures > 0:
 		print("%d checks, %d failures" % [_checks, _failures])
@@ -136,6 +146,8 @@ func _run() -> void:
 	await _test_observer()
 	await _test_government_and_native_values()
 	await _test_mod_main()
+	RegulationTests.new().run(_check)
+	await _test_dry_run_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -145,7 +157,7 @@ func _sample(overrides: Dictionary = {}) -> Dictionary:
 		"instance_id": 1, "level": 3, "max_level": 5, "time": 10.0, "max_time": 10.0,
 		"detected": false, "paused": false, "firewall": 50.0, "max_firewall": 50.0,
 		"breached": 0.0, "max_breach": 50.0, "damage_rate": 100.0, "vulnerability": 0.0,
-		"breach_variation": 0, "infection_count": 0.0, "infection_variation": 0,
+		"breach_variation": 0, "infection_count": 0.0, "infection_rate": 0.0, "infection_variation": 0,
 		"tick_speed": TICK, "now_usec": 0,
 	}
 	sample.merge(overrides, true)
@@ -780,6 +792,72 @@ func _count(text: String) -> int:
 		if message.contains(text):
 			total += 1
 	return total
+
+
+func _test_dry_run_in_observer() -> void:
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var corps := FakeBreach.new()
+	game.desktop.windows.add_child(corps)
+	corps.breach_damage.production = 30.0
+	corps.infection_damage.production = 0.0
+
+	var refused := Observer.new()
+	refused.configure(SaLog.new("info"), 0.25, false, {"mode": "active"})
+	_check(refused.regulation_mode() == "off", "any mode other than dry_run falls back to off")
+	refused.free()
+
+	var off := Observer.new()
+	off.configure(SaLog.new("info"), 0.25, false)
+	_check(off.regulation_mode() == "off", "regulation is off by default")
+	off.free()
+
+	var observer := Observer.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {"mode": "dry_run", "profile": "aggressive"})
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	game.Signals.tick.emit()
+	for attack: int in 8:
+		for step: Array in [[9.95, 20.0, 0.0], [8.95, 0.0, 0.0], [7.95, 0.0, 30.0]]:
+			corps.detected = true
+			corps.time = step[0]
+			corps.firewall = step[1]
+			corps.breached = step[2]
+			game.Signals.tick.emit()
+		corps.time = 6.95
+		corps.breached = 60.0
+		game.Signals.breached.emit(corps)
+		corps.detected = false
+		corps.time = 10.0
+		corps.firewall = 50.0
+		corps.breached = 0.0
+		game.Signals.tick.emit()
+	_check(_count("dry_run type=") >= 1, "decisions are logged")
+	_check(_count("hypothetical=true") == _count("dry_run type="), "every decision is marked hypothetical")
+	_check(_count("decision=raise") == 1, "a raise is proposed once, not at every attack")
+	_check(_count("real_level=3") >= 1 and _count("assumed_level=4") == 1, "the real level and the assumed level are told apart")
+	_check(corps.data.level == 3.0 and corps.forbidden_calls == 0, "the dry run changes nothing")
+	_check(_count("inventory save_candidates") == 2, "save identifier candidates are reported")
+
+	corps.data.level = 2.0
+	game.Signals.tick.emit()
+	_check(_count("manual_ceiling type=breach_corps ceiling=2 scope=session") == 1, "a manual change sets a ceiling, for this session only")
+	game.Signals.desktop_ready.emit()
+	corps.data.level = 3.0
+	game.Signals.tick.emit()
+	_check(_count("ceiling=3 scope=session") == 1, "a manual raise moves the ceiling")
+
+	game.Data.auto_level_breach = true
+	corps.data.level = 4.0
+	game.Signals.tick.emit()
+	_check(_count("ceiling=4") == 0, "a level change made by the native option is not manual")
+	game.Data.auto_level_breach = false
+
+	observer.stop()
+	_check(_count("regulator_summary type=breach_corps") == 1, "the regulator is summarized at stop")
+	observer.queue_free()
+	await _remove_fake_game(game)
 
 
 func _test_mod_main() -> void:

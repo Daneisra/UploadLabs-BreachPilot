@@ -67,13 +67,10 @@ func on_breached(sample: Dictionary) -> Array[Dictionary]:
 		_open_cycle(sample, true)
 		_cycle.observed_start = false
 	if _is_volley(sample, _dealt(sample) - _cycle.last_progress):
-		_cycle.volleys += 1
+		_note_volley(sample)
 	_record_hit(sample)
 	_cycle.infection_end = sample.infection_count
-	if sample.damage_rate != _cycle.damage_rate:
-		_cycle.damage_changed = true
-	if sample.tick_speed != _cycle.tick_speed:
-		_cycle.speed_changed = true
+	_check_conditions(sample)
 	var used: float = sample.max_time - sample.time
 	var event := _base_event("success", sample)
 	event.time_left = sample.time
@@ -169,6 +166,12 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"level_mismatch": false,
 		"progressed": false,
 		"volleys": 0,
+		"first_volley_time": -1.0,
+		"last_volley_time": -1.0,
+		"start_time": sample.time,
+		"infection_rate": sample.infection_rate,
+		"vulnerability": sample.vulnerability,
+		"infection_offset": 0.0 if sample.infection_count > 0.0 else -1.0,
 		"damage_rate": sample.damage_rate,
 		"damage_changed": false,
 		"tick_speed": sample.tick_speed,
@@ -193,7 +196,7 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 	if _dealt(sample) > 0.0:
 		_cycle.progressed = true
 		if _is_volley(sample, _dealt(sample)):
-			_cycle.volleys = 1
+			_note_volley(sample)
 	_next_cycle_id += 1
 
 
@@ -211,23 +214,37 @@ func _update_cycle(sample: Dictionary) -> void:
 		_cycle.paused_seen = true
 	if sample.level != _cycle.level:
 		_cycle.level_mismatch = true
-	if sample.damage_rate != _cycle.damage_rate:
-		_cycle.damage_changed = true
-	if sample.tick_speed != _cycle.tick_speed:
-		_cycle.speed_changed = true
+	_check_conditions(sample)
+	if _cycle.infection_offset < 0.0 and sample.infection_count > 0.0:
+		_cycle.infection_offset = _cycle.start_time - sample.time
 	_record_trace(sample)
 	_record_hit(sample)
 	var dealt := _dealt(sample)
 	if dealt > _cycle.last_progress:
 		_cycle.progressed = true
 		if _is_volley(sample, dealt - _cycle.last_progress):
-			_cycle.volleys += 1
+			_note_volley(sample)
 		_cycle.last_progress = dealt
 		_cycle.last_progress_time = sample.time
 
 
 func _dealt(sample: Dictionary) -> float:
 	return sample.max_firewall - sample.firewall + sample.breached
+
+
+## Power, damage or speed moving during an attack make it useless as a measure.
+func _check_conditions(sample: Dictionary) -> void:
+	if sample.damage_rate != _cycle.damage_rate or sample.infection_rate != _cycle.infection_rate or sample.vulnerability != _cycle.vulnerability:
+		_cycle.damage_changed = true
+	if sample.tick_speed != _cycle.tick_speed:
+		_cycle.speed_changed = true
+
+
+func _note_volley(sample: Dictionary) -> void:
+	_cycle.volleys += 1
+	if _cycle.first_volley_time < 0.0:
+		_cycle.first_volley_time = sample.time
+	_cycle.last_volley_time = sample.time
 
 
 ## Keeps time:infection:firewall:breached points, to compare infection with a model afterwards.
@@ -269,6 +286,12 @@ func _set_hits(event: Dictionary) -> void:
 
 func _base_event(event_name: String, sample: Dictionary) -> Dictionary:
 	var event := _core_event(event_name, sample)
+	event.infection_rate = sample.infection_rate
+	event.tick_speed = sample.tick_speed
+	if _cycle.volleys >= 2:
+		event.interval = (_cycle.first_volley_time - _cycle.last_volley_time) / (_cycle.volleys - 1)
+	if _cycle.infection_offset >= 0.0:
+		event.infection_offset = _cycle.infection_offset
 	if _cycle.breach_variation != 0:
 		event.breach_variation = _cycle.breach_variation
 	if _cycle.infection_variation != 0:

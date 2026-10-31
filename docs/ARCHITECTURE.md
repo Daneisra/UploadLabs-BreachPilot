@@ -48,6 +48,17 @@ L'observateur inspecte les méthodes du nœud à l'exécution (`get_script_metho
 
 `breach_simulator.gd` calcule la distribution exacte des salves à partir des coups entiers aléatoires, et compte une égalité avec le minuteur comme un échec. Le calcul se limite aux salves que le minuteur autorise, 64 au plus, avec 2048 états par salve et un cache par conditions. Il n'est lancé qu'en fin d'attaque complète. Il ne couvre pas encore les dégâts d'infection : une attaque qui en reçoit est marquée non fiable (`sim_trusted=false`).
 
+## Régulation simulée
+
+Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans cette version ne peut les appliquer**. Chaque décision sépare le niveau réel (`real_level`) du niveau supposé (`assumed_level`) et n'est proposée qu'une fois tant que le niveau réel et la puissance ne changent pas.
+
+- **Unités :** délais, blocages, budgets et gels sont en secondes de minuteur du jeu, cumulées depuis `tick_speed`. Les fenêtres sont en attaques complètes et comparables. Le temps réel ne sert qu'au journal.
+- **Prévision :** sans infection, probabilité exacte. Avec infection, encadrement : réussite dans le pire cas ou échec dans le cas nominal sont fiables, le reste est incertain. Le modèle d'infection doit d'abord réussir 10 comparaisons à la puissance courante, sinon il est incertain, et il devient invalide au-delà de 5 % de résultats hors plage. Vulnérabilité, furtivité et croissance `INFECTED` restent invalides tant qu'elles ne sont pas mesurées.
+- **Montée :** réussites consécutives, prévision fiable et conforme au profil, sous le maximum et le plafond, hors blocage.
+- **Baisse :** seuls les `failure_power` complets comptent. Il faut assez d'échecs pour que le hasard ne soit plus une explication acceptable (moins de 0,1 % sur la fenêtre de 20 attaques), et au moins 10 attaques si un risque est attendu. Un échec contre un risque attendu sous 1 % réfute la prévision : le niveau reste bloqué jusqu'au prochain changement de puissance.
+- **Plafond manuel :** tout changement manuel fixe le plafond au nouveau niveau, vers le haut comme vers le bas. Il n'est supprimé que par une action explicite. Sans identifiant de sauvegarde fiable, il ne dure que la session et rien n'est écrit.
+- **Sécurité :** option native active, classificateur peu fiable ou inversions répétées suspendent les décisions.
+
 ## Machine à états
 
 États : `UNBOUND`, `IDLE`, `ATTACKING`, `SUSPENDED`.
