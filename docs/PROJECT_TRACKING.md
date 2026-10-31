@@ -47,7 +47,7 @@ Deuxième essai du 2026-10-31, environ 3 min 50 d'observation, manipulations man
 
 Troisième essai du 2026-10-31, deux sessions, 30,96 dégâts par salve :
 
-- Niveau 3 : 13 réussites, 1 s restante à l'écran comme au journal. `prediction_check observed=0.8000 volleys=0.8000 coefficient=0.9000` : le modèle par salves est exact.
+- Niveau 3 : 24 réussites, 1 s restante à l'écran comme au journal. `prediction_check observed=0.8000 volleys=0.8000 coefficient=0.9000` : le modèle par salves est exact.
 - Niveau 4 : échec confirmé à l'écran, comme annoncé par le modèle (8 salves, 7 s pour 5 s). 23 `failure_power`.
 - Après `Ctrl+Z` en pleine attaque : le premier échec, sur un cycle incomplet, reste `reset_unknown` (`partial_cycle`), comme prévu.
 - Suppression du nœud : `invalidated`, 15 s sans nœud sans erreur, puis nouvelle liaison.
