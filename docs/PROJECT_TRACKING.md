@@ -129,6 +129,17 @@ Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps ho
 
 **Seuil statistique renforcé :** un seuil de 1 % provoquait 18 inversions en 22 h sur du pur hasard, car le test se répète à chaque attaque. Le seuil passe à 0,1 %, avec au moins 10 attaques si un risque est attendu. Échecs nécessaires sur 20 attaques : 2 sans risque attendu, 4 à 1 %, 5 à 3 %, 6 à 5 %.
 
+**Première session à blanc, 2026-10-31, 25 min en `dry_run`, profil équilibré** (en dessous de l'heure demandée) : 195 réussites, 223 `failure_power`, aucune erreur venant du mod, aucun niveau changé par le mod.
+
+- **Défaut trouvé et corrigé :** Gouvernement a échoué 223 fois sans proposition de baisse. La prévision annonçant un échec certain, le test statistique jugeait ces échecs attendus. Le hasard n'excuse plus que le risque accepté par le profil.
+- **Prévision avec infection :** aucune comparaison hors plage. Entreprises niveau 5 : 10,00 à 10,70 s selon le décalage, et 9,06 s à plus forte puissance.
+- **Explication des 4,90 s confirmée :** l'infection branchée en pleine attaque donne une première pile tardive (1,95 s et 4,65 s observées). Ces attaques sont bien marquées incomplètes.
+- **Temps de repos confirmé :** `tick_speed` passe de 0,05 à 0,25 puis revient, sur le geste du joueur. 14 attaques complètes à vitesse × 5, aucun faux échec. Les 2 attaques à cheval sur un changement sont marquées incomplètes.
+- **Lanceur coupé :** Entreprises continue par la seule infection (44,58, soit le double, 7,7 s). Gouvernement n'a plus de dégâts, sans faux échec.
+- **Plafond :** 5 vers 4 puis 4 vers 5 donnent les plafonds 4 et 5. Une montée vers 6 reste retenue par le plafond (`at_manual_ceiling`).
+- **Identifiant de sauvegarde :** seul `Data.files` ressort, sans valeur exploitable. La recherche est élargie.
+- **Limite trouvée :** à vitesse × 5 avec infection, les salves sont sous-comptées (8 à 9 au lieu de 11), car une salve se confond avec la pile. Le modèle d'infection n'utilise pas ce comptage.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive ni dégâts d'infection.

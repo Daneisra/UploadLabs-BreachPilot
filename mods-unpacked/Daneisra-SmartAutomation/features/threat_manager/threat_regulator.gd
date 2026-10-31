@@ -22,6 +22,8 @@ const SIGNIFICANCE := 0.001
 const MIN_ATTACKS_WITH_RISK := 10
 ## A level failing against this expected risk proves the forecast wrong at this power.
 const REFUTED_BELOW_RISK := 0.01
+## 1.0 - 0.99 is slightly above 0.01 in floating point.
+const RISK_EPSILON := 1e-9
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
 const MAX_UNEXPLAINED := 0.05
@@ -176,12 +178,13 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 
 
 func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
-	var risk := UNKNOWN_RISK
-	if current.get("status") == "reliable":
-		risk = 1.0 - current.p_success
+	var known: bool = current.get("status") == "reliable"
+	var true_risk: float = 1.0 - current.p_success if known else UNKNOWN_RISK
+	# Chance only excuses the risk the profile accepts: a level expected to fail is not "normal".
+	var risk := minf(true_risk, 1.0 - _profile.p)
 	var failures := _history.count(true)
 	var needed := failures_needed(_history.size(), risk)
-	if risk > REFUTED_BELOW_RISK and _history.size() < MIN_ATTACKS_WITH_RISK:
+	if risk > REFUTED_BELOW_RISK + RISK_EPSILON and _history.size() < MIN_ATTACKS_WITH_RISK:
 		return _decision("hold", "gathering_attacks", attack, {"failures": failures})
 	if failures < needed:
 		return _decision("hold", "within_expected_failures", attack, {"failures": failures, "needed": needed, "risk": risk})
@@ -189,8 +192,8 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 		return _decision("hold", "at_min_level", attack, {"failures": failures, "needed": needed})
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
-	_refuted = risk <= REFUTED_BELOW_RISK
-	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "forecast_refuted": _refuted})
+	_refuted = known and true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
+	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_refuted": _refuted})
 
 
 func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:

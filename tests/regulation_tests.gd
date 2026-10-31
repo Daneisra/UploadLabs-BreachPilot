@@ -193,6 +193,33 @@ func _test_lower_rules() -> void:
 		mixed.append_array(_feed(risky, 1, "failure_power", 5, {}, _reliable(0.95)))
 	_check(_kinds(mixed, "lower") == 0, "3 failures in 18 are expected at 5% risk")
 
+	# Seen in the game: Government failed 223 times in a row and no lower was proposed, because a
+	# forecast of certain failure made those failures look expected.
+	for profile: String in ["conservative", "balanced", "aggressive"]:
+		var hopeless := Regulator.new(profile)
+		_feed(hopeless, 2, "failure_power", 4, {}, _reliable(0.0))
+		var lowered: Array[Dictionary] = _feed(hopeless, 25, "failure_power", 4, {}, _reliable(0.0)).filter(func(d: Dictionary) -> bool: return d.decision == "lower")
+		_check(lowered.size() == 1, "%s lowers a level that always fails, once" % profile)
+		if not lowered.is_empty():
+			_check(not lowered[0].forecast_refuted, "%s: a level expected to fail does not refute the forecast" % profile)
+			_check(lowered[0].assumed_level == 3, "%s proposes one level down" % profile)
+	var lowered_fast: Array[Dictionary] = _feed(Regulator.new("balanced"), 6, "failure_power", 4, {}, _reliable(0.0))
+	_check(_kinds(lowered_fast, "lower") == 1, "balanced lowers a hopeless level within a few attacks")
+	var tolerated := Regulator.new("aggressive")
+	_feed(tolerated, 2, "success", 5, {})
+	var within: Array[Dictionary] = []
+	for i: int in 3:
+		within.append_array(_feed(tolerated, 6, "success", 5, {}, _reliable(0.96)))
+		within.append_array(_feed(tolerated, 1, "failure_power", 5, {}, _reliable(0.96)))
+	_check(_kinds(within, "lower") == 0, "a level inside the accepted risk still tolerates chance")
+	var outside := Regulator.new("balanced")
+	_feed(outside, 2, "success", 5, {})
+	var over: Array[Dictionary] = []
+	for i: int in 4:
+		over.append_array(_feed(outside, 4, "success", 5, {}, _reliable(0.96)))
+		over.append_array(_feed(outside, 1, "failure_power", 5, {}, _reliable(0.96)))
+	_check(_kinds(over, "lower") == 1, "the same 4% risk is not excused by a profile asking 99%")
+
 	for event: String in ["failure_starved", "failure_paused", "reset_unknown", "level_changed_reset"]:
 		var calm := Regulator.new("balanced")
 		_feed(calm, 2, "success", 5, {})
@@ -399,6 +426,13 @@ func _test_long_sequences() -> void:
 		return 1.0 if level <= best else 0.0
 	var growing := _run_sequence("balanced", 13, 6000, growing_chance, growing_chance)
 	_check(growing.level == 10, "the regulator follows growing power, got %d" % growing.level)
+
+	# Falling power, with a forecast that sees it: the level follows it down.
+	var falling_chance := func(level: int, progress: float) -> float:
+		var best := 10 - floori(progress * 3.0) * 3
+		return 1.0 if level <= best else 0.0
+	var falling := _run_sequence("balanced", 14, 6000, falling_chance, falling_chance)
+	_check(falling.level == 4, "the regulator follows falling power, got %d" % falling.level)
 
 	var first := _run_sequence("balanced", 21, 3000, random_chance, random_chance)
 	var again := _run_sequence("balanced", 21, 3000, random_chance, random_chance)

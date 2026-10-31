@@ -32,6 +32,7 @@ const TRACED_EVENTS_PER_TYPE := 12
 const FORECAST_TOLERANCE := 0.15
 const FORECAST_CACHE_SIZE := 64
 const SAVE_CANDIDATE := "(?i)save|slot|profile|file"
+const SAVE_NODES_LOGGED := 12
 ## Read-only getters called with one level argument; each is checked before use.
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
@@ -307,7 +308,11 @@ func _simulate_regulation(tracker: Dictionary, event: Dictionary) -> void:
 		"event": event.event, "complete": event.complete, "level": event.level,
 		"max_level": event.max_level, "signature": profile.signature,
 	}, current, next)
-	_log_decision(type, decision, next)
+	var assumed := next
+	if decision.decision == "lower":
+		var lower_target := _native_values(tracker, event.level - 1)
+		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, regulator.margin())
+	_log_decision(type, decision, next, assumed)
 
 
 func _regulator_for(type: String) -> ThreatRegulator:
@@ -356,7 +361,7 @@ func _check_forecast(type: String, regulator: ThreatRegulator, event: Dictionary
 
 
 ## Raises and lowers are always logged; a hold only when its reason changes.
-func _log_decision(type: String, decision: Dictionary, next: Dictionary) -> void:
+func _log_decision(type: String, decision: Dictionary, next: Dictionary, assumed: Dictionary) -> void:
 	if decision.decision == "hold":
 		if _last_hold_reason.get(type, "") == decision.reason:
 			return
@@ -370,6 +375,12 @@ func _log_decision(type: String, decision: Dictionary, next: Dictionary) -> void
 	parts.append("next_outcome=%s" % next.get("outcome", "none"))
 	parts.append("next_p=%s" % _format_value(next.get("p_success", -1.0)))
 	parts.append("next_used_max=%s" % _format_value(next.get("used_max", -1.0)))
+	if decision.decision != "hold":
+		# What the hypothetical decision would lead to, supposing it were applied.
+		parts.append("assumed_status=%s" % assumed.get("status", "none"))
+		parts.append("assumed_outcome=%s" % assumed.get("outcome", "none"))
+		parts.append("assumed_p=%s" % _format_value(assumed.get("p_success", -1.0)))
+		parts.append("assumed_used_max=%s" % _format_value(assumed.get("used_max", -1.0)))
 	_log.info(" ".join(parts))
 
 
@@ -382,14 +393,35 @@ func _log_regulators() -> void:
 ## Looks for what could identify a save slot. Only names and simple values are read.
 func _log_save_candidates() -> void:
 	var pattern := RegEx.create_from_string(SAVE_CANDIDATE)
-	for node: Node in [_data, _globals]:
+	var root := get_tree().root
+	for node: Node in root.get_children():
+		if node == self or node.get_script() == null:
+			continue
 		var found := PackedStringArray()
 		for property: Dictionary in node.get_property_list():
 			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and pattern.search(property.name) != null:
 				var value: Variant = node.get(property.name)
 				var shown: String = str(value).left(40) if value is String or value is int or value is float or value is bool else type_string(typeof(value))
 				found.append("%s=%s" % [property.name, shown])
-		_log.info("inventory save_candidates node=%s %s" % [node.name, " ".join(found)])
+		var methods := PackedStringArray()
+		for method: Dictionary in node.get_script().get_script_method_list():
+			if pattern.search(method.name) != null:
+				methods.append(method.name)
+		if node == _data or node == _globals or not found.is_empty() or not methods.is_empty():
+			_log.info("inventory save_candidates node=%s %s methods=%s" % [node.name, " ".join(found), ",".join(methods)])
+	# Screens of the current scene can hold the slot, too. Only their paths and names are read.
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var nodes := PackedStringArray()
+	for node: Node in scene.find_children("*", "", true, false):
+		var script: Script = node.get_script()
+		if script != null and pattern.search(script.resource_path.get_file()) != null:
+			nodes.append("%s(%s)" % [node.name, script.resource_path.get_file()])
+			if nodes.size() >= SAVE_NODES_LOGGED:
+				break
+	if not nodes.is_empty():
+		_log.info("inventory save_nodes %s" % ",".join(nodes))
 
 
 ## Traces are long, so only the first attacks of each type keep theirs.
