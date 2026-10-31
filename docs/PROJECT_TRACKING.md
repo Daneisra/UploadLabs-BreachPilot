@@ -109,12 +109,25 @@ Premier essai du 2026-10-31, 8 min, Entreprises et Gouvernement au niveau 4/5, t
 - **Défaut trouvé :** 3 attaques ont subi un passage à la vitesse × 5 en cours d'attaque, ce qui décale le temps mesuré de 0,15 s. Le garde-fou les a signalées. Elles ne comptent plus comme mesures complètes, et un échec dans ce cas devient `reset_unknown` (`speed_changed`).
 - **Mesurable dans la partie actuelle :** l'infection (`build_infection`). **Pas encore mesurable :** la vulnérabilité (`research.injection`) et les attaques furtives (`ghost_attack` non débloqué), sous réserve que ce nœud soit bien celui de la furtivité.
 
+Deuxième essai du 2026-10-31, 8 min, avec manipulations manuelles :
+
+- **Niveau élite 5 :** sans infection, 6 échecs observés. Les valeurs natives (303, 1212, 12 s) sont exactes, y compris sur les échecs. Avec l'infection, 9 réussites : le maximum d'Entreprises est passé à 6.
+- **L'infection est une pile :** elle gagne un entier proche de 22,29 par impulsion, à raison d'une par seconde. Chaque tick inflige `pile × tick_speed`, sur le pare-feu tant qu'il tient. La pile n'a pas grossi d'elle-même entre deux impulsions dans cette configuration, sans variante `INFECTED`. Elle atteint 243 en fin d'attaque au niveau 5.
+- **Partage de la puissance :** relier l'Interface à deux entrées divise la puissance par 2 : 89 devient 45 sur chaque nœud, et Gouvernement, privé d'infection, échoue au niveau 4 (50 `failure_power` à 24,52 dégâts).
+- **Modèle à pile, prototype hors du jeu, phases tirées au hasard :** niveau 5, 10,60 s annoncées pour 10,55 s observées. Niveau 4, 2,90 à 3,70 s annoncées pour 2,93 s en moyenne, avec 1 attaque à 4,90 s sur 84, qui sort de la plage. Observé, le décalage entre les deux sources reste quasi constant d'une attaque à l'autre : il n'est pas aléatoire.
+- **Classement :** les 2 `reset_unknown` portent `damage_changed` et correspondent à de vrais changements de puissance.
+
+Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps hors ligne), selon le joueur. Le journal `tick_speed` n'a pas encore vu d'activation pour le confirmer.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive ni dégâts d'infection.
 - Seul `breach_corps` est observé.
 - Les prédictions sont expérimentales. Le modèle par salves ne couvre ni les dégâts d'infection ni les attaques furtives. Les coups entiers aléatoires ne sont mesurés qu'à 40,865 dégâts par seconde.
-- La vitesse de minuteur × 5 observée n'est pas expliquée. Elle n'a pas gêné le mod.
+- La vitesse de minuteur × 5 observée vient très probablement du Temps de repos. Elle n'a pas gêné le mod.
+- Le simulateur intégré ne couvre pas l'infection : ces attaques sont marquées non fiables. Le modèle à pile n'existe que sous forme de prototype hors du jeu.
+- La vulnérabilité et les attaques furtives ne sont pas mesurées, faute de déblocage dans la partie.
+- Avec une très grosse pile (dégâts par tick de l'ordre du double d'un coup), une salve pourrait ne plus être distinguée de l'infection.
 - Une attaque a réussi à égalité (6 s sur 6 s) : un seul cas, à ne pas considérer comme une règle.
 - Les `cycle_id` repartent de 1 après une reprise de l'observateur.
 - Tous les essais viennent d'une seule partie et d'une seule installation.
