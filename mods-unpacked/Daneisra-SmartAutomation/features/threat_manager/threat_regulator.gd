@@ -21,7 +21,7 @@ const SIGNIFICANCE := 0.001
 const MIN_ATTACKS_WITH_RISK := 10
 ## A level failing against this expected risk proves the forecast wrong at this power.
 const REFUTED_BELOW_RISK := 0.01
-## 1.0 - 0.99 is slightly above 0.01 in floating point.
+## 1.0 - 0.99 is slightly above 0.01 in floating point, and a sure success can sum to just under 1.
 const RISK_EPSILON := 1e-9
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
@@ -239,7 +239,7 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 		return _decision("hold", "forecast_invalid", attack, {"reasons": ",".join(next.get("reasons", PackedStringArray()))})
 	if status == "uncertain":
 		return _decision("hold", "forecast_uncertain", attack, {"reasons": ",".join(next.get("reasons", PackedStringArray()))})
-	if next.p_success < _profile.p:
+	if next.p_success < _profile.p - RISK_EPSILON:
 		return _decision("hold", "forecast_too_risky", attack, {"p": next.p_success})
 
 	# Respecting the player comes last, so the log still shows what the model would have wanted.

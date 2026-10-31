@@ -1,8 +1,17 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.2 – en cours : actionneur et préparation du premier essai actif
+## 0.2.0-beta.1-dev.3 – en cours : actionneur et essais actifs
 
-**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, une seule fois, de 2 à 3 sur Gouvernement, avec son option activée. Ce n'est pas encore la `0.2.0-beta.1`.
+**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, une seule fois, avec son option activée. Montée de 2 à 3 validée sur Gouvernement. Baisse de 5 à 4 en préparation. Ce n'est pas encore la `0.2.0-beta.1`.
+
+### Corrigé
+
+- Une réussite certaine dont la probabilité s'arrondit juste sous 1 ne bloque plus une décision.
+
+### Modifié
+
+- La prévision du niveau visé par une baisse se calcule sans la marge, réservée aux montées.
+- Le journal d'une action donne le moment exact (tick, image, microsecondes) et l'état du nœud avant et après.
 
 ### Ajouté
 

@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Actionneur prêt sur `dev/0.2.0-beta.1`, testé sur un faux jeu. Premier essai autorisé le 2026-10-31 : Gouvernement de 2 à 3, une seule action, après contrôle des signatures en jeu. **Tag, fusion, actions multiples et régulation permanente non autorisés** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Montée de 2 à 3 validée en jeu sur Gouvernement. Deuxième essai autorisé le 2026-10-31 : baisse de 5 à 4, une seule action. **Tag, fusion, actions multiples et régulation permanente non autorisés** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -238,7 +238,9 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 
 **Non couvert :** baisse, fenêtre d'un tick, plusieurs actions, `Ctrl+Z` après une action du mod, Entreprises avec infection. Le marqueur `trial_used.json` reste en place. L'archive d'essai a été retirée du jeu.
 
-Ensuite, si l'essai réussit : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
+**Deuxième essai, autorisé le 2026-10-31 :** baisse de Gouvernement de 5 à 4, une seule action, profil conservateur, même protection qu'au premier essai, nouveau marqueur `trial_2_used.json`. Le niveau 4 n'est annoncé fiable que sans marge (5,0 s sur 6 s, pour une limite de 4,8 s avec 20 %), ce qui a été présenté à Jérémy avec les mesures.
+
+Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
 ## Limites connues
 

@@ -5,6 +5,7 @@ extends RefCounted
 const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/"
 const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 const Regulator := preload(MOD + "features/threat_manager/threat_regulator.gd")
+const Forecast := preload(MOD + "features/threat_manager/breach_forecast.gd")
 
 var _check_call: Callable
 var _thread_result := {}
@@ -367,62 +368,87 @@ func _trial(window_level: float) -> Dictionary:
 	return {"actuator": actuator, "window": window, "settings": settings}
 
 
-func _trial_attempt(setup: Dictionary, type: String, direction: String, level: int) -> Dictionary:
+func _trial_attempt(setup: Dictionary, type: String, direction: String, level: int, expected: Dictionary = {"status": "reliable", "p_success": 1.0}) -> Dictionary:
 	var power := {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}
 	setup.actuator.action_type = type
-	setup.actuator.request(type, direction, level, power, {}, {"reason": "conditions_met"})
+	setup.actuator.request(type, direction, level, power, expected, {"reason": "conditions_met"})
 	return setup.actuator.attempt(type, setup.window, "1|1", 1, true, true, -1)
 
 
 func _test_trial_limits() -> void:
+	var policy := Actuator.Policy
+	_check(policy.TRIAL_TYPE == "breach_government" and policy.TRIAL_DIRECTION == "lower" and policy.TRIAL_FROM == 5 and policy.TRIAL_TO == 4, "the trial is the authorized one")
+	_check(policy.TRIAL_MAX_ACTIONS == 1 and policy.TRIAL_PROFILE == "conservative", "with one action, in the conservative profile")
+	_check(policy.TRIAL_MARKER != "user://smart_automation/trial_used.json", "the first trial's marker is left alone")
 	DirAccess.remove_absolute(MARKER)
-	for entry: Array in [["breach_corps", "raise", 2.0, 2], ["breach_government", "lower", 2.0, 2], ["breach_government", "raise", 1.0, 1], ["breach_government", "raise", 3.0, 3], ["breach_government", "raise", 4.0, 4]]:
+	for entry: Array in [["breach_corps", "lower", 5.0, 5], ["breach_government", "raise", 4.0, 4], ["breach_government", "raise", 5.0, 5], ["breach_government", "lower", 4.0, 4], ["breach_government", "lower", 6.0, 6], ["breach_government", "lower", 3.0, 3]]:
 		var outside := _trial(entry[2])
 		var result := _trial_attempt(outside, entry[0], entry[1], entry[3])
 		_check(result.reason == "outside_trial" and outside.window.calls.is_empty(), "the trial refuses %s %s from %d" % [entry[0], entry[1], entry[3]])
 		_check(not FileAccess.file_exists(MARKER), "a refusal does not use up the trial")
 		_free(outside)
 
-	var busy := _trial(2.0)
+	for expected: Dictionary in [{}, {"status": "uncertain", "p_success": 1.0}, {"status": "invalid"}, {"status": "reliable", "p_success": 0.99}, {"status": "reliable", "p_success": 0.0}]:
+		var weak := _trial(5.0)
+		var result := _trial_attempt(weak, "breach_government", "lower", 5, expected)
+		_check(result.reason == "target_forecast_not_reliable" and weak.window.calls.is_empty(), "no lower towards a level not forecast safe: %s" % str(expected))
+		_check(not FileAccess.file_exists(MARKER), "this does not use up the trial")
+		_free(weak)
+
+	var busy := _trial(5.0)
 	busy.window.detected = true
-	_check(_trial_attempt(busy, "breach_government", "raise", 2).outcome == "deferred", "the trial waits for a safe window")
+	_check(_trial_attempt(busy, "breach_government", "lower", 5).outcome == "deferred", "the trial waits for a safe window")
 	_check(busy.window.calls.is_empty() and not FileAccess.file_exists(MARKER), "waiting does not use up the trial")
+	_check(busy.actuator.deferred_total == 1 and busy.actuator.summary().contains("deferred_no_safe_window=1"), "the missed window is counted")
 	_free(busy)
 
-	var first := _trial(2.0)
-	var done := _trial_attempt(first, "breach_government", "raise", 2)
-	_check(done.outcome == "acted" and first.window.calls == ["up:1"] and first.window.data.level == 3.0, "the trial's one change is made")
+	var first := _trial(5.0)
+	var done := _trial_attempt(first, "breach_government", "lower", 5)
+	_check(done.outcome == "acted" and first.window.calls == ["down:1"] and first.window.data.level == 4.0, "the trial's one change is made")
 	_check(FileAccess.file_exists(MARKER), "and it is marked as used")
 	_check(first.actuator.halt_reason == "action_limit_reached", "and the regulation stops at once")
-	first.actuator.claims_level_change("breach_government", 3)
+	first.actuator.claims_level_change("breach_government", 4)
 	for attack: int in 2:
-		_check(first.actuator.note_event("breach_government", _attack(3), false).is_empty(), "the verification follows several attacks: %d" % attack)
-	_check(first.actuator.note_event("breach_government", _attack(3), false).outcome == "verified", "and concludes after 3")
+		_check(first.actuator.note_event("breach_government", _attack(4), false).is_empty(), "the verification follows several attacks: %d" % attack)
+	_check(first.actuator.note_event("breach_government", _attack(4), false).outcome == "verified", "and concludes after 3")
 	_free(first)
 
-	var disturbed := _trial(2.0)
+	var disturbed := _trial(5.0)
 	DirAccess.remove_absolute(MARKER)
-	_trial_attempt(disturbed, "breach_government", "raise", 2)
-	disturbed.actuator.note_event("breach_government", _attack(3), false)
-	_check(disturbed.actuator.note_event("breach_government", {"event": "reset_unknown", "level": 3}, false).outcome == "failed", "any of those attacks can fail it")
+	_trial_attempt(disturbed, "breach_government", "lower", 5)
+	disturbed.actuator.note_event("breach_government", _attack(4), false)
+	_check(disturbed.actuator.note_event("breach_government", {"event": "reset_unknown", "level": 4}, false).outcome == "failed", "any of those attacks can fail it")
 	_free(disturbed)
 
-	var restarted := _trial(2.0)
-	_check(_trial_attempt(restarted, "breach_government", "raise", 2).reason == "trial_already_used", "a new session cannot act again")
-	_check(restarted.window.calls.is_empty() and restarted.window.data.level == 2.0, "and nothing moves")
+	var restarted := _trial(5.0)
+	_check(_trial_attempt(restarted, "breach_government", "lower", 5).reason == "trial_already_used", "a new session cannot act again")
+	_check(restarted.window.calls.is_empty() and restarted.window.data.level == 5.0, "and nothing moves")
 	_free(restarted)
 	DirAccess.remove_absolute(MARKER)
 
-	var unwritable := _trial(2.0)
+	var unwritable := _trial(5.0)
 	unwritable.actuator._marker_path = "user://smart_automation_test/trial_used.json/not_a_folder/marker.json"
 	DirAccess.make_dir_recursive_absolute("user://smart_automation_test")
 	var marker_file := FileAccess.open(MARKER, FileAccess.WRITE)
 	marker_file.close()
-	var refused := _trial_attempt(unwritable, "breach_government", "raise", 2)
+	var refused := _trial_attempt(unwritable, "breach_government", "lower", 5)
 	_check(refused.reason == "trial_marker_unwritable" and unwritable.window.calls.is_empty(), "no marker, no action")
 	_check(unwritable.actuator.halt_reason == "trial_marker_unwritable", "and it stops")
 	_free(unwritable)
 	DirAccess.remove_absolute(MARKER)
+
+	# The player's real figures, read from the last session's logs.
+	var profile := {"damage_rate": 35.3078, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0}
+	var level_4 := Forecast.forecast(profile, {"firewall": 101.0, "breach": 101.0, "time": 6.0}, 0.0)
+	_check(level_4.status == "reliable" and is_equal_approx(level_4.p_success, 1.0) and is_equal_approx(level_4.used_max, 5.0), "level 4 is forecast safe at 35.31 damage: %s" % str(level_4))
+	var real_target := _trial(5.0)
+	_check(_trial_attempt(real_target, "breach_government", "lower", 5, level_4).outcome == "acted", "and this forecast passes the trial's check, rounding included")
+	_free(real_target)
+	DirAccess.remove_absolute(MARKER)
+	var with_margin := Forecast.forecast(profile, {"firewall": 101.0, "breach": 101.0, "time": 6.0}, 0.2)
+	print("level 4 at 35.31 damage: without margin %s p=%s used_max=%s, with 20%% margin %s p=%s" % [level_4.outcome, level_4.p_success, level_4.used_max, with_margin.outcome, with_margin.p_success])
+	var level_5 := Forecast.forecast(profile, {"firewall": 757.5, "breach": 757.5, "time": 12.0}, 0.0)
+	_check(level_5.status == "reliable" and level_5.p_success == 0.0, "level 5 is forecast to fail at 35.31 damage: %s" % str(level_5))
 
 
 func _setup_summary() -> String:

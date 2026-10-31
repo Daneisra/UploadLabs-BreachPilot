@@ -78,6 +78,7 @@ var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowe
 var _actuator: ThreatActuator
 var _emergency := false
 var _last_refusal: Dictionary = {}
+var _tick_index := 0
 var _state: RegulationState = RegulationState.new()
 var _regulators: Dictionary = {}
 var _forecasts: Dictionary = {}
@@ -126,8 +127,8 @@ func _apply_trial() -> void:
 	_regulation.profile = Policy.TRIAL_PROFILE
 	_regulation.action_type = Policy.TRIAL_TYPE
 	_regulation.action_limit = Policy.TRIAL_MAX_ACTIONS
-	_regulation.max_allowed_level = Policy.TRIAL_TO
-	_regulation.min_level = Policy.TRIAL_FROM
+	_regulation.max_allowed_level = maxi(Policy.TRIAL_FROM, Policy.TRIAL_TO)
+	_regulation.min_level = mini(Policy.TRIAL_FROM, Policy.TRIAL_TO)
 
 
 ## regulation.mode can only be off or dry_run, unless this archive and the explicit trial option both
@@ -283,6 +284,7 @@ func _on_tick() -> void:
 		_last_tick_speed = _attributes.tick_speed
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.advance(_attributes.tick_speed)
+	_tick_index += 1
 	if _actuator != null:
 		_log_verification(_actuator.advance(_attributes.tick_speed))
 		_log_new_halt()
@@ -616,7 +618,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	var assumed := next
 	if decision.decision == "lower":
 		var lower_target := _native_values(tracker, event.level - 1)
-		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, regulator.margin())
+		# The margin is a caution against going up: without it, this says whether the lower level works.
+		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, 0.0)
 	decision.hypothetical = not _actuator.can_act()
 	_log_decision(type, decision, next, assumed)
 	_handle_action(tracker, event, decision, assumed)
@@ -640,7 +643,7 @@ func _handle_action(tracker: Dictionary, event: Dictionary, decision: Dictionary
 		return
 	var cycle_key := "%d|%d" % [tracker.window.get_instance_id(), event.cycle_id]
 	if event.event == "failure_power":
-		_attempt_action(tracker, cycle_key)
+		_attempt_action(tracker, cycle_key, "tick")
 	elif event.event == "success":
 		_attempt_after_success.call_deferred(tracker.window.get_instance_id(), cycle_key)
 
@@ -648,10 +651,10 @@ func _handle_action(tracker: Dictionary, event: Dictionary, decision: Dictionary
 func _attempt_after_success(id: int, cycle_key: String) -> void:
 	var tracker: Dictionary = _trackers.get(id, {})
 	if _actuator != null and not tracker.is_empty():
-		_attempt_action(tracker, cycle_key)
+		_attempt_action(tracker, cycle_key, "deferred")
 
 
-func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
+func _attempt_action(tracker: Dictionary, cycle_key: String, moment: String) -> void:
 	var type: String = tracker.type
 	var nodes := 0
 	for other: Dictionary in _trackers.values():
@@ -659,6 +662,7 @@ func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
 			nodes += 1
 	var regulator := _regulator_for(type)
 	var levels_before := _levels_text()
+	var state_before := _state_text(tracker.window)
 	var result := _actuator.attempt(type, tracker.window, cycle_key, nodes, not regulator.is_unsafe(), tracker.native_usable, _state.ceiling(type))
 	if result.is_empty():
 		return
@@ -668,15 +672,19 @@ func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
 		"would_act":
 			_log.info("action_would_apply type=%s %s" % [type, trace])
 		"acted":
-			_log.info("action_applied type=%s %s level_after=%d detected_after=%s time_after=%s max_time_after=%s problem=%s levels_before=%s levels_after=%s" % [type, trace, result.level_after, result.detected_after, _format_value(result.time_after), _format_value(result.max_time_after), result.get("reason", "none"), levels_before, _levels_text()])
+			_log.info("action_applied type=%s %s level_after=%d detected_after=%s time_after=%s max_time_after=%s problem=%s levels_before=%s levels_after=%s moment=%s tick=%d frame=%d usec=%d state_before=%s state_after=%s" % [type, trace, result.level_after, result.detected_after, _format_value(result.time_after), _format_value(result.max_time_after), result.get("reason", "none"), levels_before, _levels_text(), moment, _tick_index, Engine.get_process_frames(), Time.get_ticks_usec(), state_before, _state_text(tracker.window)])
 		"deferred":
-			_log.info("action_deferred_no_safe_window type=%s %s attempts=%d state=%s total=%d" % [type, trace, pending.attempts, result.reason, _actuator.deferred_total])
+			_log.info("action_deferred_no_safe_window type=%s %s attempts=%d state=%s total=%d moment=%s tick=%d frame=%d state_before=%s" % [type, trace, pending.attempts, result.reason, _actuator.deferred_total, moment, _tick_index, Engine.get_process_frames(), state_before])
 			if result.starving:
 				_log.warning("action_starving type=%s direction=%s attempts=%d: no safe window was found, the action keeps waiting" % [type, pending.direction, pending.attempts])
 		"refused":
 			regulator.cancel_last_action()
 			_log_refusal(type, pending.direction, result.reason)
 	_log_new_halt()
+
+
+func _state_text(window: Node) -> String:
+	return "detected:%s,time:%s,max_time:%s,firewall:%s,max_firewall:%s,breached:%s,paused:%s" % [window.detected, _format_value(window.time), _format_value(window.max_time), _format_value(window.firewall), _format_value(window.max_firewall), _format_value(window.breached), window.paused]
 
 
 ## The level of every watched node, to see that an action touched only its own.

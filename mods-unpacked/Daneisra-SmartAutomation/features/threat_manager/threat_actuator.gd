@@ -64,6 +64,8 @@ func _build_allows_actions() -> bool:
 func _trial_refusal(pending: Dictionary) -> String:
 	if pending.type != Policy.TRIAL_TYPE or pending.direction != Policy.TRIAL_DIRECTION or pending.from != Policy.TRIAL_FROM or pending.to != Policy.TRIAL_TO:
 		return "outside_trial"
+	if pending.expected.get("status") != "reliable" or pending.expected.get("p_success", -1.0) < Policy.TRIAL_MIN_TARGET_SUCCESS - EPSILON:
+		return "target_forecast_not_reliable"
 	if actions_done >= Policy.TRIAL_MAX_ACTIONS:
 		return "action_limit"
 	if FileAccess.file_exists(_marker_path):

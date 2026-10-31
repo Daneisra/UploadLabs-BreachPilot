@@ -22,7 +22,9 @@ main_text = (MOD_DIR / "mod_main.gd").read_text(encoding="utf-8")
 build = re.search(r'const BUILD := "([^"]+)"', main_text).group(1)
 if not build.startswith(manifest["version_number"]):
     raise SystemExit(f"BUILD {build} does not match manifest {manifest['version_number']}")
-archive_build = re.sub(r"-dev\.\d+$", "-trial.1", build) if trial else build
+policy_text = (MOD_DIR / POLICY).read_text(encoding="utf-8")
+trial_build = re.search(r'const TRIAL_BUILD := "([^"]+)"', policy_text).group(1)
+archive_build = re.sub(r"-dev\.\d+$", f"-{trial_build}", build) if trial else build
 out = ROOT / "build" / f"Daneisra-SmartAutomation-{archive_build}.zip"
 out.parent.mkdir(exist_ok=True)
 

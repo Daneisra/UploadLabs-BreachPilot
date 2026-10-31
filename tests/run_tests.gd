@@ -93,6 +93,10 @@ class FakeBreach extends Node:
 ## Follows what we think the game does when its level methods are called.
 class ActingBreach extends FakeBreach:
 	var calls: Array[String] = []
+	var fixed_time := 0.0
+
+	func get_max_time(level: int) -> float:
+		return fixed_time if fixed_time > 0.0 else super(level)
 
 	func level_up(steps: int) -> void:
 		calls.append("up:%d" % steps)
@@ -1168,7 +1172,44 @@ func _test_actions_in_observer() -> void:
 	await _remove_fake_game(game)
 
 
-## The first real test, from start to finish, on the fake game.
+## Volleys one second apart, as measured in the game: the attack ends when the bars are empty or the
+## timer runs out. restart: the next attack begins on the very tick of the reset, with no free state.
+func _play_volleys(game: Dictionary, breach: FakeBreach, restart: bool = false) -> void:
+	var start: float = breach.max_time
+	var hit: float = breach.breach_damage.production
+	var firewall: float = breach.max_firewall
+	var breached := 0.0
+	for volley: int in int(start):
+		if firewall > 0.0:
+			firewall = maxf(firewall - hit, 0.0)
+		else:
+			breached += hit
+		breach.detected = true
+		breach.time = start - 0.05 - volley
+		breach.firewall = firewall
+		breach.breached = minf(breached, breach.max_breach)
+		game.Signals.tick.emit()
+		if breached >= breach.max_breach:
+			breach.time -= 0.05
+			game.Signals.breached.emit(breach)
+			breach.detected = false
+			breach.time = breach.max_time
+			breach.firewall = breach.max_firewall
+			breach.breached = 0.0
+			await process_frame
+			game.Signals.tick.emit()
+			return
+	breach.time = 0.05
+	game.Signals.tick.emit()
+	breach.detected = restart
+	breach.time = breach.max_time - (0.05 if restart else 0.0)
+	breach.firewall = breach.max_firewall - (hit if restart else 0.0)
+	breach.breached = 0.0
+	game.Signals.tick.emit()
+	await process_frame
+
+
+## The authorized trial from start to finish, on the fake game: only the build's lock is opened.
 func _test_trial_in_observer() -> void:
 	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
 	DirAccess.remove_absolute(MARKER_PATH)
@@ -1176,13 +1217,14 @@ func _test_trial_in_observer() -> void:
 	game.Globals.desktop = game.desktop
 	var government := ActingBreach.new()
 	government.window = "breach_government"
+	government.fixed_time = 6.0
 	var corps := ActingBreach.new()
 	game.desktop.windows.add_child(government)
 	game.desktop.windows.add_child(corps)
 	for window: ActingBreach in [government, corps]:
 		window.breach_damage.production = 30.0
 		window.infection_damage.production = 0.0
-	government.data.level = 2.0
+	government.data.level = 5.0
 	government._rearm()
 
 	for old: Dictionary in [{"mode": "active"}, {"mode": "dry_run", "action_type": "breach_government"}, {"active_trial": "true"}, {"active_trial": 1}, {"active_trial": false}]:
@@ -1192,33 +1234,40 @@ func _test_trial_in_observer() -> void:
 		forgotten.free()
 
 	var observer := TrialObserver.new()
-	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 9, "action_type": "breach_corps", "max_allowed_level": 40})
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 9, "action_type": "breach_corps", "max_allowed_level": 40, "min_level": 0})
 	_check(observer.regulation_mode() == "active", "the trial needs its own option")
 	root.add_child(observer)
 	ModLoaderLog.messages.clear()
 	observer.start()
 	_check(_count("regulation_mode=active profile=conservative") == 1, "the trial sets its own profile, whatever the options say")
 	game.Signals.tick.emit()
-	for attack: int in 20:
-		await _play_attack(game, government, true)
+	for attack: int in 8:
+		await _play_volleys(game, government)
 		await _play_attack(game, corps, true)
-	_check(government.calls == ["up:1"], "one call on Government: %s, %s" % [str(government.calls), _last("active type=breach_government")])
-	_check(government.data.level == 3.0, "the level is exactly 3")
-	_check(corps.calls.is_empty() and corps.data.level == 3.0, "the other node is untouched")
-	_check(_count("levels_before=") == 1 and _last("levels_before=").contains("breach_corps:3"), "the log shows the other node's level around the action")
-	_check(_count("level_origin type=breach_government level=3 origin=mod") == 1, "the change is the mod's")
-	_check(_count("manual_ceiling") == 0, "no ceiling is created")
+		if not government.calls.is_empty():
+			break
+	_check(government.calls == ["down:1"], "one call on Government: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	_check(government.data.level == 4.0, "the level is exactly 4")
+	_check(_count("action_applied type=breach_government direction=lower level=5 target=4") == 1, "the lower is traced")
+	var applied := _last("action_applied")
+	_check(applied.contains("window_failures=2") and applied.contains("forecast_status=reliable") and applied.contains("forecast_p=1.0"), "with the observed failures and the target's forecast: %s" % applied)
+	_check(applied.contains("moment=tick") and applied.contains(" tick=") and applied.contains(" frame=") and applied.contains("state_before=detected:false"), "and its exact moment")
+	_check(applied.contains("breach_corps:3") and corps.calls.is_empty() and corps.data.level == 3.0, "the other node is untouched")
 	_check(_count("regulation_stopped reason=action_limit_reached actions=1") == 1, "the regulation stops right after")
-	_check(_count("action_verification type=breach_government from=2 to=3 outcome=verified") == 1, "the next attacks verify it: %s" % _last("action_verification"))
-	_check(_count("level_changed_reset") == 0 and _count("reset_unknown") == 0, "no attack is reset")
-	_check(_count("decision=raise") == 1 or _count("hypothetical=false") >= 1, "the real decision is marked as such")
+	for attack: int in 4:
+		await _play_volleys(game, government)
+	_check(_count("level_origin type=breach_government level=4 origin=mod") == 1, "the change is the mod's")
+	_check(_count("manual_ceiling") == 0, "no ceiling is created")
+	_check(_count("action_verification type=breach_government from=5 to=4 outcome=verified") == 1, "the next attacks verify it: %s" % _last("action_verification"))
+	_check(_count("event=level_changed_reset") == 0 and _count("event=reset_unknown") == 0, "no attack is reset")
+	_check(government.calls.size() == 1 and government.data.level == 4.0, "and nothing moves after")
 	observer.stop()
 	observer.queue_free()
 	await process_frame
 
 	# The game restarts, with the level put back by hand: the marker still says no.
 	government.calls.clear()
-	government.data.level = 2.0
+	government.data.level = 5.0
 	government._rearm()
 	var again := TrialObserver.new()
 	again.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
@@ -1226,12 +1275,40 @@ func _test_trial_in_observer() -> void:
 	ModLoaderLog.messages.clear()
 	again.start()
 	game.Signals.tick.emit()
-	for attack: int in 12:
-		await _play_attack(game, government, true)
+	for attack: int in 8:
+		await _play_volleys(game, government)
 	_check(government.calls.is_empty(), "the trial never acts a second time")
-	_check(_count("action_refused type=breach_government direction=raise reason=trial_already_used") == 1, "and says why: %s" % _last("action_"))
+	_check(_count("action_refused type=breach_government direction=lower reason=trial_already_used") == 1, "and says why: %s" % _last("action_"))
 	again.stop()
 	again.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(MARKER_PATH)
+
+	# The next attack starts on the tick of the reset: no free state, so the action waits.
+	government.calls.clear()
+	government.data.level = 5.0
+	government._rearm()
+	var tight := TrialObserver.new()
+	tight.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
+	root.add_child(tight)
+	ModLoaderLog.messages.clear()
+	tight.start()
+	game.Signals.tick.emit()
+	for attack: int in 8:
+		await _play_volleys(game, government, true)
+	_check(government.calls.is_empty(), "without a safe window nothing is forced: %s" % _last("active type=breach_government"))
+	_check(_count("action_deferred_no_safe_window type=breach_government direction=lower") >= 1, "the missed windows are reported: %s" % _last("action_"))
+	_check(_count("state=attack_in_progress") >= 1 and _count("moment=tick") >= 1, "with the state and the moment")
+	_check(not FileAccess.file_exists(MARKER_PATH), "they do not use up the trial")
+	government.detected = false
+	government.time = government.max_time
+	government.firewall = government.max_firewall
+	game.Signals.tick.emit()
+	await _play_volleys(game, government)
+	_check(government.calls == ["down:1"], "the action happens once a window is free: %s" % _last("action_"))
+	tight.stop()
+	_check(_last("actuator_summary").contains("actions=1 deferred_no_safe_window="), "the summary gives the count: %s" % _last("actuator_summary"))
+	tight.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(MARKER_PATH)
 	await _remove_fake_game(game)

@@ -4,14 +4,18 @@ extends RefCounted
 
 const ACTIONS_ENABLED := false
 
-## The only change the first active trial allows, once.
-const TRIAL_ID := "government-2-to-3-v1"
+## The only change the current active trial allows, once.
+const TRIAL_ID := "government-5-to-4-v1"
+const TRIAL_BUILD := "trial.2"
 const TRIAL_TYPE := "breach_government"
-const TRIAL_DIRECTION := "raise"
-const TRIAL_FROM := 2
-const TRIAL_TO := 3
+const TRIAL_DIRECTION := "lower"
+const TRIAL_FROM := 5
+const TRIAL_TO := 4
 const TRIAL_PROFILE := "conservative"
 const TRIAL_MAX_ACTIONS := 1
 const TRIAL_VERIFY_ATTACKS := 3
+## The target level must be forecast this safe, without the margin that only applies to raises.
+const TRIAL_MIN_TARGET_SUCCESS := 1.0
 ## Written before the call: not even a restart can make this trial act twice. It is not part of a save.
-const TRIAL_MARKER := "user://smart_automation/trial_used.json"
+## Each trial has its own: the marker of an earlier trial is kept.
+const TRIAL_MARKER := "user://smart_automation/trial_2_used.json"

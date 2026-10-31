@@ -67,7 +67,9 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 
 **Le code du dépôt ne peut changer aucun niveau.** `action_policy.gd` garde `ACTIONS_ENABLED` à faux, ce qui ferme les verrous de l'observateur et de l'actionneur. Seule l'archive construite par `tools/build_zip.py --trial` l'ouvre, pour un essai autorisé, et la construction échoue si du code réservé aux tests s'y trouve. En `dry_run`, tous les contrôles s'exécutent et le journal indique ce qui aurait été fait (`action_would_apply`).
 
-**Essai actif :** même dans une archive d'essai, il faut l'option `active_trial` à vrai. Une ancienne configuration ne contient pas cette option, et `regulation_mode` ne peut demander que `off` ou `dry_run`. L'essai fixe lui-même ses limites : `breach_government`, montée de 2 à 3, profil conservateur, 1 action, vérification sur 3 attaques. Un fichier `user://smart_automation/trial_used.json`, écrit avant l'appel et séparé des sauvegardes, empêche une seconde action même après un redémarrage.
+**Essai actif :** même dans une archive d'essai, il faut l'option `active_trial` à vrai. Une ancienne configuration ne contient pas cette option, et `regulation_mode` ne peut demander que `off` ou `dry_run`. L'essai fixe lui-même ses limites, dans `action_policy.gd` : type, sens, niveaux, profil conservateur, 1 action, vérification sur 3 attaques. Un fichier propre à chaque essai (`user://smart_automation/trial_used.json`, puis `trial_2_used.json`), écrit avant l'appel et séparé des sauvegardes, empêche une seconde action même après un redémarrage.
+
+**Marge et baisse :** la marge du profil ne s'applique qu'aux montées. Pour une baisse, le niveau cible doit être annoncé fiable et réussi à 100 % sans marge.
 
 | Étape | Règle |
 |---|---|

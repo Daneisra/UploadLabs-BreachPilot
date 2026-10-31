@@ -19,7 +19,7 @@ class FakeResource:
 
 
 class FakeWindow extends Node:
-	var data := {"level": 2.0, "max_level": 5.0}
+	var data := {"level": 5.0, "max_level": 5.0}
 	var detected := false
 	var paused := false
 	var time := 6.0
@@ -59,7 +59,7 @@ func _check(condition: bool, label: String) -> void:
 
 func _attempt(window: FakeWindow, settings: FakeSettings, type: String, direction: String, level: int) -> Dictionary:
 	var actuator := Actuator.new(true, {"attributes": settings, "data": settings}, {"action_limit": 1, "action_type": type, "marker_path": MARKER})
-	actuator.request(type, direction, level, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {})
+	actuator.request(type, direction, level, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {"status": "reliable", "p_success": 1.0}, {})
 	return actuator.attempt(type, window, "1|1", 1, true, true, -1)
 
 
@@ -79,13 +79,13 @@ func _run() -> void:
 
 	var settings := FakeSettings.new()
 	var window := FakeWindow.new()
-	for entry: Array in [["breach_corps", "raise", 2], ["breach_government", "lower", 2], ["breach_government", "raise", 3]]:
+	for entry: Array in [["breach_corps", "lower", 5], ["breach_government", "raise", 5], ["breach_government", "lower", 4]]:
 		_check(_attempt(window, settings, entry[0], entry[1], entry[2]).reason == "outside_trial", "refused: %s" % str(entry))
 	_check(window.calls.is_empty(), "nothing outside the trial is called")
-	var done := _attempt(window, settings, "breach_government", "raise", 2)
-	_check(done.outcome == "acted" and window.calls == ["up:1"] and window.data.level == 3.0, "the one change is made")
-	window.data.level = 2.0
-	_check(_attempt(window, settings, "breach_government", "raise", 2).reason == "trial_already_used", "never twice")
+	var done := _attempt(window, settings, "breach_government", "lower", 5)
+	_check(done.outcome == "acted" and window.calls == ["down:1"] and window.data.level == 4.0, "the one change is made")
+	window.data.level = 5.0
+	_check(_attempt(window, settings, "breach_government", "lower", 5).reason == "trial_already_used", "never twice")
 	_check(window.calls.size() == 1, "one call in all")
 	window.free()
 	settings.free()
