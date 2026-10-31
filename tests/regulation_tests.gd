@@ -1,13 +1,11 @@
 extends RefCounted
-## Forecast, regulator and ceilings, tested without the game. Random sequences use fixed seeds.
+## Forecast, regulator and pauses, tested without the game. Random sequences use fixed seeds.
 
 const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/"
 const Forecast := preload(MOD + "breach_forecast.gd")
 const PowerProfile := preload(MOD + "power_profile.gd")
 const Regulator := preload(MOD + "threat_regulator.gd")
 const RegulationState := preload(MOD + "regulation_state.gd")
-
-const STATE_PATH := "user://smart_automation_test/threat_state.json"
 
 var _check_call: Callable
 
@@ -27,7 +25,7 @@ func run(check: Callable) -> void:
 	_test_profiles()
 	_test_trust_and_safety()
 	_test_long_sequences()
-	_test_ceilings()
+	_test_pauses()
 
 
 func _check(condition: bool, label: String) -> void:
@@ -165,11 +163,12 @@ func _test_raise_rules() -> void:
 	_check(_feed(Regulator.new("balanced"), 30, "success", 4, _good_next(), {}, "s", 4.0, 4).back().reason == "at_game_maximum", "no raise above the game's maximum")
 	_check(_kinds(_feed(Regulator.new("balanced", 4), 30, "success", 4, _good_next()), "raise") == 0, "no raise above the allowed maximum")
 
-	var capped := Regulator.new("balanced")
-	capped.set_ceiling(4)
-	var ceiling_decisions := _feed(capped, 30, "success", 4, _good_next())
-	_check(_kinds(ceiling_decisions, "raise") == 0, "the manual ceiling is never exceeded")
-	_check(ceiling_decisions.back().reason == "at_manual_ceiling", "the log says the ceiling is what stops it")
+	var paused := Regulator.new("balanced")
+	paused.set_paused(true)
+	var paused_decisions := _feed(paused, 30, "success", 4, _good_next())
+	_check(_kinds(paused_decisions, "raise") == 0, "a pause stops raises")
+	_check(paused_decisions.back().reason == "manual_pause", "the log says the pause is what stops it")
+	_check(_kinds(_feed(paused, 30, "failure_power", 4, _reliable(1.0), {}), "lower") == 0, "and lowers")
 
 	var native := Regulator.new("balanced")
 	native.set_native(true)
@@ -439,48 +438,36 @@ func _test_long_sequences() -> void:
 	_check(first == again, "a fixed seed gives the same sequence")
 
 
-func _test_ceilings() -> void:
-	if FileAccess.file_exists(STATE_PATH):
-		DirAccess.remove_absolute(STATE_PATH)
+func _test_pauses() -> void:
+	var state := RegulationState.new()
+	_check(not state.is_paused("breach_corps"), "nothing is paused at first")
+	_check(state.pause("breach_corps", "player_button") and state.is_paused("breach_corps"), "a type can be paused")
+	_check(not state.pause("breach_corps", "player_level_change") and state.reason("breach_corps") == "player_button", "a second pause changes nothing")
+	_check(not state.is_paused("breach_government"), "each type has its own")
+	_check(state.resume("breach_corps") and not state.is_paused("breach_corps"), "a resume lifts it")
+	_check(not state.resume("breach_corps"), "once")
 
-	var session := RegulationState.new(STATE_PATH)
-	session.set_slot("")
-	session.apply_manual("breach_corps", 6)
-	_check(session.ceiling("breach_corps") == 6, "lowering by hand sets the ceiling")
-	session.apply_manual("breach_corps", 7)
-	_check(session.ceiling("breach_corps") == 7, "raising by hand moves the ceiling, it does not remove it")
-	_check(session.ceiling("breach_government") == -1, "each type has its own ceiling")
-	_check(not session.is_persistent(), "without a slot identifier nothing is persistent")
-	_check(not FileAccess.file_exists(STATE_PATH), "without a slot identifier nothing is written")
-	session.set_slot("")
-	_check(session.ceiling("breach_corps") == -1, "loading a game forgets session ceilings")
-	_check(not session.apply_clear_token(5), "a clear token does nothing without a slot")
+	# The resume keeps what must not be forgotten: delays, blocks and the budget.
+	var regulator := Regulator.new("balanced")
+	_feed(regulator, 2, "success", 6, {})
+	var lowered: Dictionary = _feed(regulator, 2, "failure_power", 6, {}, _reliable(1.0)).back()
+	_check(lowered.decision == "lower" and lowered.forecast_refuted, "a refuted level is proposed for a lower")
+	regulator.on_level_changed(5)
+	regulator.set_paused(true)
+	_feed(regulator, 10, "success", 5, _good_next())
+	var actions_before: int = regulator._actions.size()
+	regulator.on_resume(5)
+	_check(regulator._blocked.has(6) and regulator._blocked[6] == INF, "a refuted level stays blocked")
+	_check(regulator._actions.size() == actions_before, "the budget stays spent")
+	var after := _feed(regulator, 2, "success", 5, _good_next())
+	_check(after[0].reason == "stabilizing" and after[1].reason == "stabilizing", "observations start again: %s" % after[0].reason)
+	_check(_feed(regulator, 30, "success", 5, _good_next()).back().reason == "level_blocked", "and the block still holds")
 
-	var first_run := RegulationState.new(STATE_PATH)
-	first_run.set_slot("slot_a")
-	first_run.apply_manual("breach_corps", 6)
-	first_run.set_slot("slot_b")
-	_check(first_run.ceiling("breach_corps") == -1, "another slot is not affected")
-	first_run.apply_manual("breach_corps", 3)
-	first_run.set_slot("slot_a")
-	_check(first_run.ceiling("breach_corps") == 6, "each slot keeps its ceiling")
-
-	var restarted := RegulationState.new(STATE_PATH)
-	restarted.set_slot("slot_a")
-	_check(restarted.ceiling("breach_corps") == 6, "a ceiling survives a restart")
-	restarted.set_slot("slot_b")
-	_check(restarted.ceiling("breach_corps") == 3, "so does the other slot's")
-	restarted.set_slot("slot_a")
-	_check(not restarted.apply_clear_token(0), "an unchanged token removes nothing")
-	_check(restarted.ceiling("breach_corps") == 6, "the ceiling is still there")
-	_check(restarted.apply_clear_token(1), "changing the token is the explicit removal")
-	_check(restarted.ceiling("breach_corps") == -1, "the ceiling is gone")
-	_check(not restarted.apply_clear_token(1), "the token only acts once")
-	restarted.set_slot("slot_b")
-	_check(restarted.ceiling("breach_corps") == 3, "removal only affects the current slot")
-
-	var again := RegulationState.new(STATE_PATH)
-	again.set_slot("slot_a")
-	_check(again.ceiling("breach_corps") == -1, "the removal survives a restart")
-	DirAccess.remove_absolute(STATE_PATH)
-	DirAccess.remove_absolute(STATE_PATH.get_base_dir())
+	var delayed := Regulator.new("conservative")
+	var first: Array[Dictionary] = _feed(delayed, 7, "success", 4, _good_next(), {}, "s", 20.0)
+	_check(_kinds(first, "raise") == 1, "a raise is proposed")
+	delayed.on_level_changed(5)
+	delayed.set_paused(true)
+	delayed.on_resume(5)
+	var soon := _feed(delayed, 7, "success", 5, _good_next(), {}, "s", 1.0)
+	_check(_kinds(soon, "raise") == 0 and soon.back().reason == "raise_delay", "a resume does not skip the delay: %s" % soon.back().reason)

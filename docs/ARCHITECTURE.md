@@ -23,7 +23,10 @@ mods-unpacked/Daneisra-SmartAutomation/
     ├── breach_simulator.gd       # distribution exacte des salves, calcul pur et borné
     ├── gap_probe.gd              # mesure entre deux attaques, machine à états pure
     ├── gap_stats.gd              # totaux bornés de ces mesures
-    ├── threat_actuator.gd        # seul script pouvant changer un niveau, verrouillé dans ce build
+    ├── threat_actuator.gd        # seul script pouvant changer un niveau, verrouillé dans le dépôt
+    ├── action_policy.gd          # verrou du dépôt et limites de l'essai en cours
+    ├── regulation_state.gd       # pauses manuelles par type, en mémoire
+    ├── automation_control.gd     # rangée d'état et bouton sous les boutons de niveau
     └── threat_observer.gd        # adaptateur vers le jeu, en lecture seule
 tests/                            # tests simulés (Godot sans interface)
 tools/build_zip.py                # construit le zip du mod
@@ -60,14 +63,15 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 - **Prévision :** sans infection, probabilité exacte. Avec infection, encadrement : réussite dans le pire cas ou échec dans le cas nominal sont fiables, le reste est incertain. Le modèle d'infection doit d'abord réussir 10 comparaisons à la puissance courante, sinon il est incertain, et il devient invalide au-delà de 5 % de résultats hors plage. Vulnérabilité, furtivité et croissance `INFECTED` restent invalides tant qu'elles ne sont pas mesurées.
 - **Montée :** réussites consécutives, prévision fiable et conforme au profil, sous le maximum et le plafond, hors blocage.
 - **Baisse :** seuls les `failure_power` complets comptent. Il faut assez d'échecs pour que le hasard ne soit plus une explication acceptable (moins de 0,1 % sur la fenêtre de 20 attaques), et au moins 10 attaques si un risque est attendu. Un échec contre un risque attendu sous 1 % réfute la prévision : le niveau reste bloqué jusqu'au prochain changement de puissance.
-- **Plafond manuel :** tout changement manuel fixe le plafond au nouveau niveau, vers le haut comme vers le bas. Il n'est supprimé que par une action explicite. Sans identifiant de sauvegarde fiable, il ne dure que la session et rien n'est écrit.
+- **Pause manuelle :** remplace les plafonds. Tout changement de niveau du joueur, `Ctrl+Z` compris s'il change vraiment le niveau, suspend le type. Seul un clic sur le nœud la lève. Elle dure toute la session, chargements compris, et rien n'est écrit.
+- **Reprise :** le niveau actuel devient le point de départ, la fenêtre d'attaques est vidée et 2 attaques de stabilisation sont exigées. Délais, blocages, prévisions réfutées, budget et arrêts sont conservés. Le mod peut ensuite dépasser le niveau choisi par le joueur. Le bouton n'appelle aucune méthode de niveau.
 - **Sécurité :** option native active, classificateur peu fiable ou inversions répétées suspendent les décisions.
 
 ## Actionneur
 
 **Le code du dépôt ne peut changer aucun niveau.** `action_policy.gd` garde `ACTIONS_ENABLED` à faux, ce qui ferme les verrous de l'observateur et de l'actionneur. Seule l'archive construite par `tools/build_zip.py --trial` l'ouvre, pour un essai autorisé, et la construction échoue si du code réservé aux tests s'y trouve. En `dry_run`, tous les contrôles s'exécutent et le journal indique ce qui aurait été fait (`action_would_apply`).
 
-**Essai actif :** même dans une archive d'essai, il faut l'option `active_trial` à vrai. Une ancienne configuration ne contient pas cette option, et `regulation_mode` ne peut demander que `off` ou `dry_run`. L'essai fixe lui-même ses limites, dans `action_policy.gd` : type, sens, niveaux, profil conservateur, 1 action, vérification sur 3 attaques. Un fichier propre à chaque essai (`user://smart_automation/trial_used.json`, puis `trial_2_used.json`), écrit avant l'appel et séparé des sauvegardes, empêche une seconde action même après un redémarrage.
+**Essai actif :** même dans une archive d'essai, il faut l'option `active_trial` à vrai. Une ancienne configuration ne contient pas cette option, et `regulation_mode` ne peut demander que `off` ou `dry_run`. L'essai fixe lui-même ses limites, dans `action_policy.gd` : type, sens, niveaux, profil conservateur, 1 action, vérification sur 3 attaques. Un fichier propre à chaque essai (`user://smart_automation/trial_used.json`, `trial_2_used.json`, `trial_3_used.json`), écrit avant chaque appel et séparé des sauvegardes, interdit toute action après un redémarrage, même s'il reste du budget.
 
 **Marge et baisse :** la marge du profil ne s'applique qu'aux montées. Pour une baisse, le niveau cible doit être annoncé fiable et réussi à 100 % sans marge.
 
@@ -80,13 +84,27 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 | Action | Contrôles et appel dans le même appel, sans attente. Un seul niveau, un seul point d'entrée (`_call_native`) |
 | Après | Relecture immédiate du niveau et de l'état, puis vérification de l'attaque suivante (`action_verification`). Une attaque perturbée, incomplète ou absente, ou un rechargement, arrête la régulation |
 
-- **Origine d'un changement :** `origin=mod` seulement pour le niveau attendu après une action du mod, et une seule fois. Tout autre changement est celui du joueur (plafond de session, action en attente abandonnée), ou de l'option native si elle est active.
+- **Origine d'un changement :** `origin=mod` seulement pour le niveau attendu après une action du mod, et une seule fois. Tout autre changement est celui du joueur (pause du type, action en attente abandonnée), ou de l'option native si elle est active.
 - **Arrêt d'urgence :** `Ctrl+Alt+F10`, toujours actif, sans option. Il dure jusqu'au redémarrage du jeu.
 - **Limite d'actions :** `action_limit`, 1 par défaut. Elle arrête la régulation juste après l'action, et la vérification continue.
 - **Un seul type :** un actionneur armé exige `action_type`, sans valeur par défaut.
 - **Vitesse :** toute vitesse autre que 0,05 ou illisible empêche l'action. Un changement de vitesse efface la fenêtre d'attaques et relance la stabilisation.
 
 **Limite :** tout cela n'est testé que sur un faux jeu, qui suit notre compréhension de `level_up` et `level_down`. Leur effet réel et le sens de leur argument ne sont pas vérifiés.
+
+## Contrôle sur le nœud
+
+Une rangée, créée à l'exécution, est ajoutée en dernier enfant de `MainContainer`, juste sous `ActionContainer`, qui contient `Lower Threat` et `Raise Threat`. Aucun script du jeu n'est modifié. Si cette structure manque, le nœud n'a simplement pas de contrôle (`automation_control result=unavailable`). L'état appartient au type et survit à la suppression du nœud. Le contrôle est retiré à l'arrêt de l'observateur, et jamais doublé.
+
+| Affichage | Sens | Bouton |
+|---|---|---|
+| `Auto : actif` | Régulation armée, maintien du niveau compris | `Pause` |
+| `Auto : simulation` | Même état, dans un build qui ne peut pas agir | `Pause` |
+| `Pause manuelle` | Geste ou clic du joueur. L'infobulle signale un blocage éventuel | `Reprendre l'automatisation` |
+| `Auto : bloqué` | Arrêt d'urgence, anomalie, budget, option native, vitesse, API, classificateur. Cause dans l'infobulle | Aucun |
+| `Auto : désactivé` | Régulation coupée, ou type hors de l'essai | Aucun |
+
+La pause et le blocage sont indépendants : reprendre ne lève jamais un blocage. Une prévision insuffisante est un maintien, pas un blocage. Les textes ne sont qu'en français pour l'instant.
 
 ## Mesure entre deux attaques
 

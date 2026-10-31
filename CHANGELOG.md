@@ -1,8 +1,17 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.3 – en cours : actionneur et essais actifs
+## 0.2.0-beta.1-dev.5 – en cours : actionneur, essais actifs et pause sur le nœud
 
-**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, une seule fois, avec son option activée. Montée de 2 à 3 validée sur Gouvernement. Baisse de 5 à 4 en préparation. Ce n'est pas encore la `0.2.0-beta.1`.
+**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée de 2 à 3 et baisse de 5 à 4 validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
+
+### Ajouté
+
+- Rangée d'état et bouton sous `Lower Threat` et `Raise Threat`, sans dépendance à ModManager.
+- Pause manuelle par type et reprise depuis le nœud.
+
+### Retiré
+
+- Les plafonds manuels, remplacés par la pause.
 
 ### Corrigé
 

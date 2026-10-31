@@ -36,7 +36,7 @@ var suppressed_repeats := 0
 var _profile: Dictionary
 var _max_allowed: int
 var _min_level: int
-var _ceiling := -1
+var _paused := false
 var _native := false
 var _timer := 0.0
 var _level := -1
@@ -77,8 +77,8 @@ func set_native(active: bool) -> void:
 	_native = active
 
 
-func set_ceiling(level: int) -> void:
-	_ceiling = level
+func set_paused(paused: bool) -> void:
+	_paused = paused
 
 
 ## Failures the window must hold before chance stops being a fair explanation.
@@ -131,10 +131,21 @@ func model_trust() -> String:
 	return "verified"
 
 
-## The level moved. Only the caller knows why; ceilings are set apart with set_ceiling.
+## The level moved. Only the caller knows why; a pause is set apart with set_paused.
 func on_level_changed(level: int) -> void:
 	_level = level
 	_reset_window()
+	_proposal = ""
+	_undo = {}
+
+
+## The player gave control back: the level is the new starting point and nothing may happen before
+## new observations. Delays, blocks, the budget and refuted forecasts all stay.
+func on_resume(level: int) -> void:
+	_paused = false
+	_level = level
+	_reset_window()
+	_stabilizing = STABILIZE_ATTACKS
 	_proposal = ""
 	_undo = {}
 
@@ -192,6 +203,8 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		_history.pop_front()
 	_consecutive = 0 if is_failure else _consecutive + 1
 
+	if _paused:
+		return _decision("hold", "manual_pause", attack)
 	if _native:
 		return _decision("hold", "blocked_native", attack)
 	if is_unsafe():
@@ -242,9 +255,6 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	if next.p_success < _profile.p - RISK_EPSILON:
 		return _decision("hold", "forecast_too_risky", attack, {"p": next.p_success})
 
-	# Respecting the player comes last, so the log still shows what the model would have wanted.
-	if _ceiling >= 0 and target > _ceiling:
-		return _decision("hold", "at_manual_ceiling", attack, {"ceiling": _ceiling, "p": next.p_success})
 	if _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)
 	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal})

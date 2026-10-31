@@ -15,6 +15,7 @@ const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
 const ThreatActuator := preload("threat_actuator.gd")
 const Policy := preload("action_policy.gd")
+const AutomationControl := preload("automation_control.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
@@ -42,6 +43,14 @@ const SAVE_NODES_LOGGED := 12
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
 const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level", "get_reward", "get_experience_reward"]
+const BLOCK_TEXTS := {
+	"emergency_stop": "arrêt d'urgence, jusqu'au redémarrage du jeu",
+	"native_option": "option native de montée automatique active",
+	"speed": "vitesse de jeu différente de la normale",
+	"native_methods": "méthodes du jeu inutilisables",
+	"classifier": "trop de réinitialisations inexpliquées",
+	"action_limit_reached": "nombre maximal d'actions atteint",
+}
 ## Far from what the game should use, so these hooks run first and last among the frame's _process.
 const HOOK_PRIORITY := 1000000
 const PROBE_REPORT_FRAMES := 18000
@@ -127,8 +136,8 @@ func _apply_trial() -> void:
 	_regulation.profile = Policy.TRIAL_PROFILE
 	_regulation.action_type = Policy.TRIAL_TYPE
 	_regulation.action_limit = Policy.TRIAL_MAX_ACTIONS
-	_regulation.max_allowed_level = maxi(Policy.TRIAL_FROM, Policy.TRIAL_TO)
-	_regulation.min_level = mini(Policy.TRIAL_FROM, Policy.TRIAL_TO)
+	_regulation.max_allowed_level = Policy.TRIAL_MAX_LEVEL
+	_regulation.min_level = Policy.TRIAL_MIN_LEVEL
 
 
 ## regulation.mode can only be off or dry_run, unless this archive and the explicit trial option both
@@ -196,6 +205,7 @@ func stop() -> void:
 	_signals.desktop_ready.disconnect(_on_desktop_ready)
 	_signals.setting_set.disconnect(_on_setting_set)
 	_stop_probe()
+	_detach_controls()
 	if _actuator != null:
 		_log.info(_actuator.summary())
 		_actuator = null
@@ -222,11 +232,8 @@ func _exit_tree() -> void:
 	stop()
 
 
-## A game was loaded. The slot is unknown, so ceilings must not follow the player into another save.
+## A game was loaded. Pauses stay: only the player's click ends one.
 func _on_desktop_ready() -> void:
-	_state.set_slot("")
-	for regulator: ThreatRegulator in _regulators.values():
-		regulator.set_ceiling(-1)
 	if _actuator != null:
 		for type: String in _regulators:
 			_cancel_action(type, "game_loaded")
@@ -266,6 +273,7 @@ func _bind_window(window: Variant) -> void:
 		"native_usable": signatures.get("level_up", -1) == 1 and signatures.get("level_down", -1) == 1,
 	}
 	_log_native_actions(window)
+	_attach_control(_trackers[id])
 	if _gap_stats != null:
 		_trackers[id].probe = GapProbe.new()
 		_trackers[id].screen_fields = "out_of_screen" in window and "is_far" in window
@@ -279,9 +287,10 @@ func _bind_window(window: Variant) -> void:
 func _on_tick() -> void:
 	if _attributes.tick_speed != _last_tick_speed:
 		_log.info("tick_speed from=%s to=%s" % [_format_value(_last_tick_speed), _format_value(_attributes.tick_speed)])
-		if _last_tick_speed >= 0.0:
-			_on_speed_changed()
+		var speed_moved := _last_tick_speed >= 0.0
 		_last_tick_speed = _attributes.tick_speed
+		if speed_moved:
+			_on_speed_changed()
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.advance(_attributes.tick_speed)
 	_tick_index += 1
@@ -325,6 +334,7 @@ func _on_window_deleted(window: Variant) -> void:
 func _on_setting_set(setting: String) -> void:
 	if setting == "auto_level_breach":
 		_log.info("setting native_auto_level=%s" % _data.auto_level_breach)
+		_refresh_controls()
 
 
 func _drop_tracker(id: int, reason: String) -> void:
@@ -588,9 +598,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		if _data.auto_level_breach:
 			_log.info("level_origin type=%s level=%d origin=native" % [type, level])
 		else:
-			_state.apply_manual(type, level)
-			regulator.set_ceiling(level)
-			_log.info("manual_ceiling type=%s ceiling=%d scope=%s origin=player" % [type, level, "slot" if _state.is_persistent() else "session"])
+			_log.info("level_origin type=%s level=%d origin=player" % [type, level])
+			_pause_automation(type, "player_level_change", level)
 		return
 	if not event.has("max_firewall") or not is_instance_valid(tracker.window):
 		return
@@ -623,6 +632,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	decision.hypothetical = not _actuator.can_act()
 	_log_decision(type, decision, next, assumed)
 	_handle_action(tracker, event, decision, assumed)
+	_refresh_controls()
 
 
 ## A success is proof enough to forget a lower, and a failure to forget a raise. Then the attack's end
@@ -663,7 +673,7 @@ func _attempt_action(tracker: Dictionary, cycle_key: String, moment: String) -> 
 	var regulator := _regulator_for(type)
 	var levels_before := _levels_text()
 	var state_before := _state_text(tracker.window)
-	var result := _actuator.attempt(type, tracker.window, cycle_key, nodes, not regulator.is_unsafe(), tracker.native_usable, _state.ceiling(type))
+	var result := _actuator.attempt(type, tracker.window, cycle_key, nodes, not regulator.is_unsafe(), tracker.native_usable, _state.is_paused(type))
 	if result.is_empty():
 		return
 	var pending: Dictionary = result.pending
@@ -734,6 +744,7 @@ func _log_new_halt() -> void:
 	var reason := _actuator.take_new_halt()
 	if not reason.is_empty():
 		_log.warning("regulation_stopped reason=%s actions=%d" % [reason, _actuator.actions_done])
+		_refresh_controls()
 
 
 func _on_speed_changed() -> void:
@@ -741,6 +752,7 @@ func _on_speed_changed() -> void:
 		_regulators[type].on_speed_changed()
 		if _actuator != null:
 			_cancel_action(type, "speed_changed")
+	_refresh_controls()
 
 
 ## Stops all actions until the game is restarted, even if the observer starts again.
@@ -752,6 +764,109 @@ func emergency_stop() -> void:
 			_cancel_action(type, "emergency_stop")
 		_actuator.halt("emergency_stop")
 		_log_new_halt()
+	_refresh_controls()
+
+
+## Adds the row under the node's level buttons, once. Without them, the node just has no control.
+func _attach_control(tracker: Dictionary) -> void:
+	var actions: Node = tracker.window.find_child("ActionContainer", true, false)
+	var source: Node = tracker.window.find_child("AddButton", true, false)
+	if actions == null or not source is Button or actions.get_parent() == null:
+		_log.info("automation_control type=%s result=unavailable" % tracker.type)
+		return
+	var parent: Node = actions.get_parent()
+	var old: Node = parent.get_node_or_null(AutomationControl.NODE_NAME)
+	if old != null:
+		parent.remove_child(old)
+		old.queue_free()
+	var control := AutomationControl.new()
+	control.setup(source, _on_control_pressed.bind(tracker.type))
+	parent.add_child(control)
+	tracker.control = control
+	control.show_state(_automation_view(tracker.type))
+
+
+func _detach_controls() -> void:
+	for tracker: Dictionary in _trackers.values():
+		var control: Variant = tracker.get("control")
+		if is_instance_valid(control):
+			control.get_parent().remove_child(control)
+			control.queue_free()
+
+
+func _refresh_controls() -> void:
+	for tracker: Dictionary in _trackers.values():
+		var control: Variant = tracker.get("control")
+		if is_instance_valid(control):
+			control.show_state(_automation_view(tracker.type))
+
+
+## Why this type cannot act whatever the player does. A resume button cannot lift any of these.
+func _block_reason(type: String) -> String:
+	if _emergency:
+		return "emergency_stop"
+	if not _actuator.halt_reason.is_empty():
+		return _actuator.halt_reason
+	if _data.auto_level_breach:
+		return "native_option"
+	if absf(_attributes.tick_speed - ThreatActuator.NORMAL_TICK_SPEED) > ThreatActuator.SPEED_TOLERANCE:
+		return "speed"
+	for tracker: Dictionary in _trackers.values():
+		if tracker.type == type and not tracker.native_usable:
+			return "native_methods"
+	if _regulators.has(type) and _regulators[type].is_unsafe():
+		return "classifier"
+	return ""
+
+
+## What the node shows: a pause and a block are two separate things, and both can be true.
+func _automation_view(type: String) -> Dictionary:
+	if _actuator == null or (not _regulation.action_type.is_empty() and _regulation.action_type != type):
+		return {"kind": "disabled", "text": "Auto : désactivé", "button": "", "tooltip": ""}
+	var block := _block_reason(type)
+	var block_text: String = BLOCK_TEXTS.get(block, block)
+	if _state.is_paused(type):
+		var note := "" if block.is_empty() else "Reste bloqué après la reprise : %s" % block_text
+		return {"kind": "pause", "text": "Pause manuelle", "button": "Reprendre l'automatisation", "tooltip": note}
+	if not block.is_empty():
+		return {"kind": "blocked", "text": "Auto : bloqué", "button": "", "tooltip": block_text}
+	# Without the right to act, saying "active" would be false.
+	var text := "Auto : actif" if _actuator.is_armed() else "Auto : simulation"
+	return {"kind": "active", "text": text, "button": "Pause", "tooltip": ""}
+
+
+func _on_control_pressed(type: String) -> void:
+	if _actuator == null:
+		return
+	if _state.is_paused(type):
+		_resume_automation(type)
+	elif _automation_view(type).kind == "active":
+		_pause_automation(type, "player_button", _level_of_type(type))
+
+
+func _pause_automation(type: String, why: String, level: int) -> void:
+	_cancel_action(type, why)
+	if _state.pause(type, why):
+		_regulator_for(type).set_paused(true)
+		_log.info("automation_pause type=%s reason=%s level=%d" % [type, why, level])
+	_refresh_controls()
+
+
+## Only lifts the pause and starts observing again: this can never change a level by itself.
+func _resume_automation(type: String) -> void:
+	var level := _level_of_type(type)
+	if not _state.resume(type):
+		return
+	_regulator_for(type).on_resume(level)
+	_log.info("automation_resume type=%s level=%d" % [type, level])
+	_refresh_controls()
+
+
+func _level_of_type(type: String) -> int:
+	for tracker: Dictionary in _trackers.values():
+		if tracker.type == type and is_instance_valid(tracker.window):
+			return int(tracker.window.data.level)
+	return -1
 
 
 ## Where the game's Ctrl+Z may live: would it also undo a change made by the mod? Names only.
@@ -790,32 +905,12 @@ func _log_native_actions(window: Node) -> void:
 			targets.append("%s.%s" % ["self" if target.get_object() == window else str(target.get_object()), target.get_method()])
 		buttons.append("%s>%s" % [button.name, "+".join(targets)])
 	_log.info("native_actions type=%s methods=%s buttons=%s" % [window.window, ";".join(methods), ";".join(buttons)])
-	_log_window_layout(window)
-
-
-## How the node's interface is built around its level buttons, to know where a control could fit.
-## It only reads names and sizes: nothing is added or moved.
-func _log_window_layout(window: Node) -> void:
-	var button := window.find_child("AddButton", true, false) as Control
-	if button == null:
-		return
-	var chain := PackedStringArray()
-	var node: Node = button
-	while node != null and node != window.get_parent():
-		var children := PackedStringArray()
-		for child: Node in node.get_children():
-			children.append("%s:%s" % [child.name, child.get_class()])
-		var size_text := "%s min=%s" % [(node as Control).size, (node as Control).custom_minimum_size] if node is Control else "no_size"
-		chain.append("%s:%s[%s] children=%s" % [node.name, node.get_class(), size_text, ",".join(children)])
-		node = node.get_parent()
-	_log.info("ui_layout type=%s chain=%s" % [window.window, " < ".join(chain)])
-	_log.info("ui_layout type=%s button text=%s variation=%s flags=%d,%d font_size=%d" % [window.window, button.text if button is BaseButton else "", button.theme_type_variation, button.size_flags_horizontal, button.size_flags_vertical, button.get_theme_font_size("font_size")])
 
 
 func _regulator_for(type: String) -> ThreatRegulator:
 	if not _regulators.has(type):
 		var regulator := ThreatRegulator.new(_regulation.profile, _regulation.max_allowed_level, _regulation.min_level)
-		regulator.set_ceiling(_state.ceiling(type))
+		regulator.set_paused(_state.is_paused(type))
 		_regulators[type] = regulator
 	return _regulators[type]
 
@@ -884,7 +979,7 @@ func _log_decision(type: String, decision: Dictionary, next: Dictionary, assumed
 func _log_regulators() -> void:
 	for type: String in _regulators:
 		var regulator: ThreatRegulator = _regulators[type]
-		_log.info("regulator_summary type=%s profile=%s repeats_suppressed=%d model_trust=%s unsafe=%s ceiling=%d" % [type, regulator.profile_name, regulator.suppressed_repeats, regulator.model_trust(), regulator.is_unsafe(), _state.ceiling(type)])
+		_log.info("regulator_summary type=%s profile=%s repeats_suppressed=%d model_trust=%s unsafe=%s paused=%s" % [type, regulator.profile_name, regulator.suppressed_repeats, regulator.model_trust(), regulator.is_unsafe(), _state.is_paused(type)])
 
 
 ## Looks for what could identify a save slot. Only names and simple values are read.

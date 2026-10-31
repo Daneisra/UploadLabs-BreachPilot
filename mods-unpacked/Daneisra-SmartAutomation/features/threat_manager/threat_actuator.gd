@@ -38,6 +38,7 @@ var _claim: Dictionary = {}
 var _verifying: Dictionary = {}
 var _last_cycle := ""
 var _in_call := false
+var _since_action := INF
 var _halt_reported := true
 
 
@@ -62,24 +63,26 @@ func _build_allows_actions() -> bool:
 
 ## An action outside what the authorized trial allows, whatever the regulator proposed.
 func _trial_refusal(pending: Dictionary) -> String:
-	if pending.type != Policy.TRIAL_TYPE or pending.direction != Policy.TRIAL_DIRECTION or pending.from != Policy.TRIAL_FROM or pending.to != Policy.TRIAL_TO:
+	if pending.type != Policy.TRIAL_TYPE or mini(pending.from, pending.to) < Policy.TRIAL_MIN_LEVEL or maxi(pending.from, pending.to) > Policy.TRIAL_MAX_LEVEL:
 		return "outside_trial"
 	if pending.expected.get("status") != "reliable" or pending.expected.get("p_success", -1.0) < Policy.TRIAL_MIN_TARGET_SUCCESS - EPSILON:
 		return "target_forecast_not_reliable"
 	if actions_done >= Policy.TRIAL_MAX_ACTIONS:
 		return "action_limit"
-	if FileAccess.file_exists(_marker_path):
+	if actions_done == 0 and FileAccess.file_exists(_marker_path):
 		return "trial_already_used"
+	if _since_action < Policy.TRIAL_MIN_GAP:
+		return "too_soon_after_last_action"
 	return ""
 
 
-## Written before the call, so that a crash or a restart cannot lead to a second action.
+## Written before each call, so that a crash or a restart cannot lead to more actions.
 func _consume_trial() -> bool:
 	DirAccess.make_dir_recursive_absolute(_marker_path.get_base_dir())
 	var file := FileAccess.open(_marker_path, FileAccess.WRITE)
 	if file == null:
 		return false
-	file.store_string(JSON.stringify({"trial": Policy.TRIAL_ID, "unix_time": Time.get_unix_time_from_system()}))
+	file.store_string(JSON.stringify({"trial": Policy.TRIAL_ID, "actions": actions_done + 1, "unix_time": Time.get_unix_time_from_system()}))
 	file.close()
 	return FileAccess.file_exists(_marker_path)
 
@@ -156,11 +159,11 @@ func cancel_pending(type: String) -> Dictionary:
 
 
 ## Tries the waiting action of this type. From the first read to the native call, nothing here waits.
-func attempt(type: String, window: Variant, cycle_key: String, nodes_of_type: int, classifier_safe: bool, native_usable: bool, ceiling: int) -> Dictionary:
+func attempt(type: String, window: Variant, cycle_key: String, nodes_of_type: int, classifier_safe: bool, native_usable: bool, paused: bool) -> Dictionary:
 	if not has_pending(type):
 		return {}
 	var pending := _pending
-	var refusal := _refusal(window, pending, cycle_key, nodes_of_type, classifier_safe, native_usable, ceiling)
+	var refusal := _refusal(window, pending, cycle_key, nodes_of_type, classifier_safe, native_usable, paused)
 	if not refusal.is_empty():
 		refused_counts[refusal] = refused_counts.get(refusal, 0) + 1
 		_pending = {}
@@ -202,6 +205,7 @@ func note_event(type: String, event: Dictionary, claimed: bool) -> Dictionary:
 
 ## Counts the wait for the next attack. Returns a result once it took too long.
 func advance(seconds: float) -> Dictionary:
+	_since_action += seconds
 	if not is_verifying():
 		return {}
 	_verifying.waited += seconds
@@ -224,13 +228,15 @@ func summary() -> String:
 
 
 ## A reason that makes the action void, for now or for good. It is not retried.
-func _refusal(window: Variant, pending: Dictionary, cycle_key: String, nodes_of_type: int, classifier_safe: bool, native_usable: bool, ceiling: int) -> String:
+func _refusal(window: Variant, pending: Dictionary, cycle_key: String, nodes_of_type: int, classifier_safe: bool, native_usable: bool, paused: bool) -> String:
 	if OS.get_thread_caller_id() != OS.get_main_thread_id():
 		return "not_main_thread"
 	if not halt_reason.is_empty():
 		return "halted"
 	if _in_call:
 		return "action_in_progress"
+	if paused:
+		return "manual_pause"
 	if is_armed() and actions_done >= action_limit:
 		return "action_limit"
 	if is_armed():
@@ -264,8 +270,6 @@ func _refusal(window: Variant, pending: Dictionary, cycle_key: String, nodes_of_
 	if pending.direction == "raise":
 		if _max_allowed >= 0 and pending.to > _max_allowed:
 			return "above_allowed_maximum"
-		if ceiling >= 0 and pending.to > ceiling:
-			return "above_manual_ceiling"
 	if window.breach_damage.production != pending.power.damage_rate or window.infection_damage.production != pending.power.infection_rate or window.vulnerability.count != pending.power.vulnerability:
 		return "power_changed"
 	return ""
@@ -294,6 +298,7 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 		return {"outcome": "refused", "reason": "state_moved_before_call", "pending": pending}
 	_in_call = true
 	_last_cycle = cycle_key
+	_since_action = 0.0
 	actions_done += 1
 	_call_native(window, pending.direction)
 	_in_call = false

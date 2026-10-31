@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Montée de 2 à 3 validée en jeu sur Gouvernement. Deuxième essai autorisé le 2026-10-31 : baisse de 5 à 4, une seule action. **Tag, fusion, actions multiples et régulation permanente non autorisés** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Montée de 2 à 3 et baisse de 5 à 4 validées en jeu sur Gouvernement. Troisième essai validé le 2026-11-01 dans son principe : 4 actions au plus, de 0 à 4, avec la pause sur le nœud, après contrôle visuel. **Tag, fusion et régulation permanente non autorisés** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -36,8 +36,9 @@ Validées par Jérémy après revue. **Les changements automatiques de niveau ne
 | Baisse | Le seuil doit tenir compte de la probabilité d'échec attendue, pas d'une règle fixe |
 | Prédiction | Méthodes natives d'abord, modèle probabiliste par salves. Formules de remplacement pour une décision active seulement si leur fiabilité est démontrée. Montée interdite si le modèle n'est pas assez fiable |
 | Classificateur incertain | Mise en sécurité de la régulation |
-| Plafond manuel | Tout changement manuel fixe un **plafond durable** au nouveau niveau, y compris une remontée. Suppression seulement par une action explicite |
-| Portée du plafond | Par emplacement de sauvegarde, avec un identifiant stable trouvé à l'exécution. Sinon, session uniquement : jamais de plafond global persistant |
+| Intervention du joueur (2026-11-01, remplace les plafonds) | Tout changement manuel met le type en **pause**. Reprise par un bouton sur le nœud, jamais suivie d'un changement immédiat. Après une reprise, le mod peut dépasser le niveau choisi par le joueur |
+| Portée de la pause | Toute la session, chargements compris. Rien n'est écrit |
+| Langue de l'interface | Français uniquement, traductions à la préparation d'une version publique |
 | Prévision avec infection | Encadrement déterministe. Non fiable tant que le modèle ne couvre pas les observations : aucune montée fondée sur lui |
 | Partage de puissance | Surveillance seulement : détecter, invalider les mesures, attendre la stabilisation. Ne jamais modifier les branchements |
 | Simulation à blanc | Séparer le niveau réel, la décision hypothétique et ses conséquences supposées. Ne pas répéter une même proposition |
