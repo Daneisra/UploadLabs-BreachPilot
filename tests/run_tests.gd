@@ -325,6 +325,24 @@ func _test_simulation_speed() -> void:
 	var events := c.observe(_sample({"tick_speed": fast_tick}))
 	_check(_names(events) == ["failure_power"], "a higher speed keeps the failure classified")
 
+	# Measured in the game: a change of speed during an attack shifts the time used by 0.15 s.
+	var mixed := Classifier.new()
+	_attack(mixed, 8.0)
+	mixed.observe(_sample({"time": 7.75, "detected": true, "firewall": 40.0, "tick_speed": 0.25}))
+	_check(not mixed.on_breached(_sample({"time": 7.5, "detected": true, "firewall": 30.0, "tick_speed": 0.25}))[0].complete, "a speed change during the attack makes the measure incomplete")
+
+	var mixed_failure := Classifier.new()
+	_attack(mixed_failure, 5.0)
+	var mixed_time := 4.75
+	var mixed_firewall := 30.0
+	mixed_failure.observe(_sample({"time": mixed_time, "detected": true, "firewall": mixed_firewall, "tick_speed": 0.25}))
+	while mixed_time > 0.25 + 1e-6:
+		mixed_time -= 0.25
+		mixed_firewall -= 0.5
+		mixed_failure.observe(_sample({"time": mixed_time, "detected": true, "firewall": mixed_firewall, "tick_speed": 0.25}))
+	var mixed_events := mixed_failure.observe(_sample({"tick_speed": 0.25}))
+	_check(mixed_events[0].clues == "speed_changed", "a failure across a speed change is not failure_power, got: %s" % mixed_events[0].get("clues", mixed_events[0].event))
+
 	var slow := Classifier.new()
 	_attack(slow, 8.0)
 	_check(_names(slow.observe(_sample({"tick_speed": fast_tick}))) == ["reset_unknown"], "speed change does not turn a reset into a failure")
@@ -514,6 +532,16 @@ func _test_infection_measures() -> void:
 	_check(absf(success.infection_integral - 39.0) < 2.0, "infection over time is summed")
 	_check(success.infection_variation == 2, "infection variation is recorded")
 	_check(success.has("dealt_total"), "total damage is recorded for comparison")
+	_check(success.trace.split(";").size() >= 7 and success.trace.split(";").size() <= 9, "infection is traced every quarter second")
+
+	var long_trace := Classifier.new()
+	long_trace.observe(_sample())
+	var long_time := 100.0
+	for tick: int in 1000:
+		long_time -= TICK
+		long_trace.observe(_sample({"time": long_time, "max_time": 100.0, "detected": true, "firewall": 0.0, "infection_count": 5.0}))
+	var bounded := long_trace.on_breached(_sample({"time": long_time, "max_time": 100.0, "detected": true, "firewall": 0.0, "infection_count": 5.0}))[0]
+	_check(bounded.trace.split(";").size() == Classifier.TRACE_POINTS, "the trace is bounded")
 
 	var plain := Classifier.new()
 	_attack(plain, 7.0)
@@ -584,6 +612,29 @@ func _test_government_and_native_values() -> void:
 	_check(corps.forbidden_calls == 0 and government.forbidden_calls == 0, "level_up and level_down are never called")
 	_check(corps.data.level == 3.0 and government.data.level == 3.0, "no level changed")
 
+	corps.detected = false
+	corps.time = 10.0
+	corps.firewall = 50.0
+	corps.breached = 0.0
+	game.Signals.tick.emit()
+	for step: Array in [[9.95, 30.0], [0.10, 20.0], [0.05, 20.0]]:
+		corps.detected = true
+		corps.time = step[0]
+		corps.firewall = step[1]
+		game.Signals.tick.emit()
+	corps.detected = false
+	corps.time = 10.0
+	corps.firewall = 50.0
+	game.Signals.tick.emit()
+	_check(_count("event=failure_power type=breach_corps") == 1, "a failure is reported under its own type")
+	_check(_count("native_matches=true") == 2, "failures are compared with the game's getters too")
+	_check(_count("tick_speed from=") == 1, "the tick speed is logged once while it does not change")
+	_attributes_of(game).tick_speed = 0.25
+	game.Signals.tick.emit()
+	_check(_count("tick_speed from=0.05 to=0.25") == 1, "a change of tick speed is logged")
+	_attributes_of(game).tick_speed = TICK
+	game.Signals.tick.emit()
+
 	observer.stop()
 	_check(_count("reliability_check type=breach_corps") == 1, "reliability is summarized at stop")
 	_check(_count("distribution_check type=breach_corps") == 1, "the distribution is compared at stop")
@@ -645,6 +696,10 @@ func _install_fake_game() -> Dictionary:
 	root.add_child(desktop)
 	game.desktop = desktop
 	return game
+
+
+func _attributes_of(game: Dictionary) -> FakeAttributes:
+	return game.Attributes
 
 
 func _remove_fake_game(game: Dictionary) -> void:

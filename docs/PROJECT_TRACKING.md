@@ -98,6 +98,17 @@ Mesure directe des coups du 2026-10-31, 7 min 30, niveau 4 à 40,865 dégâts : 
 
 Limite pour la régulation : une entrée de dégâts d'infection est apparue sur les nœuds. Ces dégâts sont continus et le modèle par salves ne les couvre pas.
 
+## Mesures de `0.2.0-alpha.1`
+
+Premier essai du 2026-10-31, 8 min, Entreprises et Gouvernement au niveau 4/5, tous les mods actifs : 225 réussites, aucun échec ni réinitialisation inexpliquée, aucune erreur venant du mod.
+
+- **Méthodes confirmées à l'exécution, sur les deux nœuds :** `get_max_firewall/1`, `get_max_breach/1`, `get_max_time/1`, `is_elite/1`, `level_up/1`, `level_down/1`, `get_level/0`, `get_max_level/0`, `get_reward/1`, `get_experience_reward/1`. `level_up` et `level_down` n'ont pas été appelées.
+- **Valeurs natives :** accord avec le niveau courant sur 225 attaques sur 225.
+- **Variantes de dégâts :** `STEALTH=1`, `INFECTED=2`.
+- **Simulateur, sur de nouvelles attaques :** Entreprises à 40,87 dégâts, 104 attaques à 5 salves et 16 à 6 (86,7 % et 13,3 %), pour 85,8 % et 14,1 % annoncés. Gouvernement : 6 salves sur 103 attaques, comme annoncé.
+- **Défaut trouvé :** 3 attaques ont subi un passage à la vitesse × 5 en cours d'attaque, ce qui décale le temps mesuré de 0,15 s. Le garde-fou les a signalées. Elles ne comptent plus comme mesures complètes, et un échec dans ce cas devient `reset_unknown` (`speed_changed`).
+- **Mesurable dans la partie actuelle :** l'infection (`build_infection`). **Pas encore mesurable :** la vulnérabilité (`research.injection`) et les attaques furtives (`ghost_attack` non débloqué), sous réserve que ce nœud soit bien celui de la furtivité.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive ni dégâts d'infection.

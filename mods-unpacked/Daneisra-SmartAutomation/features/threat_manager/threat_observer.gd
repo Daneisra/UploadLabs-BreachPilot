@@ -21,8 +21,9 @@ const EVENT_FIELDS: Array[String] = [
 	"sim_dist", "sim_p", "sim_next_volleys", "sim_next_dist", "sim_next_p", "sim_trusted", "sim_reasons", "next_source", "formula_ok", "native_matches",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "breach_variation", "infection_variation",
 	"infection_start", "infection_end", "infection_integral", "dealt_total", "complete", "observed_start",
-	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds",
+	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "trace",
 ]
+const TRACED_EVENTS_PER_TYPE := 12
 ## Read-only getters called with one level argument; each is checked before use.
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
@@ -44,6 +45,8 @@ var _reliability: Dictionary = {}
 var _simulations: Dictionary = {}
 var _stealth_mask := 0
 var _ticks_since_scan := 0
+var _last_tick_speed := -1.0
+var _traced_events: Dictionary = {}
 
 
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool) -> void:
@@ -98,6 +101,8 @@ func stop() -> void:
 	_distributions.clear()
 	_reliability.clear()
 	_simulations.clear()
+	_traced_events.clear()
+	_last_tick_speed = -1.0
 	_log.info("observer state=stopped")
 
 
@@ -140,6 +145,9 @@ func _bind_window(window: Variant) -> void:
 
 
 func _on_tick() -> void:
+	if _attributes.tick_speed != _last_tick_speed:
+		_log.info("tick_speed from=%s to=%s" % [_format_value(_last_tick_speed), _format_value(_attributes.tick_speed)])
+		_last_tick_speed = _attributes.tick_speed
 	for id: int in _trackers.keys():
 		var tracker: Dictionary = _trackers[id]
 		if not is_instance_valid(tracker.window):
@@ -211,19 +219,36 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			event.next_ratio = BreachPrediction.next_ratio(event.ratio, event.level)
 			event.merge(BreachPrediction.volley_model(event))
 			_add_simulation(tracker, event)
+		elif event.event.begins_with("failure"):
+			_compare_native(tracker, event)
+		_limit_trace(type, event)
 		_log.info(_format(type, event))
 		if event.event == "success":
 			_check_prediction(type, event)
 			_record_distribution(type, event)
 
 
-func _add_simulation(tracker: Dictionary, event: Dictionary) -> void:
-	var window: Variant = tracker.window
-	if not is_instance_valid(window):
+## Traces are long, so only the first attacks of each type keep theirs.
+func _limit_trace(type: String, event: Dictionary) -> void:
+	if not event.has("trace"):
+		return
+	_traced_events[type] = _traced_events.get(type, 0) + 1
+	if _traced_events[type] > TRACED_EVENTS_PER_TYPE:
+		event.erase("trace")
+
+
+func _compare_native(tracker: Dictionary, event: Dictionary) -> void:
+	if not is_instance_valid(tracker.window):
 		return
 	var current := _native_values(tracker, event.level)
 	if not current.is_empty():
 		event.native_matches = _matches(current.firewall, event.max_firewall) and _matches(current.breach, event.max_breach) and _matches(current.time, event.max_time)
+
+
+func _add_simulation(tracker: Dictionary, event: Dictionary) -> void:
+	if not is_instance_valid(tracker.window):
+		return
+	_compare_native(tracker, event)
 	if not event.complete or event.volleys < 2 or event.damage_rate <= 0.0:
 		return
 
