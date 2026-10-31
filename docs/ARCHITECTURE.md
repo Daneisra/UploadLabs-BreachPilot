@@ -81,6 +81,6 @@ Avec `r = temps utilisé / temps maximal`, le rapport prévu au niveau suivant v
 
 Le journal enregistre les deux prédictions. Le modèle ignore pour l'instant les attaques furtives, qui ne touchent pas le pare-feu.
 
-**Les coups semblent être des entiers aléatoires.** À 40,865 dégâts par seconde, 14 % des attaques ont pris une salve de plus : cela correspond à des coups de 40 ou 41, où 40 ne suffit plus pour un pare-feu de 40,4. C'est une hypothèse, que `min_hit` et `max_hit` doivent confirmer. Le modèle donne donc un cas favorable et un pire cas (`_worst`) : `model_volleys` et `model_volleys_worst` rejouent le niveau courant, et des salves observées hors de cette plage invalident le modèle. Une future régulation devra raisonner sur le pire cas.
+**Les coups sont des entiers aléatoires.** À 40,865 dégâts par seconde, `min_hit` et `max_hit` n'ont mesuré que des coups de 40 ou 41, et 40 ne suffit plus pour un pare-feu de 40,4 : environ 15 % des attaques prennent une salve de plus. Cela n'a été mesuré qu'à cette valeur de dégâts. Le modèle donne donc un cas favorable et un pire cas (`_worst`) : `model_volleys` et `model_volleys_worst` rejouent le niveau courant, et des salves observées hors de cette plage invalident le modèle. Une future régulation devra raisonner sur le pire cas.
 
 La comparaison n'utilise que deux cycles complets, de niveaux consécutifs, dont les dégâts par seconde restent à ±5 % et dont les points de vie suivent la formule. Rien n'est calibré automatiquement.

@@ -64,6 +64,10 @@ Session de jeu normale du 2026-10-31, 1 h 07 avec tous les mods : 1 281 réussit
 - **Défaut trouvé et corrigé :** une attaque pendant laquelle les dégâts changent était notée complète. Elle est maintenant incomplète, et un échec dans ce cas devient `reset_unknown` (`damage_changed`).
 - Une attaque a réussi avec exactement 6 s utilisées sur 6 s : à égalité, la réussite semble passer avant l'échec. Un seul cas observé.
 
+Mesure directe des coups du 2026-10-31, 7 min 30, niveau 4 à 40,865 dégâts : 86 réussites, coups de 40 ou 41 uniquement, 73 attaques à 5 salves et 13 à 6, aucune hors de la plage du modèle (5 à 7). L'hypothèse des coups entiers aléatoires est confirmée à cette valeur de dégâts.
+
+Limite pour la régulation : une entrée de dégâts d'infection est apparue sur les nœuds. Ces dégâts sont continus et le modèle par salves ne les couvre pas.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
