@@ -6,7 +6,7 @@
 |---|---|
 | 1. Analyse | Terminée, revue externe favorable |
 | 2. Structure du projet | Terminée, dépôt GitHub privé créé |
-| 3. Prototype d'observation (0.1.0) | Premier essai en jeu réussi, scénarios d'échec à tester |
+| 3. Prototype d'observation (0.1.0) | Scénarios en jeu terminés, en attente de la revue finale |
 | 4. Auto Data Lab Supply (0.2.0) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -105,7 +105,7 @@ Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu :
 | 10 | Option native active | Journalisée, changements bien classés | Partiel : journalisée, montée native non observée |
 | 11 | Passage de 4 à 5, puis de 5 à 6 | Écart de prédiction mesuré | Partiel : 4 vers 5 vérifié, 5 vers 6 impossible (niveau 5 non franchi) |
 | 12 | Tous les mods actifs | Aucun conflit | Réussi : 1 h 07 de jeu normal |
-| 13 | Mod retiré | Sauvegarde intacte | À faire |
+| 13 | Mod retiré | Sauvegarde intacte | Réussi : partie et niveaux normaux selon le joueur, aucune erreur nouvelle au journal |
 | 14 | Réactivation avec bureau déjà créé | Fonctionne, sans double connexion (couverture partielle) | Réussi, couverture partielle |
 | 15 | Réussites rapides consécutives | Une observation par attaque | Réussi à vitesse × 5 (moins de 1 s par attaque) |
 | 16 | Vitesse de simulation modifiée | Aucun faux échec | Réussi : 626 attaques à vitesse × 5 pendant le jeu normal |
