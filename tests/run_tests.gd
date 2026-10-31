@@ -343,6 +343,43 @@ func _test_volley_model() -> void:
 	_check(Prediction.volley_model(_measured_success({"complete": false})).is_empty(), "no model from a partial measure")
 	_check(Prediction.volley_model(_measured_success({"volleys": 1})).is_empty(), "no model without an interval")
 
+	# Measured in the game: 40.865 per second gave 5 volleys, 6 in 14% of the attacks and 7 once.
+	var random_hits := Prediction.volley_model(_measured_success({
+		"level": 4, "volleys": 5, "used": 4.0, "max_time": 6.0, "damage_rate": 40.865,
+		"max_firewall": 40.4, "max_breach": 161.6,
+	}))
+	_check(random_hits.model_volleys == 5, "lucky hits of 41 need 5 volleys")
+	_check(random_hits.model_volleys_worst == 7, "hits of 40 need 7 volleys, the worst case seen")
+
+	var whole := Prediction.volley_model(_measured_success({"damage_rate": 26.0}))
+	_check(whole.model_volleys == whole.model_volleys_worst, "a whole damage value has a single outcome")
+	_check(Prediction.volley_model(_measured_success({"damage_rate": 0.5})).is_empty(), "a hit rounding down to 0 gives no model")
+
+	var changed := Classifier.new()
+	_attack(changed, 6.0)
+	changed.observe(_sample({"time": 5.95, "detected": true, "firewall": 30.0, "damage_rate": 200.0}))
+	_check(not changed.on_breached(_sample({"time": 5.9, "detected": true, "firewall": 20.0, "damage_rate": 200.0}))[0].complete, "damage changing during the attack makes the measure incomplete")
+
+	var lost := Classifier.new()
+	_attack(lost, 5.0)
+	var lost_time := 4.9
+	var lost_firewall := 30.0
+	lost.observe(_sample({"time": lost_time, "detected": true, "firewall": lost_firewall, "damage_rate": 50.0}))
+	while lost_time > TICK + 1e-6:
+		lost_time -= TICK
+		lost_firewall -= 0.01
+		lost.observe(_sample({"time": lost_time, "detected": true, "firewall": lost_firewall, "damage_rate": 50.0}))
+	var lost_events := lost.observe(_sample({"damage_rate": 50.0}))
+	_check(_names(lost_events) == ["reset_unknown"], "a failure while the damage changed is not failure_power")
+	_check(lost_events[0].clues == "damage_changed", "the clue names the damage change, got: %s" % lost_events[0].clues)
+
+	var hits := Classifier.new()
+	hits.observe(_sample())
+	hits.observe(_sample({"time": 9.95, "detected": true, "firewall": 0.0}))
+	hits.observe(_sample({"time": 9.9, "detected": true, "firewall": 0.0, "breached": 40.0}))
+	var hit_events := hits.on_breached(_sample({"time": 9.85, "detected": true, "firewall": 0.0, "breached": 81.0}))
+	_check(is_equal_approx(hit_events[0].min_hit, 40.0) and is_equal_approx(hit_events[0].max_hit, 41.0), "breach hits are measured")
+
 	var c := Classifier.new()
 	c.observe(_sample())
 	var time := 10.0

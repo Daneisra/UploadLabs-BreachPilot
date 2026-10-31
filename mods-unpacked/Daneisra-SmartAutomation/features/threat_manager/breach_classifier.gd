@@ -64,13 +64,17 @@ func on_breached(sample: Dictionary) -> Array[Dictionary]:
 		_cycle.observed_start = false
 	if _dealt(sample) > _cycle.last_progress:
 		_cycle.volleys += 1
+	_record_hit(sample)
+	if sample.damage_rate != _cycle.damage_rate:
+		_cycle.damage_changed = true
 	var used: float = sample.max_time - sample.time
 	var event := _base_event("success", sample)
 	event.time_left = sample.time
 	event.used = used
 	event.ratio = used / sample.max_time if sample.max_time > 0.0 else 0.0
-	event.complete = not _cycle.partial and not _cycle.paused_seen and not _cycle.level_mismatch
+	event.complete = not _cycle.partial and not _cycle.paused_seen and not _cycle.level_mismatch and not _cycle.damage_changed
 	event.level_after = sample.level
+	_set_hits(event)
 	_cycle = {}
 	return [event]
 
@@ -128,11 +132,14 @@ func _classify_reset(sample: Dictionary) -> Dictionary:
 		clues.append("partial_cycle")
 	if _cycle.level_mismatch:
 		clues.append("level_mismatch")
+	if _cycle.damage_changed:
+		clues.append("damage_changed")
 	if not clues.is_empty():
 		return _unknown_reset(clues)
 	var failure := _base_event("failure_power", _previous)
 	failure.threshold = threshold
 	failure.complete = true
+	_set_hits(failure)
 	return failure
 
 
@@ -153,6 +160,11 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"level_mismatch": false,
 		"progressed": false,
 		"volleys": 0,
+		"damage_rate": sample.damage_rate,
+		"damage_changed": false,
+		"min_hit": -1.0,
+		"max_hit": -1.0,
+		"last_breached": sample.breached,
 		"last_progress": _dealt(sample),
 		"last_progress_time": sample.time,
 		"max_step": 0.0,
@@ -176,6 +188,9 @@ func _update_cycle(sample: Dictionary) -> void:
 		_cycle.paused_seen = true
 	if sample.level != _cycle.level:
 		_cycle.level_mismatch = true
+	if sample.damage_rate != _cycle.damage_rate:
+		_cycle.damage_changed = true
+	_record_hit(sample)
 	var dealt := _dealt(sample)
 	if dealt > _cycle.last_progress:
 		_cycle.progressed = true
@@ -186,6 +201,22 @@ func _update_cycle(sample: Dictionary) -> void:
 
 func _dealt(sample: Dictionary) -> float:
 	return sample.max_firewall - sample.firewall + sample.breached
+
+
+## Hits on the breach bar show the real damage: unlike firewall hits, they are not cut short.
+func _record_hit(sample: Dictionary) -> void:
+	var hit: float = sample.breached - _cycle.last_breached
+	_cycle.last_breached = sample.breached
+	if hit <= 0.0:
+		return
+	_cycle.min_hit = hit if _cycle.min_hit < 0.0 else minf(_cycle.min_hit, hit)
+	_cycle.max_hit = maxf(_cycle.max_hit, hit)
+
+
+func _set_hits(event: Dictionary) -> void:
+	if _cycle.max_hit >= 0.0:
+		event.min_hit = _cycle.min_hit
+		event.max_hit = _cycle.max_hit
 
 
 func _base_event(event_name: String, sample: Dictionary) -> Dictionary:

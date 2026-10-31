@@ -42,25 +42,36 @@ static func volleys_needed(firewall: float, breach: float, per_volley: float) ->
 
 
 ## Predicts the next level from a complete success, volley by volley.
-## Returns {} when the measure does not allow it. model_volleys reproduces the current level:
-## if it differs from the observed volleys, the next-level figures should not be trusted.
+## Returns {} when the measure does not allow it.
+##
+## Measured hits look like whole numbers drawn around the displayed rate (40 or 41 for 40.865), so
+## each figure comes as a lucky case and a _worst case. model_volleys and model_volleys_worst replay
+## the current level: observed volleys outside that range mean the figures should not be trusted.
 static func volley_model(success: Dictionary) -> Dictionary:
 	if not success.complete or success.volleys < 2 or success.damage_rate <= 0.0:
 		return {}
 	var interval: float = success.used / (success.volleys - 1)
-	var per_volley: float = success.damage_rate * interval * (1.0 + success.vulnerability)
-	if per_volley <= 0.0:
+	var base_hit: float = success.damage_rate * interval
+	var bonus: float = 1.0 + success.vulnerability
+	var best_hit: float = ceilf(base_hit) * bonus
+	var worst_hit: float = floorf(base_hit) * bonus
+	if worst_hit <= 0.0:
 		return {}
 	var hp := hp_factor(success.level)
+	var next_firewall: float = success.max_firewall * hp
+	var next_breach: float = success.max_breach * hp
 	var next_max_time: float = success.max_time * hp / ratio_factor(success.level)
-	var next_volleys := volleys_needed(success.max_firewall * hp, success.max_breach * hp, per_volley)
-	var next_used: float = (next_volleys - 1) * interval
+	var next_volleys := volleys_needed(next_firewall, next_breach, best_hit)
+	var next_volleys_worst := volleys_needed(next_firewall, next_breach, worst_hit)
 	return {
-		"model_volleys": volleys_needed(success.max_firewall, success.max_breach, per_volley),
+		"model_volleys": volleys_needed(success.max_firewall, success.max_breach, best_hit),
+		"model_volleys_worst": volleys_needed(success.max_firewall, success.max_breach, worst_hit),
 		"next_volleys": next_volleys,
-		"next_used": next_used,
+		"next_volleys_worst": next_volleys_worst,
+		"next_used": (next_volleys - 1) * interval,
 		"next_max_time": next_max_time,
-		"next_model_ratio": next_used / next_max_time,
+		"next_model_ratio": (next_volleys - 1) * interval / next_max_time,
+		"next_model_ratio_worst": (next_volleys_worst - 1) * interval / next_max_time,
 	}
 
 

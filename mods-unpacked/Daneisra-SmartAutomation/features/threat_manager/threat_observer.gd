@@ -10,7 +10,8 @@ const WATCHED_WINDOWS: Array[String] = ["breach_corps"]
 const RESCAN_TICKS := 100
 const EVENT_FIELDS: Array[String] = [
 	"cycle_id", "level", "level_after", "from", "to", "max_level", "time_left", "used", "ratio", "next_ratio",
-	"volleys", "model_volleys", "next_volleys", "next_used", "next_max_time", "next_model_ratio",
+	"volleys", "min_hit", "max_hit", "model_volleys", "model_volleys_worst", "next_volleys", "next_volleys_worst",
+	"next_used", "next_max_time", "next_model_ratio", "next_model_ratio_worst",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "complete", "observed_start",
 	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds",
 ]

@@ -54,6 +54,16 @@ Troisième essai du 2026-10-31, deux sessions, 30,96 dégâts par salve :
 - Option native : ses deux changements sont journalisés. Aucune montée native n'a pu se produire, faute de réussite au niveau maximal.
 - Le redémarrage en pleine attaque n'a laissé aucune attaque en cours au rechargement : le chemin `partial` par rechargement n'a été vu qu'au premier essai, sur une réussite.
 
+Session de jeu normale du 2026-10-31, 1 h 07 avec tous les mods : 1 281 réussites, 11 `failure_power`, aucune erreur venant du mod, niveau changé uniquement par le joueur.
+
+- Niveau 4 à 61,9 dégâts : 2 s restantes, comme prévu. Le doublement en coupant Gouvernement est confirmé.
+- Niveau 5, élite, à 61,9 dégâts : 303 et 1212 de points et 10 s, comme prévu, et 8 échecs. L'échec au niveau 5 est annoncé par le modèle, mais la durée de 24 s n'a pas pu être vérifiée.
+- Niveau 4 après une amélioration (40,865 dégâts, 6 s) : le modèle annonçait 0,667 et a observé 0,6667 ; le coefficient annonçait 0,75.
+- Vitesse de minuteur multipliée par 5 pendant 626 attaques (pas de 0,25 s), cause non confirmée : aucun faux échec, seuil adapté à 0,5 s.
+- **Écart trouvé :** à 40,865 dégâts, 296 attaques ont pris 5 salves, 47 en ont pris 6 et 1 en a pris 7, d'où l'hypothèse des coups entiers aléatoires.
+- **Défaut trouvé et corrigé :** une attaque pendant laquelle les dégâts changent était notée complète. Elle est maintenant incomplète, et un échec dans ce cas devient `reset_unknown` (`damage_changed`).
+- Une attaque a réussi avec exactement 6 s utilisées sur 6 s : à égalité, la réussite semble passer avant l'échec. Un seul cas observé.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
@@ -89,10 +99,10 @@ Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu :
 | 8 | Rechargement en pleine attaque | Cycle `partial` | Réussi par deux chemins : réussite après chargement, échec après `Ctrl+Z` |
 | 9 | Suppression et recréation du nœud | `invalidated`, puis nouvelle liaison | Réussi (2026-10-31) |
 | 10 | Option native active | Journalisée, changements bien classés | Partiel : journalisée, montée native non observée |
-| 11 | Passage de 4 à 5, puis de 5 à 6 | Écart de prédiction mesuré | À faire |
-| 12 | Tous les mods actifs | Aucun conflit | Partiel : aucun conflit en 3 min 45 |
+| 11 | Passage de 4 à 5, puis de 5 à 6 | Écart de prédiction mesuré | Partiel : 4 vers 5 vérifié, 5 vers 6 impossible (niveau 5 non franchi) |
+| 12 | Tous les mods actifs | Aucun conflit | Réussi : 1 h 07 de jeu normal |
 | 13 | Mod retiré | Sauvegarde intacte | À faire |
 | 14 | Réactivation avec bureau déjà créé | Fonctionne, sans double connexion (couverture partielle) | Réussi, couverture partielle |
-| 15 | Réussites rapides consécutives | Une observation par attaque | À faire |
-| 16 | Vitesse de simulation modifiée | Aucun faux échec | À faire |
+| 15 | Réussites rapides consécutives | Une observation par attaque | Réussi à vitesse × 5 (moins de 1 s par attaque) |
+| 16 | Vitesse de simulation modifiée | Aucun faux échec | Réussi : 626 attaques à vitesse × 5 pendant le jeu normal |
 | 17 | Désactivation puis réactivation | Signaux reconnectés, sans doublon | Réussi (2026-10-31) |
