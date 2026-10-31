@@ -167,6 +167,29 @@ Vitesse × 5 : très probablement le **Temps de repos** (× 5, payé en temps ho
 - **Non couvert en jeu :** blocages, budget d'actions, gel et prévision réfutée. Une seule proposition par niveau et par puissance est apparue, car une simulation ne fait pas changer le niveau réel.
 - **Points mineurs :** `forecast_uncertain` a une raison vide quand le modèle n'est pas encore vérifié, `prediction_check` et les champs `next_*` des événements ignorent l'infection (la décision ne les utilise pas), et le journal grossit d'environ 1 Mo par heure.
 
+## Mesure des fenêtres entre attaques
+
+Session du 2026-10-31, 48 min, build `0.2.0-beta.1-gap.1`, 1 013 fins d'attaque mesurées, aucun niveau changé par le mod, aucune erreur venant de lui. Écarts au protocole : échecs raccourcis à 10 min, vitesse × 5 limitée à 18 s puis 15 s, rechargement absent du journal.
+
+| Cas | n | Fenêtre brute, en ticks | Fenêtre après connaissance du résultat |
+|---|---|---|---|
+| Réussite, × 1 | 794 | 20 : 717, 15 : 16, 8 : 1, 7 : 1, 3 : 1, 2 : 11, 1 : 47 | Minimum 21 ms, 5 images |
+| Réussite, × 5 | 30 | 4 : 13, 2 : 17 | Minimum 94 ms, 14 images |
+| `failure_power`, × 1 | 154 | 20 : 100, 1 : 54 | 19 ticks, ou 2,4 à 13 ms sans image restante |
+| `failure_power`, × 5 | 20 | 1 : 20 | 2,2 à 3,6 ms, sans image restante |
+
+- **Aucune fenêtre absente sur 1 013, aucun résultat connu après le début de l'attaque suivante.** Ce volume ne prouve pas l'absence de risque, surtout à × 5 (50 fins d'attaque seulement, sans changement de vitesse).
+- **Réussite :** `breached`, puis réinitialisation complète, visible au point différé dans la même image pour 824 sur 824. Cela ne vient pas de `call_deferred` lui-même.
+- **Échec :** réinitialisation vue au début de l'image suivante, résultat déduit au tick suivant, environ 50 ms après.
+- **Ordre mesuré :** le tick arrive après le dernier `_process` de l'image dans 56 888 cas sur 56 888. Le mod reçoit `tick` avant les nœuds du jeu dans cette session, car le minuteur n'a bougé qu'au relevé suivant dans la quasi-totalité des cas. Cet ordre n'est pas garanti : il pourrait s'inverser après une reprise de l'observateur.
+- **Durée :** la fenêtre dépend de la phase entre la fin de l'attaque et la prochaine salve. Réussites Entreprises : 3,95 s donnent 1 tick (47 fois), 3,90 s en donnent 2 (11 fois), 4,00 s en donnent 20. Échecs à × 1 : 1 tick avec le minuteur de 12 s, 20 ticks avec celui de 6 s. La cause exacte de cet écart n'est pas établie.
+- **Changements manuels :** 10 sur un nœud disponible, aucune réinitialisation, attaque suivante complète et de durée normale. 9 en pleine attaque : réinitialisation dans la même image. Aucun dans la fenêtre d'un seul tick.
+- **Option native :** activée 15 s, aucun changement de niveau, sous le maximum des deux types. Son comportement reste inconnu.
+- **Deux nœuds du même type :** impossible dans cette partie, l'ajout de nœud affiche `Actif 1/1`.
+- **Hors écran :** mêmes durées qu'à l'écran.
+- **Coût :** 173 µs par image en moyenne, 2,5 % d'une image à 144 images par seconde, pointe de 21,9 ms. Il n'existe pas de mesure de référence sans l'instrumentation.
+- **Non démontré :** l'effet d'un appel fait par le mod. Seuls des changements du joueur ont été observés.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec. Il a été juste en jeu aux niveaux 3, 4 et 5, sans attaque furtive.

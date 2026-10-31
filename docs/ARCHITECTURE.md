@@ -39,8 +39,9 @@ tools/build_zip.py                # construit le zip du mod
 - Le niveau est partagé **par type** de nœud et le minuteur est propre à **chaque instance**. La régulation future sera donc organisée par type.
 - Une réussite émet `Signals.breached` avant la réinitialisation du nœud : le temps restant est lisible à ce moment.
 - Un échec n'émet **aucun signal**. `failure_power` est donc une **déduction**, à réévaluer avant toute régulation.
-- Raise et Lower réinitialisent l'attaque en cours.
+- Raise et Lower réinitialisent l'attaque en cours. Sur un nœud disponible, ils n'ont provoqué aucune réinitialisation (10 cas sur 10, changements du joueur).
 - Le minuteur démarre aux premiers dégâts.
+- La fenêtre entre deux attaques peut ne durer qu'un tick, après une réussite comme après un échec. Voir les mesures dans le [suivi du projet](PROJECT_TRACKING.md).
 
 ## Méthodes natives
 
