@@ -36,6 +36,15 @@ Premier essai du 2026-10-31, 3 min 45 d'observation, niveau 2/4 :
 - Valeurs du journal conformes aux captures : niveau, pare-feu, infiltration, dégâts.
 - Le jeu stocke les niveaux en nombres flottants.
 
+Deuxième essai du 2026-10-31, environ 3 min 50 d'observation, manipulations manuelles :
+
+- Niveau 3 à 25,8 dégâts par salve : échec confirmé à l'écran, 9 `failure_power` sur 9. Le modèle par salves annonçait 6 s pour 5 s disponibles ; le coefficient annonçait une réussite et **est donc réfuté**.
+- Raise et Lower en pleine attaque : 2 `level_changed_reset`, aucun faux échec.
+- Lanceur coupé : 1 `failure_starved`, sans dégâts ensuite (`damage_rate=0`), aucun événement pendant l'attente.
+- Dégâts passés de 25,8 à 30,96 en cours de session, cause non confirmée : le modèle annonce alors 5 salves et 4 s au niveau 3, **pas encore vérifié**.
+- Arrêt et reprise de l'observateur : une seule observation par attaque ensuite. Les `cycle_id` repartent de 1 après une reprise.
+- Le nœud n'a pas de bouton de pause. `failure_paused` n'a pu être observé qu'en simulation.
+
 ## Limites connues
 
 - `failure_power` est une déduction : le jeu n'émet aucun événement d'échec.
@@ -64,17 +73,17 @@ Les tests simulés reposent sur notre compréhension du jeu et sur un faux jeu :
 | 1 | Lancement avec le mod | Chargé, API validées, aucune nouvelle erreur | Réussi (2026-10-31) |
 | 2 | Avec et sans nœud Corps | Détection, ou attente sans erreur | Partiel : avec nœud seulement |
 | 3 | Attaque réussie | `success`, temps restant cohérent à l'écran | Réussi (2026-10-31) |
-| 4 | Niveau trop élevé | `failure_power` | À faire |
-| 5 | Raise et Lower en pleine attaque | `level_changed_reset`, jamais d'échec | À faire |
-| 6 | Lanceur débranché | `failure_starved` | À faire |
-| 7 | Nœud en pause | `failure_paused`, ou correction de l'hypothèse | À faire |
+| 4 | Niveau trop élevé | `failure_power` | Réussi (2026-10-31) |
+| 5 | Raise et Lower en pleine attaque | `level_changed_reset`, jamais d'échec | Réussi (2026-10-31) |
+| 6 | Lanceur débranché | `failure_starved` | Réussi (2026-10-31) |
+| 7 | Nœud en pause | `failure_paused`, ou correction de l'hypothèse | Non applicable en jeu : pas de bouton de pause. Simulation seulement |
 | 8 | Rechargement en pleine attaque | Cycle `partial` | Partiel : chargement observé, sans échec |
 | 9 | Suppression et recréation du nœud | `invalidated`, puis nouvelle liaison | À faire |
 | 10 | Option native active | Journalisée, changements bien classés | À faire |
 | 11 | Passage de 4 à 5, puis de 5 à 6 | Écart de prédiction mesuré | À faire |
 | 12 | Tous les mods actifs | Aucun conflit | Partiel : aucun conflit en 3 min 45 |
 | 13 | Mod retiré | Sauvegarde intacte | À faire |
-| 14 | Réactivation avec bureau déjà créé | Fonctionne, sans double connexion (couverture partielle) | À faire |
+| 14 | Réactivation avec bureau déjà créé | Fonctionne, sans double connexion (couverture partielle) | Réussi, couverture partielle |
 | 15 | Réussites rapides consécutives | Une observation par attaque | À faire |
 | 16 | Vitesse de simulation modifiée | Aucun faux échec | À faire |
-| 17 | Désactivation puis réactivation | Signaux reconnectés, sans doublon | À faire |
+| 17 | Désactivation puis réactivation | Signaux reconnectés, sans doublon | Réussi (2026-10-31) |
