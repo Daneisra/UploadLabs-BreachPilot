@@ -1,8 +1,24 @@
 # Changelog
 
-## 0.2.0-beta.1-gap.1 – en cours : mesure de la fenêtre entre deux attaques
+## 0.2.0-beta.1-dev.1 – en cours : actionneur verrouillé
 
-**Aucun changement automatique du niveau de menace, aucun actionneur, aucun mode `active`.** Ce n'est pas encore la `0.2.0-beta.1`.
+**Aucun changement automatique du niveau de menace : le mode `active` n'est pas accessible et ce build ne peut appeler aucune méthode de niveau.** Ce n'est pas encore la `0.2.0-beta.1`.
+
+### Ajouté
+
+- `threat_actuator.gd` : point d'entrée unique, contrôles immédiats, report sans action forcée (`action_deferred_no_safe_window`), vérification de l'attaque suivante, limite d'actions. Fermé par deux verrous dans le code, et testé sur un faux jeu seulement.
+- Arrêt d'urgence `Ctrl+Alt+F10`.
+- En `dry_run`, le journal indique ce que l'actionneur aurait fait.
+- Journal en lecture seule des arguments des méthodes de niveau, des liens des boutons et des noms liés à l'annulation.
+
+### Modifié
+
+- Plus aucune baisse sans prévision fiable.
+- Un changement de vitesse efface la fenêtre d'attaques du régulateur.
+
+## 0.2.0-beta.1-gap.1 – mesure de la fenêtre entre deux attaques
+
+**Aucun changement automatique du niveau de menace, aucun actionneur, aucun mode `active`.**
 
 ### Ajouté
 

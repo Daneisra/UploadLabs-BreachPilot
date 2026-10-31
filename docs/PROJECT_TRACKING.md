@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Préparation sur `dev/0.2.0-beta.1`, limitée à la mesure de la fenêtre entre deux attaques. **Actionneur, mode `active` et appels à `level_up()` ou `level_down()` non autorisés** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Actionneur développé et verrouillé sur `dev/0.2.0-beta.1`, testé sur un faux jeu. **Mode `active` inaccessible, aucun appel réel, tag non autorisé** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -189,6 +189,25 @@ Session du 2026-10-31, 48 min, build `0.2.0-beta.1-gap.1`, 1 013 fins d'attaque 
 - **Hors écran :** mêmes durées qu'à l'écran.
 - **Coût :** 173 µs par image en moyenne, 2,5 % d'une image à 144 images par seconde, pointe de 21,9 ms. Il n'existe pas de mesure de référence sans l'instrumentation.
 - **Non démontré :** l'effet d'un appel fait par le mod. Seuls des changements du joueur ont été observés.
+
+## Anti-oscillation, en simulation
+
+Décisions appliquées à un jeu simulé, 5 tirages de 20 000 attaques (environ 22 h chacun). Ce sont des résultats de simulation, sans passage par l'actionneur ni le jeu.
+
+| Scénario | Profil | Inversions | Baisses injustifiées | Échecs | Au meilleur niveau |
+|---|---|---|---|---|---|
+| Stable | Les 3 | 0 | 0 | 0 | 99,1 à 99,2 % |
+| Niveau à 97 % | Conservateur | 0 | 0 | 0 | 99,6 % |
+| Niveau à 97 % | Équilibré | 0 | 0 | 0 | 99,8 % |
+| Niveau à 97 % | Agressif | 12 | 6 | 2 953 | 99,0 % |
+| Prévision fausse | Les 3 | 25 | 0 | 40 à 95 | 99,0 à 99,2 % |
+| Puissance changeante | Les 3 | 5 | 0 | 40 à 115 | 99,4 à 99,7 % |
+
+Avec une prévision fausse, le niveau réfuté est retenté une fois à chaque changement de puissance, soit 3 essais par tirage dans ce scénario.
+
+## Premier essai actif, à valider
+
+Conditions fixées par Jérémy : sauvegarde de test copiée, un seul type de nœud, vitesse normale, profil conservateur, une seule action, arrêt de la régulation juste après, analyse du niveau, des réinitialisations et de l'attaque suivante. Aucun tag avant validation.
 
 ## Limites connues
 

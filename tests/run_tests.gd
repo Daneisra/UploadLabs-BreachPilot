@@ -13,6 +13,8 @@ const SaLog := preload(MOD + "core/sa_log.gd")
 const ModMain := preload(MOD + "mod_main.gd")
 const RegulationTests := preload("regulation_tests.gd")
 const GapProbeTests := preload("gap_probe_tests.gd")
+const ActuatorTests := preload("actuator_tests.gd")
+const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 
 const TICK := 0.05
 const TIME_LIMIT := 120
@@ -88,6 +90,45 @@ class FakeBreach extends Node:
 		forbidden_calls += 1
 
 
+## Follows what we think the game does when its level methods are called.
+class ActingBreach extends FakeBreach:
+	var calls: Array[String] = []
+
+	func level_up(steps: int) -> void:
+		calls.append("up:%d" % steps)
+		data.level += steps
+		_rearm()
+
+	func level_down(steps: int) -> void:
+		calls.append("down:%d" % steps)
+		data.level -= steps
+		_rearm()
+
+	func _rearm() -> void:
+		max_firewall = get_max_firewall(int(data.level))
+		firewall = max_firewall
+		max_breach = get_max_breach(int(data.level))
+		max_time = get_max_time(int(data.level))
+		time = max_time
+
+
+class ArmedActuator extends Actuator:
+	func _build_allows_actions() -> bool:
+		return true
+
+
+## Only the tests open both locks.
+class ArmedObserver extends Observer:
+	func _actions_allowed() -> bool:
+		return true
+
+	func _new_actuator(armed: bool) -> Observer.ThreatActuator:
+		return ArmedActuator.new(armed, {"attributes": _attributes, "data": _data}, {
+			"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
+			"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
+		})
+
+
 ## A window of a type the mod watches, without the game's getters.
 class FakeGetterless extends Node:
 	var window := "breach_government"
@@ -118,7 +159,7 @@ func _on_time_limit() -> void:
 
 
 func _run() -> void:
-	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain, RegulationTests, GapProbeTests]:
+	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain, RegulationTests, GapProbeTests, ActuatorTests, Actuator]:
 		_check(script.can_instantiate(), "compiles: %s" % script.resource_path)
 	if _failures > 0:
 		print("%d checks, %d failures" % [_checks, _failures])
@@ -151,6 +192,8 @@ func _run() -> void:
 	await _test_dry_run_in_observer()
 	GapProbeTests.new().run(_check)
 	await _test_gap_probe_in_observer()
+	ActuatorTests.new().run(_check)
+	await _test_actions_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -570,11 +613,19 @@ func _test_infection_measures() -> void:
 	_check(flagged.on_breached(_sample({"time": 9.9, "detected": true, "firewall": 30.0, "breach_variation": 4}))[0].breach_variation == 4, "stealth variation is recorded")
 
 
-## This version must stay read-only, whatever else changes.
+## Nothing may change the level except the actuator's single entry point, whatever else changes.
 func _test_no_level_change_in_source() -> void:
-	var forbidden := RegEx.create_from_string("\\.level_(up|down)\\(|\\bdata\\.(level|max_level) *[-+*/]?= |auto_level_breach *= |set_setting\\(")
+	var forbidden := RegEx.create_from_string("\\bdata\\.(level|max_level) *[-+*/]?= |auto_level_breach *= |set_setting\\(")
+	var native_call := RegEx.create_from_string("\\.level_(up|down)\\(|\\.call(_deferred)?\\(\"level_|\"level_(up|down)\"\\)")
 	var pending: Array[String] = [MOD]
 	var scanned := 0
+	var actuator_source := FileAccess.get_file_as_string(MOD + "features/threat_manager/threat_actuator.gd")
+	_check(native_call.search_all(actuator_source).size() == 2, "the actuator holds one call of each level method")
+	var entry_start := actuator_source.find("func _call_native(")
+	var entry_end := actuator_source.find("\nfunc ", entry_start + 1)
+	var outside := actuator_source.substr(0, entry_start) + actuator_source.substr(entry_end)
+	_check(native_call.search(outside) == null, "both calls are inside its single entry point")
+	_check(outside.count("_call_native(") == 1, "which has a single caller")
 	while not pending.is_empty():
 		var folder: String = pending.pop_back()
 		for sub: String in DirAccess.get_directories_at(folder):
@@ -583,7 +634,10 @@ func _test_no_level_change_in_source() -> void:
 			if file.ends_with(".gd"):
 				scanned += 1
 				var source := FileAccess.get_file_as_string(folder.path_join(file))
-				_check(forbidden.search(source) == null, "no level change in %s" % file)
+				_check(forbidden.search(source) == null, "no direct write of a level in %s" % file)
+				if file != "threat_actuator.gd":
+					_check(native_call.search(source) == null, "no call of a level method in %s" % file)
+				_check(RegEx.create_from_string("\\bawait\\b").search(source) == null or file == "mod_main.gd", "no waiting in %s" % file)
 	_check(scanned >= 7, "the source scan found the mod's scripts")
 
 
@@ -863,6 +917,234 @@ func _test_dry_run_in_observer() -> void:
 	await _remove_fake_game(game)
 
 
+## One attack on the fake window: a success, or a failure when the timer runs out.
+func _play_attack(game: Dictionary, breach: FakeBreach, success: bool) -> void:
+	var start: float = breach.max_time
+	if not success:
+		var hit: float = breach.breach_damage.production
+		for volley: int in int(start):
+			breach.detected = true
+			breach.time = start - 0.05 - volley
+			breach.firewall = maxf(breach.max_firewall - hit * (volley + 1), 0.0)
+			breach.breached = maxf(hit * (volley + 1) - breach.max_firewall, 0.0)
+			game.Signals.tick.emit()
+		breach.time = 0.05
+		game.Signals.tick.emit()
+		breach.detected = false
+		breach.time = breach.max_time
+		breach.firewall = breach.max_firewall
+		breach.breached = 0.0
+		game.Signals.tick.emit()
+		await process_frame
+		return
+	for step: Array in [[start - 0.05, 0.6, 0.0], [start - 1.05, 0.0, 0.0], [start - 2.05, 0.0, 0.5]]:
+		breach.detected = true
+		breach.time = step[0]
+		breach.firewall = breach.max_firewall * step[1]
+		breach.breached = breach.max_breach * step[2]
+		game.Signals.tick.emit()
+	breach.time = start - 3.05
+	breach.breached = breach.max_breach
+	game.Signals.breached.emit(breach)
+	breach.detected = false
+	breach.time = breach.max_time
+	breach.firewall = breach.max_firewall
+	breach.breached = 0.0
+	await process_frame
+	game.Signals.tick.emit()
+
+
+func _armed_setup(game: Dictionary, options: Dictionary) -> ArmedObserver:
+	var regulation := {"mode": "active", "profile": "aggressive", "action_type": "breach_corps", "action_limit": 5}
+	regulation.merge(options, true)
+	var observer := ArmedObserver.new()
+	observer.configure(SaLog.new("info"), 0.25, false, regulation)
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	game.Signals.tick.emit()
+	return observer
+
+
+func _test_actions_in_observer() -> void:
+	# The real observer never opens: whatever the configuration asks.
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var corps := ActingBreach.new()
+	game.desktop.windows.add_child(corps)
+	corps.breach_damage.production = 60.0
+	corps.infection_damage.production = 0.0
+	var shipped := Observer.new()
+	shipped.configure(SaLog.new("info"), 0.25, false, {"mode": "active", "profile": "aggressive", "action_type": "breach_corps"})
+	_check(shipped.regulation_mode() == "off", "asking for active in this build gives off")
+	shipped.free()
+
+	var shadow := Observer.new()
+	shadow.configure(SaLog.new("info"), 0.25, false, {"mode": "dry_run", "profile": "aggressive"})
+	root.add_child(shadow)
+	ModLoaderLog.messages.clear()
+	shadow.start()
+	game.Signals.tick.emit()
+	for attack: int in 8:
+		await _play_attack(game, corps, true)
+	_check(_count("action_would_apply type=breach_corps") == 1, "the dry run shows what the actuator would have done")
+	_check(corps.calls.is_empty() and corps.data.level == 3.0, "and it does nothing")
+	shadow.stop()
+	_check(_count("actuator_summary armed=false actions=0") == 1, "the summary says it was not armed")
+	shadow.queue_free()
+	await process_frame
+
+	# Everything below uses the fake game with both locks opened by the tests.
+	var observer := _armed_setup(game, {})
+	for attack: int in 8:
+		await _play_attack(game, corps, true)
+		if not corps.calls.is_empty():
+			break
+	_check(corps.calls == ["up:1"], "a raise calls the game once, after the reset: %s" % str(corps.calls))
+	_check(_count("action_applied type=breach_corps direction=raise level=3 target=4") == 1, "the action is traced")
+	_check(_count("forecast_status=") == 1 and _count("margin=") >= 1 and _count("successes_in_row=") >= 1, "with its evidence")
+	game.Signals.tick.emit()
+	_check(_count("level_origin type=breach_corps level=4 origin=mod") == 1, "the mod's change is told apart")
+	_check(_count("manual_ceiling") == 0, "and it sets no ceiling")
+	await _play_attack(game, corps, true)
+	_check(_count("action_verification type=breach_corps from=3 to=4 outcome=verified") == 1, "the next attack verifies it: %s" % _last("action_verification"))
+
+	# The player comes first: a waiting action is dropped, and the change is a ceiling.
+	corps.detected = true
+	corps.time = corps.max_time - 0.05
+	corps.firewall = corps.max_firewall * 0.5
+	game.Signals.tick.emit()
+	corps.data.level = 5.0
+	corps._rearm()
+	corps.detected = false
+	game.Signals.tick.emit()
+	_check(_count("manual_ceiling type=breach_corps ceiling=5 scope=session origin=player") == 1, "the player's change is a session ceiling")
+	observer.stop()
+	observer.queue_free()
+	await process_frame
+
+	# Lowering: known at a tick, done in the same call, and only if the window is free.
+	corps.calls.clear()
+	corps.data.level = 4.0
+	corps._rearm()
+	corps.breach_damage.production = 12.0
+	var lowering := _armed_setup(game, {})
+	for attack: int in 20:
+		await _play_attack(game, corps, false)
+		if not corps.calls.is_empty():
+			break
+	_check(corps.calls == ["down:1"], "a lower calls the game once: %s, %s" % [str(corps.calls), _last("active type=")])
+	_check(_count("action_applied type=breach_corps direction=lower level=4 target=3") == 1, "the lower is traced: %s" % _last("action_"))
+	_check(_count("window_failures=") >= 1, "with the failures that motivated it")
+	game.Signals.tick.emit()
+	_check(_count("level_origin type=breach_corps level=3 origin=mod") == 1, "the lower is told apart from a player's change")
+	game.Signals.desktop_ready.emit()
+	_check(_count("action_verification type=breach_corps from=4 to=3 outcome=inconclusive reason=reload_during_verification") == 1, "a load during the verification is reported")
+	_check(_count("regulation_stopped reason=verification_inconclusive") == 1, "and it stops the regulation")
+	corps.data.level = 4.0
+	corps._rearm()
+
+	# The emergency stop survives a restart of the observer.
+	lowering.emergency_stop()
+	_check(_count("emergency_stop actuator=stopped") == 1, "the emergency stop is logged")
+	lowering.stop()
+	lowering.start()
+	var before := corps.calls.size()
+	game.Signals.tick.emit()
+	for attack: int in 12:
+		await _play_attack(game, corps, true)
+	_check(corps.calls.size() == before, "nothing acts after the emergency stop, even restarted")
+	_check(_count("regulation_stopped reason=emergency_stop") == 1, "the new actuator says why it is stopped")
+	lowering.stop()
+	lowering.queue_free()
+	await process_frame
+
+	# A single action, as in the first real test.
+	corps.calls.clear()
+	corps.data.level = 3.0
+	corps._rearm()
+	corps.breach_damage.production = 60.0
+	var single := _armed_setup(game, {"action_limit": 1})
+	for attack: int in 30:
+		await _play_attack(game, corps, true)
+	_check(corps.calls.size() == 1, "one action allowed, one action made: %s" % str(corps.calls))
+	_check(_count("regulation_stopped reason=action_limit_reached actions=1") == 1, "the regulation stops right after it")
+	single.stop()
+	_check(_count("actions=1 deferred_no_safe_window=0") == 1, "the summary counts it")
+	single.queue_free()
+	await process_frame
+
+	# No safe window: the action waits, and is never forced.
+	corps.calls.clear()
+	corps.data.level = 3.0
+	corps._rearm()
+	var busy := _armed_setup(game, {})
+	for attack: int in 12:
+		if _count("action_deferred_no_safe_window") > 0:
+			break
+		corps.detected = true
+		corps.time = corps.max_time - 0.05
+		corps.firewall = corps.max_firewall * 0.6
+		game.Signals.tick.emit()
+		corps.time = corps.max_time - 3.05
+		corps.firewall = 0.0
+		corps.breached = corps.max_breach
+		game.Signals.breached.emit(corps)
+		# The next attack is already there when the deferred check runs.
+		corps.time = corps.max_time - 0.05
+		corps.firewall = corps.max_firewall * 0.9
+		corps.breached = 0.0
+		await process_frame
+	_check(_count("action_deferred_no_safe_window type=breach_corps direction=raise") == 1, "an attack in progress defers the action")
+	_check(_count("state=attack_in_progress total=1") == 1, "the report counts it: %s" % _last("action_"))
+	_check(corps.calls.is_empty(), "and nothing is called")
+	corps.detected = false
+	corps.time = corps.max_time
+	corps.firewall = corps.max_firewall
+	game.Signals.tick.emit()
+	await _play_attack(game, corps, false)
+	_check(_count("action_cancelled type=breach_corps direction=raise reason=contradicted_by_attack") == 1, "a failure drops a waiting raise: %s" % _last("action_"))
+	_check(corps.calls.is_empty(), "so it never happens")
+	busy.stop()
+	busy.queue_free()
+	await process_frame
+
+	# No action at speed x5, and attacks seen there are forgotten.
+	corps.calls.clear()
+	corps.data.level = 3.0
+	corps._rearm()
+	var fast := _armed_setup(game, {})
+	game.Attributes.tick_speed = 0.25
+	game.Signals.tick.emit()
+	for attack: int in 12:
+		await _play_attack(game, corps, true)
+	_check(corps.calls.is_empty(), "no action at speed x5")
+	_check(_count("action_refused type=breach_corps direction=raise reason=speed_not_normal") == 1, "the reason is logged once: %s" % _last("action_"))
+	game.Attributes.tick_speed = TICK
+	fast.stop()
+	fast.queue_free()
+	await process_frame
+
+	# The native option blocks everything.
+	game.Data.auto_level_breach = true
+	var native := _armed_setup(game, {})
+	for attack: int in 12:
+		await _play_attack(game, corps, true)
+	_check(corps.calls.is_empty(), "no action while the native option is active")
+	game.Data.auto_level_breach = false
+	native.stop()
+	native.queue_free()
+	await process_frame
+	await _remove_fake_game(game)
+
+
+func _last(text: String) -> String:
+	for index: int in range(ModLoaderLog.messages.size() - 1, -1, -1):
+		if ModLoaderLog.messages[index].contains(text):
+			return ModLoaderLog.messages[index]
+	return "none"
+
+
 func _test_gap_probe_in_observer() -> void:
 	var game := _install_fake_game()
 	game.Globals.desktop = game.desktop
@@ -954,6 +1236,13 @@ func _test_mod_main() -> void:
 	game.desktop.windows.add_child(breach)
 	game.Signals.desktop_ready.emit()
 	_check(_count("bind result=ok") == 1, "the window is bound when the desktop becomes ready")
+	var stop_key := InputEventKey.new()
+	stop_key.pressed = true
+	stop_key.ctrl_pressed = true
+	stop_key.alt_pressed = true
+	stop_key.keycode = KEY_F10
+	main._input(stop_key)
+	_check(_count("emergency_stop actuator=none") == 1, "the emergency key always answers, even without an actuator")
 	main.queue_free()
 	await process_frame
 	await _remove_fake_game(game)

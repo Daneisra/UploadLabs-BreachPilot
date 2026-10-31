@@ -2,7 +2,7 @@ extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.2.0-beta.1-gap.1"
+const BUILD := "0.2.0-beta.1-dev.1"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
@@ -42,14 +42,19 @@ func _ready() -> void:
 		_observer.start()
 
 	_hotkey_enabled = settings.debug_toggle_hotkey
-	set_process_input(_hotkey_enabled)
+	set_process_input(true)
 
 
 func _input(event: InputEvent) -> void:
-	if not _hotkey_enabled or not is_instance_valid(_observer):
+	if not is_instance_valid(_observer):
 		return
 	var key := event as InputEventKey
-	if key and key.pressed and not key.echo and key.keycode == KEY_F9 and key.ctrl_pressed and key.alt_pressed:
+	if not key or not key.pressed or key.echo or not key.ctrl_pressed or not key.alt_pressed:
+		return
+	# The emergency stop has no option: it must always work.
+	if key.keycode == KEY_F10:
+		_observer.emergency_stop()
+	elif key.keycode == KEY_F9 and _hotkey_enabled:
 		if _observer.is_active():
 			_observer.stop()
 		else:

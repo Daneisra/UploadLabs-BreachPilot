@@ -16,7 +16,6 @@ const BUDGET_WINDOW := 600.0
 const REVERSALS := 3
 const REVERSAL_WINDOW := 900.0
 const FREEZE := 1800.0
-const UNKNOWN_RISK := 0.05
 const SIGNIFICANCE := 0.001
 ## The test is repeated at every attack, so a known risk needs a few attacks before it can conclude.
 const MIN_ATTACKS_WITH_RISK := 10
@@ -56,6 +55,7 @@ var _recent_events: Array[bool] = []
 var _refuted := false
 var _checks_in := 0
 var _checks_out := 0
+var _undo: Dictionary = {}
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0) -> void:
@@ -136,6 +136,29 @@ func on_level_changed(level: int) -> void:
 	_level = level
 	_reset_window()
 	_proposal = ""
+	_undo = {}
+
+
+## Attacks seen at another game speed say nothing about the decisions to come.
+func on_speed_changed() -> void:
+	_reset_window()
+	_stabilizing = STABILIZE_ATTACKS
+	_proposal = ""
+	_undo = {}
+
+
+## The last proposal was not applied: it must not cost budget, delays or a block. Once the level, the
+## power or the speed has moved, there is nothing to restore and the budget simply stays spent.
+func cancel_last_action() -> void:
+	if _undo.is_empty():
+		return
+	_actions.pop_back()
+	_last_raise = _undo.last_raise
+	_last_lower = _undo.last_lower
+	_blocked = _undo.blocked
+	_block_length = _undo.block_length
+	_proposal = ""
+	_undo = {}
 
 
 ## attack: event, complete, level, max_level, signature. current and next are forecasts of the
@@ -149,6 +172,7 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		_proposal = ""
 		_blocked.clear()
 		_block_length.clear()
+		_undo = {}
 		_checks_in = 0
 		_checks_out = 0
 		if not first:
@@ -178,11 +202,12 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 
 
 func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
-	var known: bool = current.get("status") == "reliable"
-	var true_risk: float = 1.0 - current.p_success if known else UNKNOWN_RISK
+	var failures := _history.count(true)
+	if current.get("status") != "reliable":
+		return _decision("hold", "forecast_not_reliable", attack, {"failures": failures, "status": current.get("status", "none")})
+	var true_risk: float = 1.0 - current.p_success
 	# Chance only excuses the risk the profile accepts: a level expected to fail is not "normal".
 	var risk := minf(true_risk, 1.0 - _profile.p)
-	var failures := _history.count(true)
 	var needed := failures_needed(_history.size(), risk)
 	if risk > REFUTED_BELOW_RISK + RISK_EPSILON and _history.size() < MIN_ATTACKS_WITH_RISK:
 		return _decision("hold", "gathering_attacks", attack, {"failures": failures})
@@ -192,7 +217,7 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 		return _decision("hold", "at_min_level", attack, {"failures": failures, "needed": needed})
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
-	_refuted = known and true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
+	_refuted = true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
 	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_refuted": _refuted})
 
 
@@ -250,6 +275,7 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 		_frozen_until = _timer + FREEZE
 		return _decision("hold", "frozen_by_reversals", attack, {"reversals": reversals})
 
+	_undo = {"last_raise": _last_raise, "last_lower": _last_lower, "blocked": _blocked.duplicate(), "block_length": _block_length.duplicate()}
 	_proposal = key
 	_actions.append([_timer, direction])
 	if direction == "raise":
@@ -280,6 +306,9 @@ func _reset_window() -> void:
 
 
 func _decision(kind: String, reason: String, attack: Dictionary, details: Dictionary = {}) -> Dictionary:
-	var decision := {"decision": kind, "reason": reason, "real_level": attack.level, "profile": profile_name, "hypothetical": true}
+	var decision := {
+		"decision": kind, "reason": reason, "real_level": attack.level, "profile": profile_name, "hypothetical": true,
+		"margin": _profile.margin, "window_attacks": _history.size(), "window_failures": _history.count(true), "successes_in_row": _consecutive,
+	}
 	decision.merge(details)
 	return decision

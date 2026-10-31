@@ -1,5 +1,6 @@
 extends Node
-## Connects the classifier to the game. Read-only: it never changes the threat level.
+## Connects the classifier to the game. It reads the game: only threat_actuator.gd could ever change
+## a threat level, and neither that script nor this one allows it in this build.
 
 const ApiGuard := preload("../../core/api_guard.gd")
 const SaLog := preload("../../core/sa_log.gd")
@@ -12,6 +13,7 @@ const RegulationState := preload("regulation_state.gd")
 const ThreatRegulator := preload("threat_regulator.gd")
 const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
+const ThreatActuator := preload("threat_actuator.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
@@ -71,7 +73,10 @@ var _stealth_mask := 0
 var _ticks_since_scan := 0
 var _last_tick_speed := -1.0
 var _traced_events: Dictionary = {}
-var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0}
+var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0, "action_limit": 1, "action_type": ""}
+var _actuator: ThreatActuator
+var _emergency := false
+var _last_refusal: Dictionary = {}
 var _state: RegulationState = RegulationState.new()
 var _regulators: Dictionary = {}
 var _forecasts: Dictionary = {}
@@ -96,6 +101,18 @@ var _probe_ticks_this_frame := 0
 var _probe_ticks_per_frame_max := 0
 
 
+## This build's first lock. Whatever the configuration says, active falls back to off.
+func _actions_allowed() -> bool:
+	return false
+
+
+func _new_actuator(armed: bool) -> ThreatActuator:
+	return ThreatActuator.new(armed, {"attributes": _attributes, "data": _data}, {
+		"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
+		"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
+	})
+
+
 ## regulation.mode can only be off or dry_run: nothing in this version can apply a decision.
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
@@ -103,7 +120,7 @@ func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulatio
 	_api_dump = api_dump
 	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
-	if _regulation.mode != "dry_run":
+	if _regulation.mode != "dry_run" and not (_regulation.mode == "active" and _actions_allowed()):
 		_regulation.mode = "off"
 
 
@@ -124,6 +141,10 @@ func start() -> void:
 	_attributes = root.get_node("Attributes")
 	_data = root.get_node("Data")
 	_active = true
+	if _regulation.mode != "off":
+		_actuator = _new_actuator(_regulation.mode == "active")
+		if _emergency:
+			_actuator.halt("emergency_stop")
 	_signals.tick.connect(_on_tick)
 	_signals.breached.connect(_on_breached)
 	_signals.window_created.connect(_bind_window)
@@ -134,6 +155,7 @@ func start() -> void:
 	_log.info("observer state=started native_auto_level=%s regulation_mode=%s profile=%s" % [_data.auto_level_breach, _regulation.mode, _regulation.profile])
 	_log_inventory(root)
 	_log_save_candidates()
+	_log_undo_candidates(root)
 	if _gap_probe:
 		_start_probe()
 	# The desktop may already exist: desktop_ready would then never come.
@@ -152,6 +174,10 @@ func stop() -> void:
 	_signals.desktop_ready.disconnect(_on_desktop_ready)
 	_signals.setting_set.disconnect(_on_setting_set)
 	_stop_probe()
+	if _actuator != null:
+		_log.info(_actuator.summary())
+		_actuator = null
+	_last_refusal.clear()
 	_log_regulators()
 	for key: String in _distributions:
 		_log_distribution(key)
@@ -179,6 +205,11 @@ func _on_desktop_ready() -> void:
 	_state.set_slot("")
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.set_ceiling(-1)
+	if _actuator != null:
+		for type: String in _regulators:
+			_cancel_action(type, "game_loaded")
+		_log_verification(_actuator.on_reload())
+		_log_new_halt()
 	_log_save_candidates()
 	_scan_desktop()
 
@@ -210,7 +241,9 @@ func _bind_window(window: Variant) -> void:
 		"type": window.window,
 		"classifier": BreachClassifier.new(_starvation_ratio),
 		"getters": _usable_getters(signatures),
+		"native_usable": signatures.get("level_up", -1) == 1 and signatures.get("level_down", -1) == 1,
 	}
+	_log_native_actions(window)
 	if _gap_stats != null:
 		_trackers[id].probe = GapProbe.new()
 		_trackers[id].screen_fields = "out_of_screen" in window and "is_far" in window
@@ -224,9 +257,14 @@ func _bind_window(window: Variant) -> void:
 func _on_tick() -> void:
 	if _attributes.tick_speed != _last_tick_speed:
 		_log.info("tick_speed from=%s to=%s" % [_format_value(_last_tick_speed), _format_value(_attributes.tick_speed)])
+		if _last_tick_speed >= 0.0:
+			_on_speed_changed()
 		_last_tick_speed = _attributes.tick_speed
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.advance(_attributes.tick_speed)
+	if _actuator != null:
+		_log_verification(_actuator.advance(_attributes.tick_speed))
+		_log_new_halt()
 	if _gap_stats != null:
 		_note_probe_tick()
 	for id: int in _trackers.keys():
@@ -317,8 +355,8 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 		if event.event == "success":
 			_check_prediction(type, event)
 			_record_distribution(type, event)
-		if _regulation.mode == "dry_run":
-			_simulate_regulation(tracker, event)
+		if _regulation.mode != "off":
+			_regulate(tracker, event)
 
 
 func _start_probe() -> void:
@@ -506,19 +544,30 @@ func _log_level_change(type: String, record: Dictionary) -> void:
 	_log.info(" ".join(parts))
 
 
-## Dry run: logs what the regulator would decide. Nothing here can change the game.
-func _simulate_regulation(tracker: Dictionary, event: Dictionary) -> void:
+## Logs what the regulator decides and hands it to the actuator, which in this build only tells what
+## it would have done.
+func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	var type: String = tracker.type
 	var regulator := _regulator_for(type)
 	regulator.set_native(_data.auto_level_breach)
 	regulator.note_event(event.event, event.get("clues", ""))
-	if event.event == "level_changed" or event.event == "level_changed_reset":
-		var level: int = event.get("to", event.get("level_after", -1))
+	var is_level_event: bool = event.event == "level_changed" or event.event == "level_changed_reset"
+	var level: int = event.get("to", event.get("level_after", -1))
+	var claimed: bool = is_level_event and _actuator.claims_level_change(type, level)
+	_log_verification(_actuator.note_event(type, event, claimed))
+	_log_new_halt()
+	if is_level_event:
 		regulator.on_level_changed(level)
-		if not _data.auto_level_breach:
+		if claimed:
+			_log.info("level_origin type=%s level=%d origin=mod" % [type, level])
+			return
+		_cancel_action(type, "level_changed_by_other")
+		if _data.auto_level_breach:
+			_log.info("level_origin type=%s level=%d origin=native" % [type, level])
+		else:
 			_state.apply_manual(type, level)
 			regulator.set_ceiling(level)
-			_log.info("manual_ceiling type=%s ceiling=%d scope=%s" % [type, level, "slot" if _state.is_persistent() else "session"])
+			_log.info("manual_ceiling type=%s ceiling=%d scope=%s origin=player" % [type, level, "slot" if _state.is_persistent() else "session"])
 		return
 	if not event.has("max_firewall") or not is_instance_valid(tracker.window):
 		return
@@ -547,7 +596,161 @@ func _simulate_regulation(tracker: Dictionary, event: Dictionary) -> void:
 	if decision.decision == "lower":
 		var lower_target := _native_values(tracker, event.level - 1)
 		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, regulator.margin())
+	decision.hypothetical = not _actuator.is_armed()
 	_log_decision(type, decision, next, assumed)
+	_handle_action(tracker, event, decision, assumed)
+
+
+## A success is proof enough to forget a lower, and a failure to forget a raise. Then the attack's end
+## is an occasion to act: the failure is known at a tick, and a success resets the window after the signal.
+func _handle_action(tracker: Dictionary, event: Dictionary, decision: Dictionary, assumed: Dictionary) -> void:
+	var type: String = tracker.type
+	if _actuator.has_pending(type):
+		var direction := _actuator.pending_direction()
+		if (direction == "raise" and event.event == "failure_power") or (direction == "lower" and event.event == "success"):
+			_cancel_action(type, "contradicted_by_attack")
+	if decision.decision != "hold":
+		var power := {"damage_rate": event.damage_rate, "infection_rate": event.infection_rate, "vulnerability": event.vulnerability}
+		var refused := _actuator.request(type, decision.decision, event.level, power, assumed, decision)
+		if not refused.is_empty():
+			_regulator_for(type).cancel_last_action()
+			_log_refusal(type, decision.decision, refused)
+	if not _actuator.has_pending(type):
+		return
+	var cycle_key := "%d|%d" % [tracker.window.get_instance_id(), event.cycle_id]
+	if event.event == "failure_power":
+		_attempt_action(tracker, cycle_key)
+	elif event.event == "success":
+		_attempt_after_success.call_deferred(tracker.window.get_instance_id(), cycle_key)
+
+
+func _attempt_after_success(id: int, cycle_key: String) -> void:
+	var tracker: Dictionary = _trackers.get(id, {})
+	if _actuator != null and not tracker.is_empty():
+		_attempt_action(tracker, cycle_key)
+
+
+func _attempt_action(tracker: Dictionary, cycle_key: String) -> void:
+	var type: String = tracker.type
+	var nodes := 0
+	for other: Dictionary in _trackers.values():
+		if other.type == type and is_instance_valid(other.window):
+			nodes += 1
+	var regulator := _regulator_for(type)
+	var result := _actuator.attempt(type, tracker.window, cycle_key, nodes, not regulator.is_unsafe(), tracker.native_usable, _state.ceiling(type))
+	if result.is_empty():
+		return
+	var pending: Dictionary = result.pending
+	var trace := _action_trace(pending)
+	match result.outcome:
+		"would_act":
+			_log.info("action_would_apply type=%s %s" % [type, trace])
+		"acted":
+			_log.info("action_applied type=%s %s level_after=%d detected_after=%s time_after=%s max_time_after=%s problem=%s" % [type, trace, result.level_after, result.detected_after, _format_value(result.time_after), _format_value(result.max_time_after), result.get("reason", "none")])
+		"deferred":
+			_log.info("action_deferred_no_safe_window type=%s %s attempts=%d state=%s total=%d" % [type, trace, pending.attempts, result.reason, _actuator.deferred_total])
+			if result.starving:
+				_log.warning("action_starving type=%s direction=%s attempts=%d: no safe window was found, the action keeps waiting" % [type, pending.direction, pending.attempts])
+		"refused":
+			regulator.cancel_last_action()
+			_log_refusal(type, pending.direction, result.reason)
+	_log_new_halt()
+
+
+## Everything that motivated an action, on one line.
+func _action_trace(pending: Dictionary) -> String:
+	var decision: Dictionary = pending.decision
+	var expected: Dictionary = pending.expected
+	return "direction=%s level=%d target=%d reason=%s profile=%s margin=%s window_attacks=%d window_failures=%d successes_in_row=%d failures_needed=%s risk=%s forecast_status=%s forecast_outcome=%s forecast_p=%s used_max=%s" % [
+		pending.direction, pending.from, pending.to, decision.reason, decision.profile, _format_value(decision.margin),
+		decision.window_attacks, decision.window_failures, decision.successes_in_row, decision.get("needed", "none"),
+		_format_value(decision.get("risk", -1.0)), expected.get("status", "none"), expected.get("outcome", "none"),
+		_format_value(expected.get("p_success", -1.0)), _format_value(expected.get("used_max", -1.0)),
+	]
+
+
+func _cancel_action(type: String, reason: String) -> void:
+	var cancelled := _actuator.cancel_pending(type)
+	if cancelled.is_empty():
+		return
+	_regulator_for(type).cancel_last_action()
+	_log.info("action_cancelled type=%s direction=%s reason=%s attempts=%d" % [type, cancelled.direction, reason, cancelled.attempts])
+
+
+## Refusals repeat at every attack: only a new reason is logged, the summary has the counts.
+func _log_refusal(type: String, direction: String, reason: String) -> void:
+	var key := "%s|%s" % [direction, reason]
+	if _last_refusal.get(type, "") == key:
+		return
+	_last_refusal[type] = key
+	_log.info("action_refused type=%s direction=%s reason=%s" % [type, direction, reason])
+
+
+func _log_verification(result: Dictionary) -> void:
+	if not result.is_empty():
+		_log.info("action_verification type=%s from=%d to=%d outcome=%s reason=%s next_event=%s next_used=%s" % [result.type, result.from, result.to, result.outcome, result.reason, result.next_event, _format_value(result.next_used)])
+
+
+func _log_new_halt() -> void:
+	var reason := _actuator.take_new_halt()
+	if not reason.is_empty():
+		_log.warning("regulation_stopped reason=%s actions=%d" % [reason, _actuator.actions_done])
+
+
+func _on_speed_changed() -> void:
+	for type: String in _regulators:
+		_regulators[type].on_speed_changed()
+		if _actuator != null:
+			_cancel_action(type, "speed_changed")
+
+
+## Stops all actions until the game is restarted, even if the observer starts again.
+func emergency_stop() -> void:
+	_emergency = true
+	_log.warning("emergency_stop actuator=%s" % ("none" if _actuator == null else "stopped"))
+	if _actuator != null:
+		for type: String in _regulators:
+			_cancel_action(type, "emergency_stop")
+		_actuator.halt("emergency_stop")
+		_log_new_halt()
+
+
+## Where the game's Ctrl+Z may live: would it also undo a change made by the mod? Names only.
+func _log_undo_candidates(root: Node) -> void:
+	var pattern := RegEx.create_from_string("(?i)undo|redo|history")
+	for node: Node in root.get_children():
+		var script: Script = node.get_script()
+		if node == self or script == null:
+			continue
+		var found := PackedStringArray()
+		for method: Dictionary in script.get_script_method_list():
+			if pattern.search(method.name) != null:
+				found.append(method.name)
+		if not found.is_empty():
+			_log.info("inventory undo_candidates node=%s methods=%s" % [node.name, ",".join(found)])
+
+
+## What can be learned about the level methods without calling them: their arguments and which
+## methods the node's buttons reach. Names only.
+func _log_native_actions(window: Node) -> void:
+	var script: Script = window.get_script()
+	var methods := PackedStringArray()
+	while script != null:
+		for method: Dictionary in script.get_script_method_list():
+			if method.name in ["level_up", "level_down", "animate_level_up", "animate_level_down", "reset", "_on_add_button_pressed", "_on_reduce_button_pressed"]:
+				var arguments := PackedStringArray()
+				for argument: Dictionary in method.args:
+					arguments.append("%s:%s" % [argument.name, type_string(argument.type)])
+				methods.append("%s(%s)defaults=%d" % [method.name, ",".join(arguments), method.default_args.size()])
+		script = script.get_base_script()
+	var buttons := PackedStringArray()
+	for button: Node in window.find_children("*", "BaseButton", true, false):
+		var targets := PackedStringArray()
+		for connection: Dictionary in button.pressed.get_connections():
+			var target: Callable = connection.callable
+			targets.append("%s.%s" % ["self" if target.get_object() == window else str(target.get_object()), target.get_method()])
+		buttons.append("%s>%s" % [button.name, "+".join(targets)])
+	_log.info("native_actions type=%s methods=%s buttons=%s" % [window.window, ";".join(methods), ";".join(buttons)])
 
 
 func _regulator_for(type: String) -> ThreatRegulator:
@@ -603,7 +806,7 @@ func _log_decision(type: String, decision: Dictionary, next: Dictionary, assumed
 		_last_hold_reason[type] = decision.reason
 	else:
 		_last_hold_reason[type] = ""
-	var parts := PackedStringArray(["dry_run", "type=%s" % type])
+	var parts := PackedStringArray([_regulation.mode, "type=%s" % type])
 	for key: String in decision:
 		parts.append("%s=%s" % [key, _format_value(decision[key])])
 	parts.append("next_status=%s" % next.get("status", "none"))

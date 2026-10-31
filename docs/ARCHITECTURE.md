@@ -23,6 +23,7 @@ mods-unpacked/Daneisra-SmartAutomation/
     ├── breach_simulator.gd       # distribution exacte des salves, calcul pur et borné
     ├── gap_probe.gd              # mesure entre deux attaques, machine à états pure
     ├── gap_stats.gd              # totaux bornés de ces mesures
+    ├── threat_actuator.gd        # seul script pouvant changer un niveau, verrouillé dans ce build
     └── threat_observer.gd        # adaptateur vers le jeu, en lecture seule
 tests/                            # tests simulés (Godot sans interface)
 tools/build_zip.py                # construit le zip du mod
@@ -61,6 +62,27 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 - **Baisse :** seuls les `failure_power` complets comptent. Il faut assez d'échecs pour que le hasard ne soit plus une explication acceptable (moins de 0,1 % sur la fenêtre de 20 attaques), et au moins 10 attaques si un risque est attendu. Un échec contre un risque attendu sous 1 % réfute la prévision : le niveau reste bloqué jusqu'au prochain changement de puissance.
 - **Plafond manuel :** tout changement manuel fixe le plafond au nouveau niveau, vers le haut comme vers le bas. Il n'est supprimé que par une action explicite. Sans identifiant de sauvegarde fiable, il ne dure que la session et rien n'est écrit.
 - **Sécurité :** option native active, classificateur peu fiable ou inversions répétées suspendent les décisions.
+
+## Actionneur
+
+**Ce build ne peut changer aucun niveau.** Deux verrous indépendants sont fermés dans le code : `_actions_allowed()` dans l'observateur ramène le mode `active` à `off`, et `_build_allows_actions()` dans l'actionneur empêche tout appel natif. Les options ne proposent pas ce mode. Seuls les tests ouvrent ces verrous, sur un faux jeu. En `dry_run`, tous les contrôles s'exécutent et le journal indique ce qui aurait été fait (`action_would_apply`).
+
+| Étape | Règle |
+|---|---|
+| Décision | Le régulateur propose. Une baisse exige une prévision fiable et assez d'échecs observés |
+| Occasion | Fin d'attaque uniquement : au tick où l'échec est déduit, ou dans un appel différé après `breached`. Le report n'est qu'un moyen d'arriver après la réinitialisation |
+| Refus | Thread, arrêt, limite, nœud absent, option native, vitesse, plusieurs nœuds, classificateur, même attaque, niveau, bornes, plafond, puissance. L'action est abandonnée et le budget rendu si rien n'a bougé |
+| Report | Attaque, dégâts, pause ou minuteur non réarmé : `action_deferred_no_safe_window`, nouvelle tentative à la fin d'attaque suivante, `action_starving` après 5 reports |
+| Action | Contrôles et appel dans le même appel, sans attente. Un seul niveau, un seul point d'entrée (`_call_native`) |
+| Après | Relecture immédiate du niveau et de l'état, puis vérification de l'attaque suivante (`action_verification`). Une attaque perturbée, incomplète ou absente, ou un rechargement, arrête la régulation |
+
+- **Origine d'un changement :** `origin=mod` seulement pour le niveau attendu après une action du mod, et une seule fois. Tout autre changement est celui du joueur (plafond de session, action en attente abandonnée), ou de l'option native si elle est active.
+- **Arrêt d'urgence :** `Ctrl+Alt+F10`, toujours actif, sans option. Il dure jusqu'au redémarrage du jeu.
+- **Limite d'actions :** `action_limit`, 1 par défaut. Elle arrête la régulation juste après l'action, et la vérification continue.
+- **Un seul type :** un actionneur armé exige `action_type`, sans valeur par défaut.
+- **Vitesse :** toute vitesse autre que 0,05 ou illisible empêche l'action. Un changement de vitesse efface la fenêtre d'attaques et relance la stabilisation.
+
+**Limite :** tout cela n'est testé que sur un faux jeu, qui suit notre compréhension de `level_up` et `level_down`. Leur effet réel et le sens de leur argument ne sont pas vérifiés.
 
 ## Mesure entre deux attaques
 
