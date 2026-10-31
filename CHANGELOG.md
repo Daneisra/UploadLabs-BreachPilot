@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-beta.1-gap.1 – en cours : mesure de la fenêtre entre deux attaques
+
+**Aucun changement automatique du niveau de menace, aucun actionneur, aucun mode `active`.** Ce n'est pas encore la `0.2.0-beta.1`.
+
+### Ajouté
+
+- Option `gap_probe`, désactivée par défaut : mesure en lecture seule du temps entre deux attaques.
+- `gap_probe.gd` : horodatage en microsecondes, images et ticks, résultat connu distingué du nœud réellement disponible, effet des changements de niveau.
+- `gap_stats.gd` : totaux bornés par cas, minimum, maximum, moyenne et distributions.
+- Relevés au début et à la fin du `_process` de chaque image, pour établir l'ordre des traitements, et coût de la mesure dans le journal.
+
 ## 0.2.0-alpha.2 – 2026-10-31 : simulation à blanc
 
 **Aucun changement automatique du niveau de menace.** Le mod peut seulement journaliser les décisions qu'il aurait prises. `regulation_mode` n'accepte que `off` (par défaut) et `dry_run`. Pré-version validée, tag `v0.2.0-alpha.2`.

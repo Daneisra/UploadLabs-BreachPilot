@@ -12,7 +12,8 @@ Automatiser des tâches répétitives en respectant les mécaniques normales du 
 |---|---|---|
 | Observateur des infiltrations (lecture seule) | 0.1.0 | **Validé en jeu** |
 | Mesures pour la régulation (lecture seule) | 0.2.0-alpha.1 | Validé en jeu |
-| Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | En développement |
+| Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | Validé en jeu |
+| Mesure de la fenêtre entre deux attaques (lecture seule) | Préparation de 0.2.0-beta.1 | En cours de mesure |
 | Auto Threat Manager (régulation de la menace) | 0.2.0 | Non commencé |
 | Auto Data Lab Supply : observateur, puis répartiteur | Ultérieure | Non commencé |
 

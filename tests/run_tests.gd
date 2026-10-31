@@ -12,6 +12,7 @@ const ApiGuard := preload(MOD + "core/api_guard.gd")
 const SaLog := preload(MOD + "core/sa_log.gd")
 const ModMain := preload(MOD + "mod_main.gd")
 const RegulationTests := preload("regulation_tests.gd")
+const GapProbeTests := preload("gap_probe_tests.gd")
 
 const TICK := 0.05
 const TIME_LIMIT := 120
@@ -117,7 +118,7 @@ func _on_time_limit() -> void:
 
 
 func _run() -> void:
-	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain, RegulationTests]:
+	for script: GDScript in [Classifier, Prediction, Simulator, Observer, ApiGuard, SaLog, ModMain, RegulationTests, GapProbeTests]:
 		_check(script.can_instantiate(), "compiles: %s" % script.resource_path)
 	if _failures > 0:
 		print("%d checks, %d failures" % [_checks, _failures])
@@ -148,6 +149,8 @@ func _run() -> void:
 	await _test_mod_main()
 	RegulationTests.new().run(_check)
 	await _test_dry_run_in_observer()
+	GapProbeTests.new().run(_check)
+	await _test_gap_probe_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -856,6 +859,74 @@ func _test_dry_run_in_observer() -> void:
 
 	observer.stop()
 	_check(_count("regulator_summary type=breach_corps") == 1, "the regulator is summarized at stop")
+	observer.queue_free()
+	await _remove_fake_game(game)
+
+
+func _test_gap_probe_in_observer() -> void:
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var corps := FakeBreach.new()
+	var twin := FakeBreach.new()
+	game.desktop.windows.add_child(corps)
+	game.desktop.windows.add_child(twin)
+	var off := Observer.new()
+	off.configure(SaLog.new("info"), 0.25, false)
+	root.add_child(off)
+	ModLoaderLog.messages.clear()
+	off.start()
+	_check(off.get_child_count() == 0 and _count("gap_") == 0, "the gap probe does nothing unless enabled")
+	off.stop()
+	off.free()
+
+	var observer := Observer.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {}, true)
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	_check(observer.get_child_count() == 2, "the probe samples at both ends of the frame")
+	_check(_count("gap_probe_bound type=breach_corps process_priority=0") == 2, "the windows' process priority is reported")
+	for attack: int in 3:
+		corps.detected = true
+		corps.time = 9.0
+		corps.firewall = 20.0
+		game.Signals.tick.emit()
+		await process_frame
+		game.Signals.breached.emit(corps)
+		await process_frame
+		corps.detected = false
+		corps.time = 10.0
+		corps.firewall = 50.0
+		game.Signals.tick.emit()
+		await process_frame
+		await process_frame
+	corps.detected = true
+	corps.firewall = 20.0
+	game.Signals.tick.emit()
+	await process_frame
+	await process_frame
+	corps.data.level = 4.0
+	await process_frame
+	await process_frame
+	game.Signals.breached.emit(corps)
+	await process_frame
+	await process_frame
+	_check(_count("gap_sequence type=breach_corps result=success") == 3, "attack ends are measured in the game's order")
+	_check(_count("gap_level_change type=breach_corps") == 1, "a level change is measured")
+	_check(corps.data.level == 4.0 and corps.forbidden_calls == 0 and twin.forbidden_calls == 0, "the probe never calls level_up or level_down")
+	var lines := ModLoaderLog.messages.size()
+	for frame: int in 30:
+		await process_frame
+	_check(ModLoaderLog.messages.size() == lines, "idle frames log nothing")
+	twin.free()
+	await process_frame
+	observer.stop()
+	_check(_count("gap_case type=breach_corps result=success") >= 1, "the totals are logged at stop")
+	_check(_count("gap_common type=breach_corps nodes=2") == 1, "windows of one type are compared")
+	_check(_count("gap_order type=breach_corps") == 1, "the order of changes is logged")
+	_check(_count("gap_cost frames=") == 1 and _count("share_of_frame=") == 1, "the probe reports its own cost")
+	await process_frame
+	_check(observer.get_child_count() == 0, "stopping removes the hooks")
 	observer.queue_free()
 	await _remove_fake_game(game)
 

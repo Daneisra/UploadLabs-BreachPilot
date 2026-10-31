@@ -10,6 +10,8 @@ const BreachForecast := preload("breach_forecast.gd")
 const PowerProfile := preload("power_profile.gd")
 const RegulationState := preload("regulation_state.gd")
 const ThreatRegulator := preload("threat_regulator.gd")
+const GapProbe := preload("gap_probe.gd")
+const GapStats := preload("gap_stats.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
@@ -37,6 +39,19 @@ const SAVE_NODES_LOGGED := 12
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
 const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level", "get_reward", "get_experience_reward"]
+## Far from what the game should use, so these hooks run first and last among the frame's _process.
+const HOOK_PRIORITY := 1000000
+const PROBE_REPORT_FRAMES := 18000
+
+
+## Samples the windows at one point of the frame.
+class FrameHook extends Node:
+	var hook: String
+	var target: Callable
+
+	func _process(_delta: float) -> void:
+		target.call(hook)
+
 
 var _log: SaLog
 var _starvation_ratio := 0.25
@@ -63,13 +78,30 @@ var _forecasts: Dictionary = {}
 var _last_intervals: Dictionary = {}
 var _last_signatures: Dictionary = {}
 var _last_hold_reason: Dictionary = {}
+var _gap_probe := false
+var _gap_stats: GapStats
+var _hooks: Array[FrameHook] = []
+var _probe_hook := "F"
+var _probe_frame_hook := "start"
+var _probe_tick := 0
+var _probe_frames := 0
+var _probe_samples := 0
+var _probe_cost_total := 0
+var _probe_cost_max := 0
+var _probe_last_frame_usec := 0
+var _probe_longest_frame := 0
+var _probe_ticks_after: Dictionary = {}
+var _probe_tick_frame := -1
+var _probe_ticks_this_frame := 0
+var _probe_ticks_per_frame_max := 0
 
 
 ## regulation.mode can only be off or dry_run: nothing in this version can apply a decision.
-func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}) -> void:
+func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio
 	_api_dump = api_dump
+	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
 	if _regulation.mode != "dry_run":
 		_regulation.mode = "off"
@@ -102,6 +134,8 @@ func start() -> void:
 	_log.info("observer state=started native_auto_level=%s regulation_mode=%s profile=%s" % [_data.auto_level_breach, _regulation.mode, _regulation.profile])
 	_log_inventory(root)
 	_log_save_candidates()
+	if _gap_probe:
+		_start_probe()
 	# The desktop may already exist: desktop_ready would then never come.
 	_scan_desktop()
 
@@ -117,6 +151,7 @@ func stop() -> void:
 	_signals.window_deleted.disconnect(_on_window_deleted)
 	_signals.desktop_ready.disconnect(_on_desktop_ready)
 	_signals.setting_set.disconnect(_on_setting_set)
+	_stop_probe()
 	_log_regulators()
 	for key: String in _distributions:
 		_log_distribution(key)
@@ -176,6 +211,10 @@ func _bind_window(window: Variant) -> void:
 		"classifier": BreachClassifier.new(_starvation_ratio),
 		"getters": _usable_getters(signatures),
 	}
+	if _gap_stats != null:
+		_trackers[id].probe = GapProbe.new()
+		_trackers[id].screen_fields = "out_of_screen" in window and "is_far" in window
+		_log.info("gap_probe_bound type=%s process_priority=%d hook_priority=%d" % [window.window, window.process_priority, HOOK_PRIORITY])
 	_log.info("bind result=ok type=%s level=%d max_level=%d" % [window.window, window.data.level, window.data.max_level])
 	_log_native_methods(window.window, signatures)
 	if _api_dump:
@@ -188,11 +227,15 @@ func _on_tick() -> void:
 		_last_tick_speed = _attributes.tick_speed
 	for regulator: ThreatRegulator in _regulators.values():
 		regulator.advance(_attributes.tick_speed)
+	if _gap_stats != null:
+		_note_probe_tick()
 	for id: int in _trackers.keys():
 		var tracker: Dictionary = _trackers[id]
 		if not is_instance_valid(tracker.window):
 			_drop_tracker(id, "window_freed")
 			continue
+		if _gap_stats != null:
+			_probe_at("T", tracker)
 		_report(tracker, tracker.classifier.observe(_sample(tracker.window)))
 	if _trackers.is_empty():
 		_ticks_since_scan += 1
@@ -207,6 +250,9 @@ func _on_breached(window: Variant) -> void:
 	_bind_window(window)
 	var tracker: Dictionary = _trackers.get(window.get_instance_id(), {})
 	if not tracker.is_empty():
+		if _gap_stats != null:
+			_probe_at("B", tracker)
+			_probe_deferred.call_deferred(window.get_instance_id())
 		_report(tracker, tracker.classifier.on_breached(_sample(window)))
 
 
@@ -226,6 +272,8 @@ func _drop_tracker(id: int, reason: String) -> void:
 		return
 	_trackers.erase(id)
 	_report(tracker, tracker.classifier.invalidate(reason))
+	if _gap_stats != null:
+		_finish_probe(tracker)
 
 
 func _sample(window: Node) -> Dictionary:
@@ -255,6 +303,8 @@ func _sample(window: Node) -> Dictionary:
 func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 	var type: String = tracker.type
 	for event: Dictionary in events:
+		if _gap_stats != null:
+			_probe_result(tracker, event)
 		_count_reliability(type, event.event)
 		if event.event == "success":
 			event.next_ratio = BreachPrediction.next_ratio(event.ratio, event.level)
@@ -269,6 +319,191 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			_record_distribution(type, event)
 		if _regulation.mode == "dry_run":
 			_simulate_regulation(tracker, event)
+
+
+func _start_probe() -> void:
+	_gap_stats = GapStats.new()
+	_probe_tick = 0
+	_probe_frames = 0
+	_probe_samples = 0
+	_probe_cost_total = 0
+	_probe_cost_max = 0
+	_probe_last_frame_usec = 0
+	_probe_longest_frame = 0
+	_probe_ticks_after = {}
+	_probe_ticks_per_frame_max = 0
+	_probe_frame_hook = "start"
+	for entry: Array in [["F", -HOOK_PRIORITY], ["L", HOOK_PRIORITY]]:
+		var hook := FrameHook.new()
+		hook.name = "GapHook%s" % entry[0]
+		hook.hook = entry[0]
+		hook.target = _on_frame_hook
+		hook.process_priority = entry[1]
+		add_child(hook)
+		_hooks.append(hook)
+	_log.info("gap_probe state=started")
+
+
+func _stop_probe() -> void:
+	if _gap_stats == null:
+		return
+	for hook: FrameHook in _hooks:
+		hook.queue_free()
+	_hooks.clear()
+	for tracker: Dictionary in _trackers.values():
+		_finish_probe(tracker)
+	_log_probe_summary()
+	_gap_stats = null
+	_log.info("gap_probe state=stopped")
+
+
+## Runs twice per frame: nothing is logged here except rare, bounded reports.
+func _on_frame_hook(hook: String) -> void:
+	var started := Time.get_ticks_usec()
+	if hook == "F":
+		_probe_frames += 1
+		if _probe_last_frame_usec > 0:
+			_probe_longest_frame = maxi(_probe_longest_frame, started - _probe_last_frame_usec)
+		_probe_last_frame_usec = started
+	_probe_hook = hook
+	_probe_frame_hook = hook
+	for tracker: Dictionary in _trackers.values():
+		if is_instance_valid(tracker.window):
+			_probe_collect(tracker.type, tracker.probe.feed(_probe_sample(tracker)))
+	if hook == "L":
+		_note_common_windows()
+	_add_probe_cost(started)
+	if hook == "L" and _probe_frames % PROBE_REPORT_FRAMES == 0:
+		_log_probe_cost()
+
+
+func _note_probe_tick() -> void:
+	_probe_tick += 1
+	_probe_ticks_after[_probe_frame_hook] = _probe_ticks_after.get(_probe_frame_hook, 0) + 1
+	var frame := Engine.get_process_frames()
+	_probe_ticks_this_frame = _probe_ticks_this_frame + 1 if frame == _probe_tick_frame else 1
+	_probe_tick_frame = frame
+	_probe_ticks_per_frame_max = maxi(_probe_ticks_per_frame_max, _probe_ticks_this_frame)
+
+
+func _probe_at(hook: String, tracker: Dictionary) -> void:
+	var started := Time.get_ticks_usec()
+	_probe_hook = hook
+	_probe_collect(tracker.type, tracker.probe.feed(_probe_sample(tracker)))
+	_add_probe_cost(started)
+
+
+## An observation point after the breached signal. It is not a guarantee of anything by itself.
+func _probe_deferred(id: int) -> void:
+	var tracker: Dictionary = _trackers.get(id, {})
+	if _gap_stats != null and not tracker.is_empty() and is_instance_valid(tracker.window):
+		_probe_at("D", tracker)
+
+
+func _probe_result(tracker: Dictionary, event: Dictionary) -> void:
+	var stamp := {"hook": _probe_hook, "usec": Time.get_ticks_usec(), "frame": Engine.get_process_frames(), "tick": _probe_tick}
+	_probe_collect(tracker.type, tracker.probe.note_result(event.event, stamp, event))
+
+
+func _finish_probe(tracker: Dictionary) -> void:
+	_probe_collect(tracker.type, tracker.probe.finish())
+	_gap_stats.add_changes(tracker.type, tracker.probe.take_changes())
+	if tracker.probe.results_unmatched > 0 or tracker.probe.gaps_interrupted > 0:
+		_log.info("gap_probe_finished type=%s results_unmatched=%d gaps_interrupted=%d" % [tracker.type, tracker.probe.results_unmatched, tracker.probe.gaps_interrupted])
+
+
+func _probe_sample(tracker: Dictionary) -> Dictionary:
+	var window: Node = tracker.window
+	return {
+		"hook": _probe_hook,
+		"usec": Time.get_ticks_usec(),
+		"frame": Engine.get_process_frames(),
+		"tick": _probe_tick,
+		"detected": window.detected,
+		"paused": window.paused,
+		"time": window.time,
+		"max_time": window.max_time,
+		"firewall": window.firewall,
+		"max_firewall": window.max_firewall,
+		"breached": window.breached,
+		"infection_count": window.infection_damage.count,
+		"level": int(window.data.level),
+		"tick_speed": _attributes.tick_speed,
+		"damage_rate": window.breach_damage.production,
+		"infection_rate": window.infection_damage.production,
+		"offscreen": tracker.screen_fields and (window.out_of_screen or window.is_far),
+		"native": _data.auto_level_breach,
+	}
+
+
+func _probe_collect(type: String, records: Array[Dictionary]) -> void:
+	_probe_samples += 1
+	for record: Dictionary in records:
+		if record.kind == "level_change":
+			_log_level_change(type, record)
+			continue
+		var outcome := _gap_stats.add(type, record)
+		if outcome.sequence:
+			_log_gap_sequence(type, record)
+		if not outcome.report.is_empty():
+			_log.info(_gap_stats.case_line(outcome.report))
+
+
+func _note_common_windows() -> void:
+	if _trackers.size() < 2:
+		return
+	var groups := {}
+	for tracker: Dictionary in _trackers.values():
+		if not is_instance_valid(tracker.window):
+			continue
+		var group: Array = groups.get(tracker.type, [0, true])
+		group[0] += 1
+		group[1] = group[1] and tracker.probe.is_available()
+		groups[tracker.type] = group
+	for type: String in groups:
+		if groups[type][0] >= 2:
+			_gap_stats.note_common(type, groups[type][0], groups[type][1])
+
+
+func _add_probe_cost(started: int) -> void:
+	var cost := Time.get_ticks_usec() - started
+	_probe_cost_total += cost
+	_probe_cost_max = maxi(_probe_cost_max, cost)
+
+
+func _log_probe_cost() -> void:
+	var frames := maxi(_probe_frames, 1)
+	var per_frame := float(_probe_cost_total) / frames
+	var mean_frame := 1000000.0 / maxf(Engine.get_frames_per_second(), 1.0)
+	_log.info("gap_cost frames=%d samples=%d mean_us_per_frame=%.1f max_us=%d share_of_frame=%.3f%% fps=%.0f longest_frame_ms=%.1f ticks=%d ticks_after=%s ticks_per_frame_max=%d" % [_probe_frames, _probe_samples, per_frame, _probe_cost_max, per_frame / mean_frame * 100.0, Engine.get_frames_per_second(), _probe_longest_frame / 1000.0, _probe_tick, JSON.stringify(_probe_ticks_after), _probe_ticks_per_frame_max])
+
+
+func _log_probe_summary() -> void:
+	_log_probe_cost()
+	for line: String in _gap_stats.summary_lines():
+		_log.info(line)
+
+
+func _log_gap_sequence(type: String, record: Dictionary) -> void:
+	var origin: Dictionary = record.last_attack
+	var parts := PackedStringArray(["gap_sequence", "type=%s" % type, "result=%s" % record.case_result, "level=%d" % record.level, "tick_speed=%s" % _format_value(record.tick_speed)])
+	for field: String in ["known", "idle", "available", "start", "detected", "damage", "pile"]:
+		var stamp: Dictionary = record[field]
+		if stamp.is_empty():
+			parts.append("%s=none" % field)
+		else:
+			parts.append("%s=%s:%dus:%df:%dt" % [field, stamp.hook, stamp.usec - origin.usec, stamp.frame - origin.frame, stamp.tick - origin.tick])
+	for field: String in ["time_end", "time_idle", "max_time", "firewall_idle", "breached_idle", "pile_end", "pile_idle", "armed_at_idle", "no_window", "raw_us", "usable_us", "uncertainty_us", "start_sign"]:
+		parts.append("%s=%s" % [field, _format_value(record[field])])
+	_log.info(" ".join(parts))
+
+
+func _log_level_change(type: String, record: Dictionary) -> void:
+	var parts := PackedStringArray(["gap_level_change", "type=%s" % type])
+	for field: String in record:
+		if field != "kind" and field != "usec":
+			parts.append("%s=%s" % [field, _format_value(record[field])])
+	_log.info(" ".join(parts))
 
 
 ## Dry run: logs what the regulator would decide. Nothing here can change the game.

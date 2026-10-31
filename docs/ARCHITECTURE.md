@@ -21,6 +21,8 @@ mods-unpacked/Daneisra-SmartAutomation/
     ├── breach_classifier.gd      # machine à états pure
     ├── breach_prediction.gd      # calculs purs
     ├── breach_simulator.gd       # distribution exacte des salves, calcul pur et borné
+    ├── gap_probe.gd              # mesure entre deux attaques, machine à états pure
+    ├── gap_stats.gd              # totaux bornés de ces mesures
     └── threat_observer.gd        # adaptateur vers le jeu, en lecture seule
 tests/                            # tests simulés (Godot sans interface)
 tools/build_zip.py                # construit le zip du mod
@@ -58,6 +60,18 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 - **Baisse :** seuls les `failure_power` complets comptent. Il faut assez d'échecs pour que le hasard ne soit plus une explication acceptable (moins de 0,1 % sur la fenêtre de 20 attaques), et au moins 10 attaques si un risque est attendu. Un échec contre un risque attendu sous 1 % réfute la prévision : le niveau reste bloqué jusqu'au prochain changement de puissance.
 - **Plafond manuel :** tout changement manuel fixe le plafond au nouveau niveau, vers le haut comme vers le bas. Il n'est supprimé que par une action explicite. Sans identifiant de sauvegarde fiable, il ne dure que la session et rien n'est écrit.
 - **Sécurité :** option native active, classificateur peu fiable ou inversions répétées suspendent les décisions.
+
+## Mesure entre deux attaques
+
+Avec l'option `gap_probe`, désactivée par défaut, l'observateur relève l'état de chaque nœud en lecture seule : au début (`F`) et à la fin (`L`) du `_process` de l'image, à chaque tick (`T`), au signal `breached` (`B`) et dans un appel différé après ce signal (`D`). `call_deferred` n'est qu'un point d'observation.
+
+- **Disponible :** ni attaque (`detected`), ni dégâts, ni pause, avec un minuteur réarmé. Connaître le résultat ne rend pas le nœud disponible.
+- **Fenêtre brute :** du premier état disponible à la première trace de l'attaque suivante. **Fenêtre utilisable :** la même, à partir du moment où le résultat est aussi connu. Un échec n'est connu qu'après coup.
+- **Incertitude :** chaque bord réel se situe entre deux relevés. L'écart maximal est journalisé (`uncertainty_ms_max`).
+- **Journal :** rien par image. Détail des 20 premières fins d'attaque de chaque cas, 300 au total, totaux tous les 100 et à l'arrêt, au plus 64 cas.
+- **Ordre :** `gap_order` indique à quel relevé chaque changement a été vu en premier.
+
+Une fenêtre observée n'est pas une preuve de sécurité. Une future régulation devra contrôler l'état immédiatement avant chaque action et renoncer si elle ne peut pas garantir que le nœud est disponible.
 
 ## Machine à états
 

@@ -56,6 +56,8 @@ Validées par Jérémy après revue. **Les changements automatiques de niveau ne
 
 **Si aucune fenêtre fiable n'est démontrée entre deux attaques, l'architecture sera revue avant de poursuivre.** Le rapport sur cette mesure décidera si le développement de l'actionneur peut commencer.
 
+**Protocole de mesure validé le 2026-10-31 :** instrumentation `gap_probe` en lecture seule, cas A à H, dont l'option native (à remettre à sa valeur initiale après l'essai) et deux nœuds du même type si le jeu le permet, sans contourner ses limites. Zéro fenêtre nulle sur 300 observations serait encourageant, mais ne démontrerait pas l'absence de risque.
+
 **Exigences pour la revue de l'actionneur, décidées par Jérémy le 2026-10-31.** Ce n'est pas une autorisation de le développer.
 
 1. **Baisse :** jamais sur une prévision seule. Il faut une prévision fiable, des échecs réellement observés, une puissance stable et un seuil statistique suffisant. Les interruptions et les échecs de classement incertain sont exclus.
