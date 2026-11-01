@@ -39,6 +39,18 @@ Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte 
 
 **Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Jérémy, corrigés.
 
+**Sortie de la `0.3.0`, décidée par Jérémy :** un achat normal en jeu, puis comparaison du résultat réel avec la prévision du panneau. Si c'est cohérent et sans problème fonctionnel important : tag `v0.3.0` et fusion dans `main`, sans autre campagne.
+
+**Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
+
+1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
+2. Améliorations : classer les achats selon leur rentabilité réelle et les ressources disponibles.
+3. Objectifs : privilégier l'XP de hacking, les données, les renseignements ou un compromis équilibré.
+4. Recommandations : ce qu'il faut modifier, pourquoi, le gain estimé et les inconvénients.
+5. Interface : à terme, consulter les recommandations directement dans le jeu, sans dépendre d'un raccourci ni des journaux.
+
+Jérémy choisit lui-même ses branchements et ses achats.
+
 ## Décisions
 
 | Sujet | Décision |
