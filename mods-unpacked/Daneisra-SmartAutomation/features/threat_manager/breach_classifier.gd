@@ -181,6 +181,7 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"min_hit": -1.0,
 		"max_hit": -1.0,
 		"low_hit": -1.0,
+		"hits": PackedFloat32Array(),
 		"last_breached": sample.breached,
 		"breach_variation": sample.breach_variation,
 		"infection_variation": sample.infection_variation,
@@ -280,6 +281,7 @@ func _record_hit(sample: Dictionary) -> void:
 	# A hit that empties the bar is cut to what was left: it says nothing about the hit's real size.
 	if sample.breached < sample.max_breach - EPSILON_DAMAGE:
 		_cycle.low_hit = hit if _cycle.low_hit < 0.0 else minf(_cycle.low_hit, hit)
+		_cycle.hits.append(hit)
 
 
 func _set_hits(event: Dictionary) -> void:
@@ -288,6 +290,7 @@ func _set_hits(event: Dictionary) -> void:
 		event.max_hit = _cycle.max_hit
 	if _cycle.low_hit >= 0.0:
 		event.low_hit = _cycle.low_hit
+		event.hits = _cycle.hits
 
 
 func _base_event(event_name: String, sample: Dictionary) -> Dictionary:

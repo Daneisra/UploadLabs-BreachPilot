@@ -1,17 +1,22 @@
 # Changelog
 
-## 0.4.0-dev.2 – en cours : conseiller par objectif
+## 0.4.0-dev.3 – en cours : conseiller générique
 
 ### Ajouté
 
 - Choix de l'objectif dans le panneau : XP, données, renseignements ou équilibré. Le compromis équilibré écarte un branchement qui ne rapporte plus rien d'une des trois.
 - Recommandations en clair pour le branchement et pour les achats : quoi changer, pourquoi, le gain et l'inconvénient.
 - Achats classés selon vos ressources : ce que vous pouvez payer d'abord, par ressource, avec ce qu'il manque pour le reste.
-- Le conseiller tient compte de `Charged Attack` et d'`Exécuter l'injection`, qu'il peut proposer de retirer.
+- Bouton `Conseil` sur les nœuds d'infiltration, en plus de `Ctrl+Alt+F8`.
+- Lecture générique de la chaîne : n'importe quels nœuds et branchements, sans liste de noms. Un nœud inconnu ne bloque plus rien, et ses effets sont pris en compte par les coups réellement mesurés sur la chaîne.
+- Les noms viennent du jeu, et tout achat lié au hacking apparaît seul. Un achat dont l'effet ne peut pas être suivi est listé sans chiffre.
 
 ### Modifié
 
-- Avec de la vulnérabilité, le mod n'a pas de prévision : il passe par des essais de niveau réels, en profil équilibré ou agressif, au lieu de ne plus monter.
+- Tout nœud d'infiltration est régulé, y compris Banque et Anonymous ou le nœud d'un autre mod.
+- Sans prévision possible, quelle qu'en soit la raison, le mod passe par des essais de niveau réels en profil équilibré ou agressif, au lieu de ne plus monter.
+- « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
+- Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
 
 ### Corrigé
 

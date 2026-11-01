@@ -22,6 +22,11 @@ static func missing_autoload_api(root: Node) -> PackedStringArray:
 	return missing
 
 
+## The attack nodes of the game, and any other with the same slots.
+static func is_breach_like(window: Node) -> bool:
+	return "breach_damage" in window and "infection_damage" in window and "max_firewall" in window
+
+
 static func missing_breach_api(window: Node) -> PackedStringArray:
 	var missing := PackedStringArray()
 	for property: String in BREACH_PROPERTIES:

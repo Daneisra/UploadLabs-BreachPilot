@@ -54,6 +54,8 @@ Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la ca
 
 **Nouveaux nœuds, mesurés le 2026-11-01 sur peu d'attaques :** `Charged Attack` double 1 coup sur 3 (76 à 152, 383 en critique), le jeu annonce +33 %. `Exécuter l'injection` prend sa part de puissance et multiplie les coups (59,3 à 72,8 avec 0,234). Sa vulnérabilité croît peu avec la puissance (0,226 à 92,4, 0,234 à 107,8) : la règle n'est pas établie, le conseiller la garde constante, et ne compare que garder ou retirer l'injection.
 
+**Architecture générique, décidée par Jérémy le 2026-11-01 après avis de Codex et ChatGPT (issue #1) :** hybride. Le mod lit à l'exécution le graphe et les tables du jeu, et compte sur les coups mesurés ; seul un petit nombre de règles mesurées restent écrites (partage égal de la puissance, délai de l'infection, prochain tir, effets lus par attribut). « Marcher pour tout le monde » veut dire : aucun nœud ni branchement ne fait échouer le mod, et « données insuffisantes » plutôt qu'un chiffre faux. Limites : les coups sont tirés sans leur ordre, donc une séquence régulière (1 coup sur 3) devient une proportion, et la puissance est supposée proportionnelle pour un scénario jamais joué.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

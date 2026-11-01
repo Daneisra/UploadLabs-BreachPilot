@@ -15,8 +15,9 @@ const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
 const ThreatActuator := preload("threat_actuator.gd")
 const AutomationControl := preload("automation_control.gd")
+const HitLog := preload("../hacking_advisor/hit_log.gd")
+const HackingGraph := preload("../hacking_advisor/hacking_graph.gd")
 
-const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
 const RESCAN_TICKS := 100
 const DISTRIBUTION_REPORT_EVERY := 50
 const RELIABILITY_REPORT_EVERY := 200
@@ -96,6 +97,8 @@ var _observed_hits: Dictionary = {}
 var _level_scans: Dictionary = {}
 var _last_signatures: Dictionary = {}
 var _last_hold_reason: Dictionary = {}
+var _hit_log: HitLog = HitLog.new()
+var _advice_action := Callable()
 var _gap_probe := false
 var _gap_stats: GapStats
 var _hooks: Array[FrameHook] = []
@@ -120,12 +123,22 @@ func _new_actuator(armed: bool) -> ThreatActuator:
 	})
 
 
-## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
 ## The attack interval last seen for each type: the advisor has no other way to know it.
 func attack_intervals() -> Dictionary:
 	return _last_intervals
 
 
+## What attacks really did, by chain. It survives restarting the observer, like the player's chain.
+func hit_log() -> HitLog:
+	return _hit_log
+
+
+## Set before start: the nodes then get a button for it.
+func set_advice_action(action: Callable) -> void:
+	_advice_action = action
+
+
+## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio
@@ -241,7 +254,8 @@ func _scan_desktop() -> void:
 func _bind_window(window: Variant) -> void:
 	if not is_instance_valid(window) or not window is Node or not "window" in window:
 		return
-	if not window.window in WATCHED_WINDOWS or not window.is_node_ready():
+	# A target is known by what it exposes: any attack node qualifies, whatever its name.
+	if not ApiGuard.is_breach_like(window) or not window.is_node_ready():
 		return
 	var id: int = window.get_instance_id()
 	if _trackers.has(id) or _rejected.has(id):
@@ -372,11 +386,20 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			_compare_native(tracker, event)
 		_limit_trace(type, event)
 		_log.info(_format(type, event))
+		_note_hits(tracker, event)
 		if event.event == "success":
 			_check_prediction(type, event)
 			_record_distribution(type, event)
 		if _regulation.mode != "off":
 			_regulate(tracker, event)
+
+
+## The chain is read again at each attack: a rewired node must not mix with the measures of the old chain.
+func _note_hits(tracker: Dictionary, event: Dictionary) -> void:
+	if not event.get("complete", false) or not event.event in ["success", "failure_power"] or not is_instance_valid(tracker.window):
+		return
+	var graph := HackingGraph.snapshot(_globals.desktop)
+	_hit_log.add(tracker.type, HackingGraph.chain_key(graph, tracker.window, _attributes), event)
 
 
 func _start_probe() -> void:
@@ -784,7 +807,7 @@ func _attach_control(tracker: Dictionary) -> void:
 		parent.remove_child(old)
 		old.queue_free()
 	var control := AutomationControl.new()
-	control.setup(source, _on_control_pressed.bind(tracker.type))
+	control.setup(source, _on_control_pressed.bind(tracker.type), _advice_action)
 	parent.add_child(control)
 	tracker.control = control
 	control.show_state(_automation_view(tracker.type))
@@ -952,8 +975,9 @@ func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> b
 		if profile.get("hit_spread", false) and seen.get("lowest", -1.0) > 0.0 and profile.interval > 0.0:
 			hopeful.damage_rate = (seen.lowest + (seen.highest - seen.lowest) * 0.25) / profile.interval
 		var result := BreachForecast.forecast(hopeful, target, 0.0)
-		# With vulnerability there is no forecast: a real trial decides, and the way back exists.
-		answer = profile.vulnerability > 0.0 or result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
+		# Without a forecast, whatever the reason, a real trial decides: the way back exists. Only having no damage at all rules it out.
+		var unknown: bool = result.status == "invalid" and not result.reasons.has("no_damage") and not result.reasons.has("low_hit")
+		answer = unknown or result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
 	_level_scans[key] = answer
 	return answer
 
