@@ -21,6 +21,7 @@ const FORECAST_TOLERANCE := 0.15
 
 var action_limit: int
 var action_type: String
+var action_types: Array = []
 var actions_done := 0
 var deferred_total := 0
 var refused_counts: Dictionary = {}
@@ -42,7 +43,7 @@ var _since_action := INF
 var _halt_reported := true
 
 
-## game holds the attributes and data nodes. options: action_limit, action_type, min_level, max_allowed,
+## game holds the attributes and data nodes. options: action_limit, action_type, action_types, min_level, max_allowed,
 ## verify_attacks, marker_path.
 func _init(armed: bool, game: Dictionary, options: Dictionary = {}) -> void:
 	_armed = armed
@@ -50,6 +51,7 @@ func _init(armed: bool, game: Dictionary, options: Dictionary = {}) -> void:
 	_data = game.get("data")
 	action_limit = options.get("action_limit", 1)
 	action_type = options.get("action_type", "")
+	action_types = options.get("action_types", [])
 	_min_level = options.get("min_level", 0)
 	_max_allowed = options.get("max_allowed", -1)
 	_verify_attacks = options.get("verify_attacks", 1)
@@ -63,7 +65,7 @@ func _build_allows_actions() -> bool:
 
 ## An action outside what the authorized trial allows, whatever the regulator proposed.
 func _trial_refusal(pending: Dictionary) -> String:
-	if pending.type != Policy.TRIAL_TYPE or mini(pending.from, pending.to) < Policy.TRIAL_MIN_LEVEL or maxi(pending.from, pending.to) > Policy.TRIAL_MAX_LEVEL:
+	if not pending.type in Policy.TRIAL_TYPES or mini(pending.from, pending.to) < Policy.TRIAL_MIN_LEVEL or (Policy.TRIAL_MAX_LEVEL >= 0 and maxi(pending.from, pending.to) > Policy.TRIAL_MAX_LEVEL):
 		return "outside_trial"
 	if pending.expected.get("status") != "reliable" or pending.expected.get("p_success", -1.0) < Policy.TRIAL_MIN_TARGET_SUCCESS - EPSILON:
 		return "target_forecast_not_reliable"
@@ -85,6 +87,13 @@ func _consume_trial() -> bool:
 	file.store_string(JSON.stringify({"trial": Policy.TRIAL_ID, "actions": actions_done + 1, "unix_time": Time.get_unix_time_from_system()}))
 	file.close()
 	return FileAccess.file_exists(_marker_path)
+
+
+## With no list at all, every type may be judged. Only an armed actuator requires one.
+func type_allowed(type: String) -> bool:
+	if action_type.is_empty() and action_types.is_empty():
+		return true
+	return type == action_type or type in action_types
 
 
 func is_armed() -> bool:
@@ -133,9 +142,9 @@ func request(type: String, direction: String, level: int, power: Dictionary, exp
 		reason = "another_action_pending"
 	elif is_verifying():
 		reason = "previous_action_unverified"
-	elif is_armed() and action_type.is_empty():
+	elif is_armed() and action_type.is_empty() and action_types.is_empty():
 		reason = "no_action_type"
-	elif not action_type.is_empty() and type != action_type:
+	elif not type_allowed(type):
 		reason = "type_not_allowed"
 	elif is_armed() and actions_done >= action_limit:
 		reason = "action_limit"
@@ -200,6 +209,10 @@ func note_event(type: String, event: Dictionary, claimed: bool) -> Dictionary:
 			return _end_verification("manual_override", "player_changed_level", event)
 		"success", "failure_power":
 			return _judge_next_attack(event)
+		"reset_unknown":
+			# The power moving says nothing about the action: the next attack will.
+			if _conditions_moved(event):
+				return {}
 	return _end_verification("failed", event.event, event)
 
 
@@ -313,7 +326,7 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 		halt("state_disturbed_by_action")
 	else:
 		_claim = {"type": pending.type, "to": pending.to}
-		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0, "remaining": 1 if pending.decision.get("certain", false) else _verify_attacks}
+		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0, "remaining": pending.decision.get("verify_attacks", _verify_attacks), "power": pending.power}
 	if actions_done >= action_limit:
 		halt("action_limit_reached")
 	return result
@@ -333,10 +346,11 @@ func _call_native(window: Node, direction: String) -> void:
 func _judge_next_attack(event: Dictionary) -> Dictionary:
 	if event.level != _verifying.to:
 		return _end_verification("failed", "unexpected_level", event)
+	var moved := _conditions_moved(event)
 	if not event.complete or not event.get("observed_start", false):
-		return _end_verification("inconclusive", "next_attack_incomplete", event)
+		return {} if moved else _end_verification("inconclusive", "next_attack_incomplete", event)
 	var expected: Dictionary = _verifying.expected
-	if event.event == "success":
+	if event.event == "success" and not moved:
 		var used: float = event.used
 		var low: float = expected.get("used_min", -1.0)
 		var high: float = expected.get("used_max", -1.0)
@@ -350,6 +364,16 @@ func _judge_next_attack(event: Dictionary) -> Dictionary:
 		return {}
 	# A failure is a normal attack: it can prove the forecast wrong, not the action.
 	return _end_verification("verified", "forecast_refuted" if _verifying.get("refuted", false) else "next_attacks_normal", event)
+
+
+## Different power or speed from the action's: the forecast no longer applies to this attack.
+func _conditions_moved(event: Dictionary) -> bool:
+	if not event.has("damage_rate"):
+		return false
+	var power: Dictionary = _verifying.power
+	if event.damage_rate != power.get("damage_rate") or event.get("infection_rate", power.get("infection_rate")) != power.get("infection_rate"):
+		return true
+	return absf(event.get("tick_speed", NORMAL_TICK_SPEED) - NORMAL_TICK_SPEED) > SPEED_TOLERANCE
 
 
 func _end_verification(outcome: String, reason: String, event: Dictionary) -> Dictionary:

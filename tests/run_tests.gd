@@ -153,7 +153,7 @@ class TrialObserver extends Observer:
 		return TrialActuator.new(armed, {"attributes": _attributes, "data": _data}, {
 			"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
 			"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
-			"verify_attacks": Observer.Policy.TRIAL_VERIFY_ATTACKS, "marker_path": "user://smart_automation_test/observer_trial_used.json",
+			"action_types": _regulation.action_types, "verify_attacks": Observer.Policy.TRIAL_VERIFY_ATTACKS, "marker_path": "user://smart_automation_test/observer_trial_used.json",
 		})
 
 
@@ -1262,53 +1262,55 @@ func _test_trial_in_observer() -> void:
 		forgotten.free()
 
 	var observer := TrialObserver.new()
-	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 9, "action_type": "breach_corps", "max_allowed_level": 40, "min_level": 3})
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 99, "action_type": "breach_corps", "max_allowed_level": 40, "min_level": 3})
 	_check(observer.regulation_mode() == "active", "the trial needs its own option")
 	root.add_child(observer)
 	ModLoaderLog.messages.clear()
 	observer.start()
-	_check(_count("regulation_mode=active profile=conservative") == 1, "the trial sets its own profile, whatever the options say")
+	_check(_count("regulation_mode=active profile=balanced") == 1, "the trial sets its own profile, whatever the options say")
 	game.Signals.tick.emit()
 	_check(_control_of(government).shown().text == "Auto : actif", "the trial's node says it is active: %s" % str(_control_of(government).shown()))
-	_check(_control_of(corps).shown().text == "Auto : désactivé", "the other type says it is left out")
+	_check(_control_of(corps).shown().text == "Auto : actif", "and so does the other one")
 
-	# Up from 0 to 3, one verified step at a time, then a deliberate hold.
+	# Up from 0 to 4, one verified step at a time, then a deliberate hold.
 	var attacks_before := _count("event=success type=breach_government")
-	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= 3)
+	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= 4)
 	var climb_attacks := _count("event=success type=breach_government") - attacks_before
 	_check(climb_attacks <= 6, "a certain climb takes one attack per level, after stabilizing: %d" % climb_attacks)
-	_check(government.calls == ["up:1", "up:1", "up:1"] and government.data.level == 3.0, "three raises to level 3: %s, %s" % [str(government.calls), _last("active type=breach_government")])
-	await _play_until(game, observer, government, func() -> bool: return _count("from=2 to=3 outcome=verified") == 1, 8)
-	_check(_count("outcome=verified") == 3, "each one is verified: %s" % _last("action_verification"))
-	_check(_count("level_origin type=breach_government level=3 origin=mod") == 1 and _count("origin=player") == 0, "they are the mod's")
+	_check(government.calls == ["up:1", "up:1", "up:1", "up:1"] and government.data.level == 4.0, "four raises to level 4: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	await _play_until(game, observer, government, func() -> bool: return _count("from=3 to=4 outcome=verified") == 1, 8)
+	_check(_count("outcome=verified") == 4, "each one is verified: %s" % _last("action_verification"))
+	_check(_count("level_origin type=breach_government level=4 origin=mod") == 1 and _count("origin=player") == 0, "they are the mod's")
+	_check(corps.data.level == 3.0 and corps.calls.is_empty(), "the other type is not touched")
 	for attack: int in 8:
 		await _play_volleys(game, government)
 		observer._regulator_for("breach_government").advance(61.0)
 		observer._actuator.advance(61.0)
-	_check(government.calls.size() == 3 and government.data.level == 3.0, "level 4 misses the margin, so it holds at 3")
+	_check(government.calls.size() == 4 and government.data.level == 4.0, "level 5 fails, so it holds at 4")
 	_check(_last("active type=breach_government").contains("forecast_too_risky"), "and says why: %s" % _last("active type=breach_government"))
 	_check(observer._actuator.halt_reason.is_empty() and _control_of(government).shown().text == "Auto : actif", "holding is not stopping")
 
 	# The player lowers by hand: pause, and no way back up.
-	government.data.level = 2.0
-	government._rearm()
-	game.Signals.tick.emit()
-	_check(_count("level_origin type=breach_government level=2 origin=player") == 1, "the player's change is told apart")
-	_check(_count("automation_pause type=breach_government reason=player_level_change level=2") == 1, "and pauses the type")
-	_check(_control_of(government).shown().text == "Pause manuelle" and _control_of(government).shown().button == "Reprendre l'automatisation", "the node shows it: %s" % str(_control_of(government).shown()))
-	await _play_until(game, observer, government, func() -> bool: return false, 12)
-	_check(government.calls.size() == 3 and government.data.level == 2.0, "nothing moves during a pause")
-	_check(_last("active type=breach_government").contains("manual_pause"), "the log says why")
-
-	# Ctrl+Z: a real change is the player's, and a second pause is not created.
 	government.data.level = 3.0
 	government._rearm()
 	game.Signals.tick.emit()
-	_check(_count("level_origin type=breach_government level=3 origin=player") == 1, "an undo that changes the level is the player's")
+	_check(_count("level_origin type=breach_government level=3 origin=player") == 1, "the player's change is told apart")
+	_check(_count("automation_pause type=breach_government reason=player_level_change level=3") == 1, "and pauses the type")
+	_check(_control_of(corps).shown().text == "Auto : actif", "the other type goes on")
+	_check(_control_of(government).shown().text == "Pause manuelle" and _control_of(government).shown().button == "Reprendre l'automatisation", "the node shows it: %s" % str(_control_of(government).shown()))
+	await _play_until(game, observer, government, func() -> bool: return false, 12)
+	_check(government.calls.size() == 4 and government.data.level == 3.0, "nothing moves during a pause")
+	_check(_last("active type=breach_government").contains("manual_pause"), "the log says why")
+
+	# Ctrl+Z: a real change is the player's, and a second pause is not created.
+	government.data.level = 4.0
+	government._rearm()
+	game.Signals.tick.emit()
+	_check(_count("level_origin type=breach_government level=4 origin=player") == 1, "an undo that changes the level is the player's")
 	_check(_count("automation_pause type=breach_government") == 1 and _control_of(government).shown().kind == "pause", "the pause simply goes on")
 	game.Signals.tick.emit()
 	_check(_count("origin=player") == 2, "no change, no event")
-	government.data.level = 2.0
+	government.data.level = 3.0
 	government._rearm()
 	game.Signals.tick.emit()
 
@@ -1318,25 +1320,30 @@ func _test_trial_in_observer() -> void:
 
 	# The resume button: nothing happens at once, the old limits stay, the last action comes later.
 	var calls_before := government.calls.size()
+	# The budget goes through pauses and resumes: one action is left.
+	observer._actuator.actions_done = 11
 	_control_of(government).button().pressed.emit()
-	_check(_count("automation_resume type=breach_government level=2") == 1, "the resume is logged")
-	_check(government.calls.size() == calls_before and government.data.level == 2.0, "the resume changes nothing by itself")
+	_check(_count("automation_resume type=breach_government level=3") == 1, "the resume is logged")
+	_check(government.calls.size() == calls_before and government.data.level == 3.0, "the resume changes nothing by itself")
+	_check(observer._actuator.actions_done == 11, "and gives no budget back")
 	_check(_control_of(government).shown().text == "Auto : actif", "the node shows it")
 	await _play_volleys(game, government)
 	await _play_volleys(game, government)
 	_check(government.calls.size() == calls_before, "nothing while it stabilizes")
 	_check(_last("active type=breach_government").contains("stabilizing"), "it says so: %s" % _last("active type=breach_government"))
-	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= 4)
-	_check(government.calls.size() == 4 and government.data.level == 3.0, "the player gave control back, so it may go above the chosen level: %s" % str(government.calls))
-	_check(_count("regulation_stopped reason=action_limit_reached actions=4") == 1, "the budget is spent: %s" % _last("regulation_stopped"))
+	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= calls_before + 1)
+	_check(government.calls.size() == calls_before + 1 and government.data.level == 4.0, "the player gave control back, so it may go above the chosen level: %s" % str(government.calls))
+	_check(_count("regulation_stopped reason=action_limit_reached actions=12") == 1, "the budget is spent: %s" % _last("regulation_stopped"))
 	_check(_control_of(government).shown().text == "Auto : bloqué" and _control_of(government).shown().button.is_empty(), "the node shows a block with no button")
 	await _play_until(game, observer, government, func() -> bool: return false, 8)
-	_check(government.calls.size() == 4, "there is no fifth action")
-	_check(_count("from=2 to=3 outcome=verified") == 2, "the last one is verified too: %s" % _last("action_verification"))
+	_check(government.calls.size() == calls_before + 1, "there is no action past the budget")
+	_check(_count("from=3 to=4 outcome=verified") == 2, "the last one is verified too: %s" % _last("action_verification"))
+	await _play_attack(game, corps, true)
+	_check(_control_of(corps).shown().text == "Auto : bloqué" and corps.calls.is_empty(), "the budget is global: the other type stops too")
 	_check(corps.calls.is_empty() and corps.data.level == 3.0, "the other node is untouched")
 	_check(_count("event=level_changed_reset") == 0, "no attack is reset")
 	var applied := _last("action_applied")
-	_check(applied.contains("direction=raise level=2 target=3") and applied.contains("window_failures=0"), "the last action is traced: %s" % applied)
+	_check(applied.contains("direction=raise level=3 target=4") and applied.contains("window_failures=0") and applied.contains("certain=true verify_attacks=1"), "the last action is traced: %s" % applied)
 	observer.stop()
 	_check(_control_of(government) == null and _control_of(corps) == null, "stopping removes the controls")
 	observer.queue_free()

@@ -299,6 +299,7 @@ func _test_dedup_and_budget() -> void:
 			frozen = frozen or decision.reason.begins_with("frozen")
 		swinging.on_level_changed(4)
 		swinging._blocked.clear()
+		swinging._raises_suspended = false
 	_check(frozen, "repeated reversals freeze the regulator")
 
 
@@ -449,6 +450,7 @@ func _test_certain_raises() -> void:
 	var decisions := _feed(regulator, 3, "success", 4, _good_next(), {}, "s", 2.0)
 	_check(decisions[0].reason == "stabilizing" and decisions[1].reason == "stabilizing", "a new power still stabilizes")
 	_check(decisions[2].decision == "raise" and decisions[2].certain, "then one success is enough when the next level is certain")
+	_check(decisions[2].verify_attacks == 1, "and one attack verifies a normal level")
 	regulator.on_level_changed(5)
 	_check(_feed(regulator, 1, "success", 5, _good_next(), {}, "s", 2.0)[0].decision == "raise", "and it does not wait for the profile's delay")
 	regulator.on_level_changed(6)
@@ -467,7 +469,36 @@ func _test_certain_raises() -> void:
 	_feed(verified, 3, "success", 4, infected, {}, "s", 2.0)
 	for i: int in 10:
 		verified.note_forecast_check(true)
-	_check(_feed(verified, 1, "success", 4, infected, {}, "s", 2.0)[0].certain, "an infection model proven at this power is certain too")
+	var proven: Dictionary = _feed(verified, 1, "success", 4, infected, {}, "s", 2.0)[0]
+	_check(proven.certain, "an infection model proven at this power is certain too")
+	_check(proven.verify_attacks == 3, "but infection is verified on 3 attacks")
+	var elite_next := {"status": "reliable", "outcome": "pass", "p_success": 1.0, "used_nominal": 3.0, "infected": false, "elite": true}
+	var elite: Dictionary = _feed(Regulator.new("balanced"), 3, "success", 4, elite_next, {}, "s", 2.0)[2]
+	_check(elite.certain and elite.verify_attacks == 3, "so is an elite level")
+	var moved := Regulator.new("balanced")
+	_feed(moved, 3, "success", 4, _good_next(), {}, "old", 2.0)
+	moved.on_level_changed(5)
+	var fresh := _feed(moved, 4, "success", 5, _good_next(), {}, "new", 2.0)
+	_check(fresh[0].reason == "power_changed" and fresh[1].reason == "stabilizing" and fresh[2].reason == "stabilizing", "new power stabilizes first")
+	_check(fresh[3].certain and fresh[3].verify_attacks == 3, "and the first raise after it is watched longer")
+	moved.on_level_changed(6)
+	_check(_feed(moved, 1, "success", 6, _good_next(), {}, "new", 2.0)[0].verify_attacks == 1, "then it goes back to normal")
+	_check(_kinds(_feed(_reg("balanced"), 8, "success", 4, _reliable(0.995)), "raise") == 1 and _feed(Regulator.new("balanced"), 4, "success", 4, _reliable(0.995)).filter(func(d: Dictionary) -> bool: return d.decision == "raise").is_empty(), "a likely level keeps the profile's rules")
+
+	# One failure against a sure forecast: raises stop and it is logged, and only the normal conditions lower.
+	var isolated := Regulator.new("balanced")
+	_feed(isolated, 2, "success", 5, _good_next(), _reliable(1.0))
+	var failed := _feed(isolated, 1, "failure_power", 5, _good_next(), _reliable(1.0))[0]
+	_check(failed.decision == "hold" and failed.forecast_contradicted, "one failure is reported and does not lower")
+	_check(isolated._raises_suspended and _feed(isolated, 1, "success", 5, _good_next(), _reliable(1.0))[0].reason == "raises_suspended", "raises are suspended at once")
+	var calm_down := _feed(isolated, 40, "success", 5, _good_next(), _reliable(1.0))
+	_check(_kinds(calm_down, "lower") == 0, "an isolated failure never lowers")
+	_check(_kinds(calm_down, "raise") == 1 and calm_down.filter(func(d: Dictionary) -> bool: return d.decision == "raise")[0].verify_attacks == 3 and not calm_down.filter(func(d: Dictionary) -> bool: return d.decision == "raise")[0].certain, "after 20 clean attacks, raises come back with the profile's rules")
+	var twice := Regulator.new("balanced")
+	_feed(twice, 2, "success", 5, _good_next(), _reliable(1.0))
+	_check(_feed(twice, 1, "failure_power", 5, {}, _reliable(1.0))[0].decision == "hold", "a first failure holds")
+	var second: Dictionary = _feed(twice, 1, "failure_power", 5, {}, _reliable(1.0))[0]
+	_check(second.decision == "lower" and not second.has("forecast_contradicted"), "the normal conditions then lower, with one report")
 
 	# A refuted forecast brings the doubts back, until the power changes.
 	var refuted := Regulator.new("conservative")

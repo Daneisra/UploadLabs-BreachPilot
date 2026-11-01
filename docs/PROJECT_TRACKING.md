@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Montée de 2 à 3 et baisse de 5 à 4 validées en jeu sur Gouvernement. Troisième essai validé le 2026-11-01 dans son principe : 4 actions au plus, de 0 à 4, avec la pause sur le nœud, après contrôle visuel. **Tag, fusion et régulation permanente non autorisés** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Trois essais validés en jeu sur Gouvernement, avec la pause sur le nœud. Quatrième essai autorisé le 2026-11-01 : Gouvernement et Entreprises, profil équilibré, 12 actions au plus, voie rapide. **Tag, fusion et régulation permanente non autorisés** |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -293,6 +293,8 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 **Remarque de Jérémy :** les temps sont respectés, mais c'est trop lent quand le niveau suivant est certain. Le journal le confirme : 31 attaques au niveau 1 pour une prévision certaine dès la première.
 
 **Puissance :** l'Interface est montée à 42,37 dégâts par nœud à 01:13:39, pendant une pause. Le changement est bien détecté, sans action.
+
+**Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
 
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 

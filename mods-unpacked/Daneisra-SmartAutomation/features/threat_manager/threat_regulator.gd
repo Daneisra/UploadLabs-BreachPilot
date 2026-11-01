@@ -23,6 +23,10 @@ const MIN_ATTACKS_WITH_RISK := 10
 const REFUTED_BELOW_RISK := 0.01
 ## 1.0 - 0.99 is slightly above 0.01 in floating point, and a sure success can sum to just under 1.
 const RISK_EPSILON := 1e-9
+## Attacks that verify a raise: one if nothing about it is new, more with infection, an elite level
+## or a recent change of power.
+const VERIFY_CERTAIN := 1
+const VERIFY_CAREFUL := 3
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
 const MAX_UNEXPLAINED := 0.05
@@ -58,6 +62,9 @@ var _checks_out := 0
 var _undo: Dictionary = {}
 var _fast_raises: bool
 var _certainty_lost := false
+var _raises_suspended := false
+var _just_contradicted := false
+var _power_fresh := false
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
@@ -140,6 +147,7 @@ func on_level_changed(level: int) -> void:
 	_reset_window()
 	_proposal = ""
 	_undo = {}
+	_power_fresh = false
 
 
 ## The player gave control back: the level is the new starting point and nothing may happen before
@@ -188,6 +196,8 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		_block_length.clear()
 		_undo = {}
 		_certainty_lost = false
+		_raises_suspended = false
+		_power_fresh = not first
 		_checks_in = 0
 		_checks_out = 0
 		if not first:
@@ -215,7 +225,13 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		return _decision("hold", "classifier_unsafe", attack)
 	if _timer < _frozen_until:
 		return _decision("hold", "frozen", attack)
-	return _try_lower(attack, current) if is_failure else _try_raise(attack, next)
+	if not is_failure:
+		return _try_raise(attack, next)
+	var decision := _try_lower(attack, current)
+	if _just_contradicted:
+		_just_contradicted = false
+		decision.forecast_contradicted = true
+	return decision
 
 
 func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
@@ -223,6 +239,11 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	if current.get("status") != "reliable":
 		return _decision("hold", "forecast_not_reliable", attack, {"failures": failures, "status": current.get("status", "none")})
 	var true_risk: float = 1.0 - current.p_success
+	# One failure against a sure forecast stops the raises. It takes the normal conditions below to lower.
+	if true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON and not _raises_suspended:
+		_raises_suspended = true
+		_certainty_lost = true
+		_just_contradicted = true
 	# Chance only excuses the risk the profile accepts: a level expected to fail is not "normal".
 	var risk := minf(true_risk, 1.0 - _profile.p)
 	var needed := failures_needed(_history.size(), risk)
@@ -235,7 +256,6 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
 	_refuted = true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
-	_certainty_lost = _certainty_lost or _refuted
 	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_refuted": _refuted})
 
 
@@ -249,6 +269,10 @@ func _is_certain(next: Dictionary) -> bool:
 
 func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	var target: int = attack.level + 1
+	if _raises_suspended:
+		if _consecutive < WINDOW:
+			return _decision("hold", "raises_suspended", attack)
+		_raises_suspended = false
 	var certain := _is_certain(next)
 	if _consecutive < (1 if certain else _profile.raise_after):
 		return _decision("hold", "gathering_successes", attack, {"successes": _consecutive})
@@ -271,7 +295,8 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 
 	if not certain and _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)
-	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain})
+	var careful: bool = not certain or next.get("infected", false) or next.get("elite", false) or _power_fresh
+	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain, "verify_attacks": VERIFY_CAREFUL if careful else VERIFY_CERTAIN})
 
 
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:

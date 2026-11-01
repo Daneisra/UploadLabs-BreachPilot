@@ -83,7 +83,7 @@ var _stealth_mask := 0
 var _ticks_since_scan := 0
 var _last_tick_speed := -1.0
 var _traced_events: Dictionary = {}
-var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0, "action_limit": 1, "action_type": ""}
+var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0, "action_limit": 1, "action_type": "", "action_types": []}
 var _actuator: ThreatActuator
 var _emergency := false
 var _last_refusal: Dictionary = {}
@@ -124,7 +124,7 @@ func _accepts_active_without_trial() -> bool:
 
 func _new_actuator(armed: bool) -> ThreatActuator:
 	return ThreatActuator.new(armed, {"attributes": _attributes, "data": _data}, {
-		"action_limit": _regulation.action_limit, "action_type": _regulation.action_type,
+		"action_limit": _regulation.action_limit, "action_type": _regulation.action_type, "action_types": _regulation.action_types,
 		"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
 		"verify_attacks": Policy.TRIAL_VERIFY_ATTACKS,
 	})
@@ -134,7 +134,8 @@ func _new_actuator(armed: bool) -> ThreatActuator:
 func _apply_trial() -> void:
 	_regulation.mode = "active"
 	_regulation.profile = Policy.TRIAL_PROFILE
-	_regulation.action_type = Policy.TRIAL_TYPE
+	_regulation.action_type = ""
+	_regulation.action_types = Policy.TRIAL_TYPES
 	_regulation.action_limit = Policy.TRIAL_MAX_ACTIONS
 	_regulation.max_allowed_level = Policy.TRIAL_MAX_LEVEL
 	_regulation.min_level = Policy.TRIAL_MIN_LEVEL
@@ -619,7 +620,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		_check_forecast(type, regulator, event, profile, current)
 	var next_target := _native_values(tracker, event.level + 1)
 	if not next_target.is_empty():
-		next = _forecast_for(profile, next_target, regulator.margin())
+		next = _forecast_for(profile, next_target, regulator.margin()).duplicate()
+		next.elite = next_target.elite
 	var decision := regulator.on_attack({
 		"event": event.event, "complete": event.complete, "level": event.level,
 		"max_level": event.max_level, "signature": profile.signature,
@@ -630,6 +632,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		# The margin is a caution against going up: without it, this says whether the lower level works.
 		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, 0.0)
 	decision.hypothetical = not _actuator.can_act()
+	if decision.get("forecast_contradicted", false):
+		_log.warning("forecast_contradicted type=%s level=%d status=%s p=%s power=%s: raises suspended, no lower on this failure alone" % [type, event.level, current.get("status", "none"), _format_value(current.get("p_success", -1.0)), profile.signature])
 	_log_decision(type, decision, next, assumed)
 	_handle_action(tracker, event, decision, assumed)
 	_refresh_controls()
@@ -710,8 +714,8 @@ func _levels_text() -> String:
 func _action_trace(pending: Dictionary) -> String:
 	var decision: Dictionary = pending.decision
 	var expected: Dictionary = pending.expected
-	return "direction=%s level=%d target=%d reason=%s certain=%s profile=%s margin=%s window_attacks=%d window_failures=%d successes_in_row=%d failures_needed=%s risk=%s forecast_status=%s forecast_outcome=%s forecast_p=%s used_max=%s" % [
-		pending.direction, pending.from, pending.to, decision.reason, decision.get("certain", false), decision.profile, _format_value(decision.margin),
+	return "direction=%s level=%d target=%d reason=%s certain=%s verify_attacks=%s profile=%s margin=%s window_attacks=%d window_failures=%d successes_in_row=%d failures_needed=%s risk=%s forecast_status=%s forecast_outcome=%s forecast_p=%s used_max=%s" % [
+		pending.direction, pending.from, pending.to, decision.reason, decision.get("certain", false), decision.get("verify_attacks", "default"), decision.profile, _format_value(decision.margin),
 		decision.window_attacks, decision.window_failures, decision.successes_in_row, decision.get("needed", "none"),
 		_format_value(decision.get("risk", -1.0)), expected.get("status", "none"), expected.get("outcome", "none"),
 		_format_value(expected.get("p_success", -1.0)), _format_value(expected.get("used_max", -1.0)),
@@ -821,7 +825,7 @@ func _block_reason(type: String) -> String:
 
 ## What the node shows: a pause and a block are two separate things, and both can be true.
 func _automation_view(type: String) -> Dictionary:
-	if _actuator == null or (not _regulation.action_type.is_empty() and _regulation.action_type != type):
+	if _actuator == null or not _actuator.type_allowed(type):
 		return {"kind": "disabled", "text": "Auto : désactivé", "button": "", "tooltip": ""}
 	var block := _block_reason(type)
 	var block_text: String = BLOCK_TEXTS.get(block, block)

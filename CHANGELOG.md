@@ -1,12 +1,15 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.6 – en cours : actionneur, essais actifs et pause sur le nœud
+## 0.2.0-beta.1-dev.7 – en cours : actionneur, essais actifs et pause sur le nœud
 
 **Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée, baisse et 4 actions successives validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
 
 ### Modifié
 
-- Voie rapide : quand le niveau suivant est certain, une seule réussite suffit pour monter, sans délai de profil, et une seule attaque vérifie l'action. Testée en simulation seulement.
+- Voie rapide : quand le niveau suivant est certain, une seule réussite suffit pour monter, sans délai de profil. Vérification sur 1 attaque pour un niveau normal, 3 avec infection, sur un niveau élite ou après un changement de puissance. Testée en simulation seulement.
+- Une prévision certaine démentie suspend les montées sans baisser sur ce seul échec.
+- Un changement de puissance ou de vitesse pendant une vérification n'arrête plus la régulation.
+- Essai suivant : Gouvernement et Entreprises, profil équilibré, 12 actions au plus.
 
 ### Ajouté
 
