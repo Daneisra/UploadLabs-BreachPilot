@@ -8,8 +8,8 @@ const PROFILES := {
 	"aggressive": {"p": 0.95, "margin": 0.0, "raise_after": 2, "raise_delay": 15.0, "block": 120.0},
 }
 const WINDOW := 20
-const STABILIZE_ATTACKS := 2
-const LOWER_DELAY := 10.0
+const STABILIZE_ATTACKS := 1
+const LOWER_DELAY := 5.0
 const MAX_BLOCK := 3600.0
 const BUDGET := 6
 const BUDGET_WINDOW := 600.0
@@ -23,8 +23,7 @@ const MIN_ATTACKS_WITH_RISK := 10
 const REFUTED_BELOW_RISK := 0.01
 ## 1.0 - 0.99 is slightly above 0.01 in floating point, and a sure success can sum to just under 1.
 const RISK_EPSILON := 1e-9
-## Attacks that verify a raise: one if nothing about it is new, more with infection, an elite level
-## or a recent change of power.
+## Attacks that verify an action: one when it is certain or a lower, more when it rests on doubts.
 const VERIFY_CERTAIN := 1
 const FAILURES_IN_ROW_TO_LOWER := 2
 const VERIFY_CAREFUL := 3
@@ -32,7 +31,7 @@ const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
 const MAX_UNEXPLAINED := 0.05
 const EXPLAINED_CLUES: Array[String] = ["damage_changed", "speed_changed", "partial_cycle"]
-const MIN_VERIFIED_CHECKS := 10
+const MIN_VERIFIED_CHECKS := 3
 const MAX_OUT_OF_RANGE := 0.05
 
 var profile_name: String
@@ -66,7 +65,6 @@ var _fast_raises: bool
 var _certainty_lost := false
 var _raises_suspended := false
 var _just_contradicted := false
-var _power_fresh := false
 var _action_busy := false
 
 
@@ -155,7 +153,6 @@ func on_level_changed(level: int) -> void:
 	_reset_window()
 	_proposal = ""
 	_undo = {}
-	_power_fresh = false
 
 
 ## The player gave control back: the level is the new starting point and nothing may happen before
@@ -214,7 +211,6 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		_undo = {}
 		_certainty_lost = false
 		_raises_suspended = false
-		_power_fresh = not first
 		_checks_in = 0
 		_checks_out = 0
 		if not first:
@@ -264,7 +260,9 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	# Failing twice in a row is enough, unless the forecast knows this level to fail now and then, within
 	# what the profile accepts: chance may then explain it, and the count over the window decides.
 	var accepted_chance: bool = known and true_risk > RISK_EPSILON and true_risk <= 1.0 - _profile.p + RISK_EPSILON
-	var repeated: bool = _failures_in_row >= FAILURES_IN_ROW_TO_LOWER and not accepted_chance
+	# Failure expected and no success seen at this level: the attack only confirms the forecast.
+	var confirmed: bool = known and current.p_success <= RISK_EPSILON and _history.count(false) == 0
+	var repeated: bool = (_failures_in_row >= FAILURES_IN_ROW_TO_LOWER or confirmed) and not accepted_chance
 	# Chance only excuses the risk the profile accepts: a level expected to fail is not "normal".
 	var risk := minf(true_risk, 1.0 - _profile.p)
 	var needed := failures_needed(_history.size(), risk)
@@ -280,7 +278,7 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
 	_refuted = known and true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
-	return _act("lower", attack, {"failures": failures, "failures_in_row": _failures_in_row, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_status": current.get("status", "none"), "forecast_refuted": _refuted, "verify_attacks": VERIFY_CERTAIN})
+	return _act("lower", attack, {"failures": failures, "failures_in_row": _failures_in_row, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_status": current.get("status", "none"), "forecast_refuted": _refuted, "verify_attacks": VERIFY_CERTAIN, "target": maxi(attack.get("target_down", attack.level - 1), _min_level)})
 
 
 ## A raise the forecast is sure of needs no waiting: one success here, and it goes up. The profile's
@@ -291,8 +289,21 @@ func _is_certain(next: Dictionary) -> bool:
 	return not next.get("infected", false) or model_trust() == "verified"
 
 
+## Whether a raise could go to this level. For the search of the best one.
+func can_reach(level: int) -> bool:
+	return (_max_allowed < 0 or level <= _max_allowed) and _blocked.get(level, -INF) <= _timer
+
+
+func required_success() -> float:
+	return _profile.p
+
+
+## attack can name best_level and best_forecast: the highest level known to work, to go straight to it.
 func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	var target: int = attack.level + 1
+	if attack.has("best_forecast") and _is_certain(attack.best_forecast):
+		target = attack.best_level
+		next = attack.best_forecast
 	if _raises_suspended:
 		if _consecutive < WINDOW:
 			return _decision("hold", "raises_suspended", attack)
@@ -319,8 +330,7 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 
 	if not certain and _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)
-	var careful: bool = not certain or next.get("infected", false) or next.get("elite", false) or _power_fresh
-	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain, "verify_attacks": VERIFY_CAREFUL if careful else VERIFY_CERTAIN})
+	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain, "verify_attacks": VERIFY_CERTAIN if certain else VERIFY_CAREFUL, "target": target})
 
 
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:
@@ -359,7 +369,7 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 	else:
 		_last_lower = _timer
 		_block(attack.level)
-	var assumed: int = attack.level + (1 if direction == "raise" else -1)
+	var assumed: int = details.get("target", attack.level + (1 if direction == "raise" else -1))
 	var extra := details.duplicate()
 	extra.assumed_level = assumed
 	return _decision(direction, "conditions_met", attack, extra)

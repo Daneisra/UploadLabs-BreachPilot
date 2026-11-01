@@ -157,7 +157,7 @@ func _test_raise_rules() -> void:
 	var decisions := _feed(regulator, 20, "success", 4, _good_next())
 	_check(_kinds(decisions, "raise") == 1, "a good level proposes a raise once")
 	var raise_index := decisions.map(func(d: Dictionary) -> String: return d.decision).find("raise")
-	_check(raise_index == 2 + 3 - 1, "after 2 stabilizing attacks and 3 successes, got %d" % raise_index)
+	_check(raise_index == 1 + 3 - 1, "after 1 stabilizing attack and 3 successes, got %d" % raise_index)
 	var second := _reg("balanced")
 	_feed(second, 5, "success", 4, _good_next())
 	second.on_level_changed(5)
@@ -205,7 +205,7 @@ func _test_lower_rules() -> void:
 	# forecast of certain failure made those failures look expected.
 	for profile: String in ["conservative", "balanced", "aggressive"]:
 		var hopeless := _reg(profile)
-		_feed(hopeless, 2, "failure_power", 4, {}, _reliable(0.0))
+		_feed(hopeless, 1, "failure_power", 4, {}, _reliable(0.0))
 		var lowered: Array[Dictionary] = _feed(hopeless, 25, "failure_power", 4, {}, _reliable(0.0)).filter(func(d: Dictionary) -> bool: return d.decision == "lower")
 		_check(lowered.size() == 1, "%s lowers a level that always fails, once" % profile)
 		if not lowered.is_empty():
@@ -251,8 +251,8 @@ func _test_power_changes() -> void:
 	_feed(regulator, 1, "failure_power", 5, {}, _reliable(1.0))
 	var changed := _feed(regulator, 1, "failure_power", 5, {}, _reliable(1.0), "other")
 	_check(changed[0].reason == "power_changed", "a power change is noticed")
-	var settling := _feed(regulator, 2, "failure_power", 5, {}, _reliable(1.0), "other")
-	_check(settling[0].reason == "stabilizing" and settling[1].reason == "stabilizing", "failures while stabilizing do not count")
+	var settling := _feed(regulator, 1, "failure_power", 5, {}, _reliable(1.0), "other")
+	_check(settling[0].reason == "stabilizing", "failures while stabilizing do not count")
 	_check(_feed(regulator, 1, "failure_power", 5, {}, _reliable(1.0), "other")[0].decision == "hold", "old failures were forgotten")
 
 	var blocked := _reg("balanced")
@@ -451,9 +451,9 @@ func _test_long_sequences() -> void:
 func _test_certain_raises() -> void:
 	var regulator := Regulator.new("conservative")
 	var decisions := _feed(regulator, 3, "success", 4, _good_next(), {}, "s", 2.0)
-	_check(decisions[0].reason == "stabilizing" and decisions[1].reason == "stabilizing", "a new power still stabilizes")
-	_check(decisions[2].decision == "raise" and decisions[2].certain, "then one success is enough when the next level is certain")
-	_check(decisions[2].verify_attacks == 1, "and one attack verifies a normal level")
+	_check(decisions[0].reason == "stabilizing", "a new power still stabilizes")
+	_check(decisions[1].decision == "raise" and decisions[1].certain, "then one success is enough when the next level is certain")
+	_check(decisions[1].verify_attacks == 1, "and one attack verifies it")
 	regulator.on_level_changed(5)
 	_check(_feed(regulator, 1, "success", 5, _good_next(), {}, "s", 2.0)[0].decision == "raise", "and it does not wait for the profile's delay")
 	regulator.on_level_changed(6)
@@ -466,7 +466,7 @@ func _test_certain_raises() -> void:
 
 	for doubt: Dictionary in [_reliable(0.999), {"status": "uncertain", "p_success": 1.0}, {"status": "reliable", "p_success": 1.0, "used_nominal": 3.0, "infected": true}]:
 		var slow := Regulator.new("aggressive")
-		_check(_kinds(_feed(slow, 3, "success", 4, doubt, {}, "s", 2.0), "raise") == 0, "doubts keep the profile's rules: %s" % str(doubt))
+		_check(_kinds(_feed(slow, 2, "success", 4, doubt, {}, "s", 2.0), "raise") == 0, "doubts keep the profile's rules: %s" % str(doubt))
 	var verified := Regulator.new("conservative")
 	var infected := {"status": "reliable", "outcome": "pass", "p_success": 1.0, "used_nominal": 3.0, "infected": true}
 	_feed(verified, 3, "success", 4, infected, {}, "s", 2.0)
@@ -474,23 +474,40 @@ func _test_certain_raises() -> void:
 		verified.note_forecast_check(true)
 	var proven: Dictionary = _feed(verified, 1, "success", 4, infected, {}, "s", 2.0)[0]
 	_check(proven.certain, "an infection model proven at this power is certain too")
-	_check(proven.verify_attacks == 3, "but infection is verified on 3 attacks")
-	var elite_next := {"status": "reliable", "outcome": "pass", "p_success": 1.0, "used_nominal": 3.0, "infected": false, "elite": true}
-	var elite: Dictionary = _feed(Regulator.new("balanced"), 3, "success", 4, elite_next, {}, "s", 2.0)[2]
-	_check(elite.certain and elite.verify_attacks == 3, "so is an elite level")
+	_check(proven.verify_attacks == 1, "and one attack verifies it")
 	var moved := Regulator.new("balanced")
 	_feed(moved, 3, "success", 4, _good_next(), {}, "old", 2.0)
 	moved.on_level_changed(5)
-	var fresh := _feed(moved, 4, "success", 5, _good_next(), {}, "new", 2.0)
-	_check(fresh[0].reason == "power_changed" and fresh[1].reason == "stabilizing" and fresh[2].reason == "stabilizing", "new power stabilizes first")
-	_check(fresh[3].certain and fresh[3].verify_attacks == 3, "and the first raise after it is watched longer")
-	moved.on_level_changed(6)
-	_check(_feed(moved, 1, "success", 6, _good_next(), {}, "new", 2.0)[0].verify_attacks == 1, "then it goes back to normal")
-	_check(_kinds(_feed(_reg("balanced"), 8, "success", 4, _reliable(0.995)), "raise") == 1 and _feed(Regulator.new("balanced"), 4, "success", 4, _reliable(0.995)).filter(func(d: Dictionary) -> bool: return d.decision == "raise").is_empty(), "a likely level keeps the profile's rules")
+	var fresh := _feed(moved, 3, "success", 5, _good_next(), {}, "new", 2.0)
+	_check(fresh[0].reason == "power_changed" and fresh[1].reason == "stabilizing", "new power stabilizes first")
+	_check(fresh[2].certain, "for one attack")
+	var doubtful: Dictionary = _feed(_reg("balanced"), 8, "success", 4, _reliable(0.995)).filter(func(d: Dictionary) -> bool: return d.decision == "raise")[0]
+	_check(doubtful.verify_attacks == 3 and not doubtful.certain, "a raise on doubts is still watched longer")
+
+	# Straight to the best level, when it is certain.
+	var jumping := Regulator.new("balanced")
+	var far := {"status": "reliable", "outcome": "pass", "p_success": 1.0, "used_nominal": 5.0, "infected": false}
+	jumping.advance(2.0)
+	jumping.on_attack({"event": "success", "complete": true, "level": 1, "max_level": 9, "signature": "s"}, {}, _good_next())
+	jumping.advance(2.0)
+	var jump := jumping.on_attack({"event": "success", "complete": true, "level": 1, "max_level": 9, "signature": "s", "best_level": 5, "best_forecast": far}, {}, _good_next())
+	_check(jump.decision == "raise" and jump.assumed_level == 5, "a certain level is reached at once: %s" % str(jump))
+	var unsure_far := Regulator.new("balanced")
+	unsure_far.advance(2.0)
+	unsure_far.on_attack({"event": "success", "complete": true, "level": 1, "max_level": 9, "signature": "s"}, {}, _good_next())
+	unsure_far.advance(2.0)
+	var one_step := unsure_far.on_attack({"event": "success", "complete": true, "level": 1, "max_level": 9, "signature": "s", "best_level": 5, "best_forecast": {"status": "uncertain"}}, {}, _good_next())
+	_check(one_step.decision == "raise" and one_step.assumed_level == 2, "an unsure far level is not jumped to")
+	var no_jump := Regulator.new("balanced", 4)
+	_check(not no_jump.can_reach(5) and no_jump.can_reach(4), "the allowed maximum limits the search")
+	var blocked_jump := Regulator.new("balanced")
+	blocked_jump._blocked[5] = INF
+	_check(not blocked_jump.can_reach(5), "and so do blocked levels")
+	_check(_kinds(_feed(_reg("balanced"), 8, "success", 4, _reliable(0.995)), "raise") == 1 and _feed(Regulator.new("balanced"), 3, "success", 4, _reliable(0.995)).filter(func(d: Dictionary) -> bool: return d.decision == "raise").is_empty(), "a likely level keeps the profile's rules")
 
 	# One failure against a sure forecast: raises stop and it is logged, and only the normal conditions lower.
 	var isolated := Regulator.new("balanced")
-	_feed(isolated, 2, "success", 5, _good_next(), _reliable(1.0))
+	_feed(isolated, 1, "success", 5, _good_next(), _reliable(1.0))
 	var failed := _feed(isolated, 1, "failure_power", 5, _good_next(), _reliable(1.0))[0]
 	_check(failed.decision == "hold" and failed.forecast_contradicted, "one failure is reported and does not lower")
 	_check(isolated._raises_suspended and _feed(isolated, 1, "success", 5, _good_next(), _reliable(1.0))[0].reason == "raises_suspended", "raises are suspended at once")
@@ -512,8 +529,8 @@ func _test_certain_raises() -> void:
 	refuted.on_level_changed(5)
 	_check(_kinds(_feed(refuted, 1, "success", 5, _good_next()), "raise") == 0, "after that, a raise is not certain any more")
 	_check(_feed(refuted, 30, "success", 5, _good_next()).back().reason == "level_blocked", "and the refuted level stays blocked")
-	var stronger := _feed(refuted, 4, "success", 5, _good_next(), {}, "stronger", 2.0)
-	_check(stronger[3].decision == "raise" and stronger[3].certain, "more power makes it certain again, after stabilizing")
+	var stronger := _feed(refuted, 3, "success", 5, _good_next(), {}, "stronger", 2.0)
+	_check(stronger[2].decision == "raise" and stronger[2].certain, "more power makes it certain again, after stabilizing")
 
 	var capped := Regulator.new("conservative", 4)
 	_check(_kinds(_feed(capped, 5, "success", 4, _good_next()), "raise") == 0, "certainty does not cross the allowed maximum")
@@ -571,8 +588,28 @@ func _test_failures_in_row() -> void:
 	regulator.on_level_changed(7)
 	regulator.advance(20.0)
 	var hopeless := {"status": "reliable", "outcome": "mixed", "p_success": 0.0}
-	_check(_feed(regulator, 1, "failure_power", 7, {}, hopeless)[0].decision == "hold", "the count starts again at each level")
-	_check(_feed(regulator, 1, "failure_power", 7, {}, hopeless)[0].decision == "lower", "and it can go down again")
+	_check(_feed(regulator, 1, "failure_power", 7, {}, hopeless)[0].decision == "lower", "a failure the forecast expected, with no success at this level, goes down at once")
+	regulator.on_level_changed(6)
+	regulator.advance(20.0)
+	var unsure := {"status": "uncertain"}
+	_check(_feed(regulator, 1, "failure_power", 6, {}, unsure)[0].decision == "hold", "an unsure forecast waits for a second failure")
+	_check(_feed(regulator, 1, "failure_power", 6, {}, unsure)[0].decision == "lower", "and then goes down")
+	var lucky := Regulator.new("balanced")
+	_feed(lucky, 2, "success", 8, {}, hopeless)
+	_check(_feed(lucky, 1, "failure_power", 8, {}, hopeless)[0].decision == "hold", "a success seen here keeps it from going down on one failure")
+	var aimed := Regulator.new("balanced")
+	aimed.advance(1.0)
+	aimed.on_attack({"event": "success", "complete": false, "level": 8, "max_level": 9, "signature": "s"}, {}, {})
+	aimed.advance(1.0)
+	aimed.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s"}, hopeless, {})
+	aimed.advance(1.0)
+	var deep := aimed.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s", "target_down": 4}, hopeless, {})
+	_check(deep.decision == "lower" and deep.assumed_level == 4, "it goes straight to the level that should work: %s" % str(deep))
+	var floor_level := Regulator.new("balanced", -1, 6)
+	floor_level.advance(1.0)
+	floor_level.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s"}, hopeless, {})
+	floor_level.advance(1.0)
+	_check(floor_level.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s", "target_down": 4}, hopeless, {}).assumed_level == 6, "never below the minimum level")
 
 	var interrupted := Regulator.new("balanced")
 	_feed(interrupted, 2, "success", 8, {}, _reliable(0.5))
@@ -601,9 +638,9 @@ func _test_game_load() -> void:
 	_feed(regulator, 3, "success", 4, _good_next(), {}, "s", 2.0)
 	regulator.on_level_changed(5)
 	regulator.on_game_loaded()
-	var after := _feed(regulator, 3, "success", 3, _good_next(), {}, "s", 2.0)
-	_check(after[0].reason == "stabilizing" and after[1].reason == "stabilizing", "a load starts observing again: %s" % after[0].reason)
-	_check(after[2].decision == "raise" and after[2].real_level == 3, "and judges the level it finds")
+	var after := _feed(regulator, 2, "success", 3, _good_next(), {}, "s", 2.0)
+	_check(after[0].reason == "stabilizing", "a load starts observing again: %s" % after[0].reason)
+	_check(after[1].decision == "raise" and after[1].real_level == 3, "and judges the level it finds")
 	var paused := Regulator.new("balanced")
 	paused.set_paused(true)
 	paused.on_game_loaded()
@@ -639,8 +676,8 @@ func _test_pauses() -> void:
 	regulator.on_resume(5)
 	_check(regulator._blocked.has(6) and regulator._blocked[6] == INF, "a refuted level stays blocked")
 	_check(regulator._actions.size() == actions_before, "the budget stays spent")
-	var after := _feed(regulator, 2, "success", 5, _good_next())
-	_check(after[0].reason == "stabilizing" and after[1].reason == "stabilizing", "observations start again: %s" % after[0].reason)
+	var after := _feed(regulator, 1, "success", 5, _good_next())
+	_check(after[0].reason == "stabilizing", "observations start again: %s" % after[0].reason)
 	_check(_feed(regulator, 30, "success", 5, _good_next()).back().reason == "level_blocked", "and the block still holds")
 
 	var delayed := _reg("conservative")

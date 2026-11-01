@@ -82,6 +82,7 @@ func run(check: Callable) -> void:
 	_test_one_action()
 	_test_incoherence()
 	_test_verification()
+	_test_jumps()
 	_test_stop_rules()
 	_test_trial_limits()
 	_test_certain_actions()
@@ -328,6 +329,39 @@ func _test_verification() -> void:
 	_free(loaded)
 
 
+## One action can cover several levels: the game's own "times" argument, and the level read back.
+func _test_jumps() -> void:
+	var setup := _setup()
+	setup.window.data.max_level = 9.0
+	setup.actuator.request("breach_corps", "raise", 4, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {"reason": "conditions_met", "assumed_level": 8})
+	var result: Dictionary = _attempt(setup)
+	_check(result.outcome == "acted" and setup.window.calls == ["up:4"] and setup.window.data.level == 8.0, "a jump is one call: %s" % str(setup.window.calls))
+	_check(setup.actuator.actions_done == 1, "and one action")
+	_check(setup.actuator.claims_level_change("breach_corps", 8), "the level reached is the mod's")
+	_free(setup)
+
+	var down := _setup()
+	down.window.data.level = 8.0
+	down.window.data.max_level = 9.0
+	down.actuator.request("breach_corps", "lower", 8, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {"reason": "conditions_met", "assumed_level": 4})
+	_attempt(down)
+	_check(down.window.calls == ["down:4"] and down.window.data.level == 4.0, "and so is a jump down")
+	_free(down)
+
+	var wrong := _setup()
+	wrong.window.behavior = "ignored"
+	wrong.window.data.max_level = 9.0
+	wrong.actuator.request("breach_corps", "raise", 4, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {"reason": "conditions_met", "assumed_level": 8})
+	_attempt(wrong)
+	_check(wrong.actuator.halt_reason == "level_mismatch", "a game that does not follow stops everything")
+	_free(wrong)
+
+	var too_far := _setup()
+	too_far.actuator.request("breach_corps", "raise", 4, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {"reason": "conditions_met", "assumed_level": 9})
+	_check(_attempt(too_far).reason == "target_out_of_bounds" and too_far.window.calls.is_empty(), "the game's maximum holds for a jump too")
+	_free(too_far)
+
+
 func _test_stop_rules() -> void:
 	var single := _setup(true, {"action_limit": 1})
 	_request(single)
@@ -379,7 +413,7 @@ func _test_trial_limits() -> void:
 	var policy := Actuator.Policy
 	_check(policy.TRIAL_TYPES == ["breach_government", "breach_corps"] and policy.TRIAL_MIN_LEVEL == 0 and policy.TRIAL_MAX_LEVEL == -1, "the trial is the authorized one")
 	_check(policy.TRIAL_MAX_ACTIONS == 40 and policy.TRIAL_PROFILE == "balanced", "with 40 actions, in the balanced profile")
-	_check(policy.TRIAL_MARKER.ends_with("trial_7_used.json"), "earlier markers are left alone")
+	_check(policy.TRIAL_MARKER.ends_with("trial_8_used.json"), "earlier markers are left alone")
 	DirAccess.remove_absolute(MARKER)
 	var other_type := _trial(2.0)
 	other_type.actuator.action_types = ["breach_government", "breach_corps", "breach_bank"]

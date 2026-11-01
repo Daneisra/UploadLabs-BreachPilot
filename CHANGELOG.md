@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0-dev.1 – en cours : régulation rapide
+
+**Le code du dépôt ne peut toujours changer aucun niveau.** Testé en simulation seulement.
+
+### Modifié
+
+- Le mod va directement au meilleur niveau, en une seule action, vers le haut comme vers le bas.
+- Une baisse se fait dès le premier échec si la prévision l'annonçait et qu'aucune réussite n'a été vue à ce niveau.
+- Stabilisation réduite à 1 attaque, 3 comparaisons pour le modèle d'infection, 1 attaque de vérification pour toute action certaine et toute baisse.
+
 ## 0.2.0-beta.1 – 2026-11-01 : actionneur, essais actifs et pause sur le nœud
 
 **Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Validé en jeu sur Gouvernement et Entreprises, avec infection et `Payload critique`. Régulation permanente non disponible : le mode `active` arrive avec la `0.2.0`.

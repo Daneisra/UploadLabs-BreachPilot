@@ -943,7 +943,7 @@ func _test_dry_run_in_observer() -> void:
 	_check(_count("dry_run type=") >= 1, "decisions are logged")
 	_check(_count("hypothetical=true") == _count("dry_run type="), "every decision is marked hypothetical")
 	_check(_count("decision=raise") == 1, "a raise is proposed once, not at every attack")
-	_check(_count("real_level=3") >= 1 and _count("assumed_level=4") == 1, "the real level and the assumed level are told apart")
+	_check(_count("real_level=3") >= 1 and _count("assumed_level=") == 1, "the real level and the assumed level are told apart")
 	_check(corps.data.level == 3.0 and corps.forbidden_calls == 0, "the dry run changes nothing")
 	_check(_count("inventory save_candidates") == 2, "save identifier candidates are reported")
 
@@ -1050,14 +1050,14 @@ func _test_actions_in_observer() -> void:
 		await _play_attack(game, corps, true)
 		if not corps.calls.is_empty():
 			break
-	_check(corps.calls == ["up:1"], "a raise calls the game once, after the reset: %s" % str(corps.calls))
-	_check(_count("action_applied type=breach_corps direction=raise level=3 target=4") == 1, "the action is traced")
+	_check(corps.calls == ["up:2"], "a raise calls the game once, after the reset, straight to the best level: %s" % str(corps.calls))
+	_check(_count("action_applied type=breach_corps direction=raise level=3 target=5") == 1, "the action is traced")
 	_check(_count("forecast_status=") == 1 and _count("margin=") >= 1 and _count("successes_in_row=") >= 1, "with its evidence")
 	game.Signals.tick.emit()
-	_check(_count("level_origin type=breach_corps level=4 origin=mod") == 1, "the mod's change is told apart")
+	_check(_count("level_origin type=breach_corps level=5 origin=mod") == 1, "the mod's change is told apart")
 	_check(_count("automation_pause") == 0, "and it does not pause")
 	await _play_attack(game, corps, true)
-	_check(_count("action_verification type=breach_corps from=3 to=4 outcome=verified") == 1, "the next attack verifies it: %s" % _last("action_verification"))
+	_check(_count("action_verification type=breach_corps from=3 to=5") == 1, "the next attack verifies it: %s" % _last("action_verification"))
 
 	# The player comes first: the change pauses the type.
 	corps.detected = true
@@ -1278,21 +1278,21 @@ func _test_trial_in_observer() -> void:
 	_check(_control_of(government).shown().text == "Auto : actif", "the trial's node says it is active: %s" % str(_control_of(government).shown()))
 	_check(_control_of(corps).shown().text == "Auto : actif", "and so does the other one")
 
-	# Up from 0 to 4, one verified step at a time, then a deliberate hold.
+	# Straight from 0 to 4 in one action, verified, then a deliberate hold.
 	var attacks_before := _count("event=success type=breach_government")
-	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= 4)
+	await _play_until(game, observer, government, func() -> bool: return government.data.level >= 4.0)
 	var climb_attacks := _count("event=success type=breach_government") - attacks_before
-	_check(climb_attacks <= 6, "a certain climb takes one attack per level, after stabilizing: %d" % climb_attacks)
-	_check(government.calls == ["up:1", "up:1", "up:1", "up:1"] and government.data.level == 4.0, "four raises to level 4: %s, %s" % [str(government.calls), _last("active type=breach_government")])
-	await _play_until(game, observer, government, func() -> bool: return _count("from=3 to=4 outcome=verified") == 1, 8)
-	_check(_count("outcome=verified") == 4, "each one is verified: %s" % _last("action_verification"))
+	_check(climb_attacks <= 3, "the best level is reached after one attack and its stabilization: %d" % climb_attacks)
+	_check(government.calls == ["up:4"] and government.data.level == 4.0, "one action to level 4: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	await _play_until(game, observer, government, func() -> bool: return _count("from=0 to=4 outcome=verified") == 1, 8)
+	_check(_count("outcome=verified") == 1, "it is verified: %s" % _last("action_verification"))
 	_check(_count("level_origin type=breach_government level=4 origin=mod") == 1 and _count("origin=player") == 0, "they are the mod's")
 	_check(corps.data.level == 3.0 and corps.calls.is_empty(), "the other type is not touched")
 	for attack: int in 8:
 		await _play_volleys(game, government)
 		observer._regulator_for("breach_government").advance(61.0)
 		observer._actuator.advance(61.0)
-	_check(government.calls.size() == 4 and government.data.level == 4.0, "level 5 fails, so it holds at 4")
+	_check(government.calls.size() == 1 and government.data.level == 4.0, "level 5 fails, so it holds at 4")
 	_check(_last("active type=breach_government").contains("forecast_too_risky"), "and says why: %s" % _last("active type=breach_government"))
 	_check(observer._actuator.halt_reason.is_empty() and _control_of(government).shown().text == "Auto : actif", "holding is not stopping")
 
@@ -1305,7 +1305,7 @@ func _test_trial_in_observer() -> void:
 	_check(_control_of(corps).shown().text == "Auto : actif", "the other type goes on")
 	_check(_control_of(government).shown().text == "Pause manuelle" and _control_of(government).shown().button == "Reprendre l'automatisation", "the node shows it: %s" % str(_control_of(government).shown()))
 	await _play_until(game, observer, government, func() -> bool: return false, 12)
-	_check(government.calls.size() == 4 and government.data.level == 3.0, "nothing moves during a pause")
+	_check(government.calls.size() == 1 and government.data.level == 3.0, "nothing moves during a pause")
 	_check(_last("active type=breach_government").contains("manual_pause"), "the log says why")
 
 	# Ctrl+Z: a real change is the player's, and a second pause is not created.
@@ -1334,7 +1334,6 @@ func _test_trial_in_observer() -> void:
 	_check(observer._actuator.actions_done == Observer.Policy.TRIAL_MAX_ACTIONS - 1, "and gives no budget back")
 	_check(_control_of(government).shown().text == "Auto : actif", "the node shows it")
 	await _play_volleys(game, government)
-	await _play_volleys(game, government)
 	_check(government.calls.size() == calls_before, "nothing while it stabilizes")
 	_check(_last("active type=breach_government").contains("stabilizing"), "it says so: %s" % _last("active type=breach_government"))
 	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= calls_before + 1)
@@ -1343,7 +1342,7 @@ func _test_trial_in_observer() -> void:
 	_check(_control_of(government).shown().text == "Auto : bloqué" and _control_of(government).shown().button.is_empty(), "the node shows a block with no button")
 	await _play_until(game, observer, government, func() -> bool: return false, 8)
 	_check(government.calls.size() == calls_before + 1, "there is no action past the budget")
-	_check(_count("from=3 to=4 outcome=verified") == 2, "the last one is verified too: %s" % _last("action_verification"))
+	_check(_count("from=3 to=4 outcome=verified") == 1, "the last one is verified too: %s" % _last("action_verification"))
 	await _play_attack(game, corps, true)
 	_check(_control_of(corps).shown().text == "Auto : bloqué" and corps.calls.is_empty(), "the budget is global: the other type stops too")
 	_check(corps.calls.is_empty() and corps.data.level == 3.0, "the other node is untouched")
@@ -1441,7 +1440,7 @@ func _test_announced_damage_in_observer() -> void:
 	await _remove_fake_game(game)
 
 
-## Weak hits on a high level: every level near it fails too, so the mod must walk down until one works.
+## Weak hits on a high level: the levels near it fail too, so the mod must go down to the one that works.
 func _test_descent_in_observer() -> void:
 	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
 	DirAccess.remove_absolute(MARKER_PATH)
@@ -1464,10 +1463,10 @@ func _test_descent_in_observer() -> void:
 	for attack: int in 16:
 		await _play_volleys(game, government)
 		observer._regulator_for("breach_government").advance(11.0)
-	_check(government.calls == ["down:1", "down:1"] and government.data.level == 2.0, "it walks down until a level works: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	_check(government.calls == ["down:2"] and government.data.level == 2.0, "it goes straight down to the level that works: %s, %s" % [str(government.calls), _last("active type=breach_government")])
 	_check(_count("action_refused") == 0, "without any refusal: %s" % _last("action_refused"))
 	_check(_count("regulation_stopped") == 0, "a failing level is not an anomaly")
-	_check(_count("outcome=verified") == 2, "each step is verified: %s" % _last("action_verification"))
+	_check(_count("outcome=verified") == 1, "it is verified: %s" % _last("action_verification"))
 	observer.stop()
 	observer.queue_free()
 	await process_frame

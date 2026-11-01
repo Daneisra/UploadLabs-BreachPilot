@@ -93,6 +93,7 @@ var _regulators: Dictionary = {}
 var _forecasts: Dictionary = {}
 var _last_intervals: Dictionary = {}
 var _observed_hits: Dictionary = {}
+var _level_scans: Dictionary = {}
 var _last_signatures: Dictionary = {}
 var _last_hold_reason: Dictionary = {}
 var _gap_probe := false
@@ -624,18 +625,25 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		_check_forecast(type, regulator, event, profile, current)
 	var next_target := _native_values(tracker, event.level + 1)
 	if not next_target.is_empty():
-		next = _forecast_for(profile, next_target, regulator.margin()).duplicate()
-		next.elite = next_target.elite
+		next = _forecast_for(profile, next_target, regulator.margin())
 	regulator.set_action_busy(_actuator.is_busy())
-	var decision := regulator.on_attack({
+	var attack := {
 		"event": event.event, "complete": event.complete, "level": event.level,
 		"max_level": event.max_level, "signature": profile.signature,
-	}, current, next)
+	}
+	if event.complete and event.event == "success":
+		var best := _best_raise(tracker, profile, regulator, event)
+		if best > event.level:
+			attack.best_level = best
+			attack.best_forecast = _forecast_for(profile, _native_values(tracker, best), regulator.margin())
+	elif event.complete and event.event == "failure_power":
+		attack.target_down = _best_lower(tracker, profile, regulator, event)
+	var decision := regulator.on_attack(attack, current, next)
 	var assumed := next
-	if decision.decision == "lower":
-		var lower_target := _native_values(tracker, event.level - 1)
-		# The margin is a caution against going up: without it, this says whether the lower level works.
-		assumed = {} if lower_target.is_empty() else _forecast_for(profile, lower_target, 0.0)
+	if decision.decision != "hold":
+		var aimed := _native_values(tracker, decision.assumed_level)
+		# The margin is a caution against going up: without it, this says whether a lower level works.
+		assumed = {} if aimed.is_empty() else _forecast_for(profile, aimed, regulator.margin() if decision.decision == "raise" else 0.0)
 	decision.hypothetical = not _actuator.can_act()
 	if decision.get("forecast_contradicted", false):
 		_log.warning("forecast_contradicted type=%s level=%d status=%s p=%s power=%s: raises suspended, no lower on this failure alone" % [type, event.level, current.get("status", "none"), _format_value(current.get("p_success", -1.0)), profile.signature])
@@ -922,6 +930,41 @@ func _regulator_for(type: String) -> ThreatRegulator:
 		regulator.set_paused(_state.is_paused(type))
 		_regulators[type] = regulator
 	return _regulators[type]
+
+
+## Which levels work at this power: the answer only changes with the power or the levels unlocked.
+func _level_scan(tracker: Dictionary, profile: Dictionary, margin: float, top: int) -> Dictionary:
+	var key := "%s|%s|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, profile.damage_rate, profile.get("hit_spread", false), profile.interval, margin, top]
+	if _level_scans.has(key):
+		return _level_scans[key]
+	if _level_scans.size() >= FORECAST_CACHE_SIZE:
+		_level_scans.clear()
+	var scan := {}
+	for level: int in range(0, top + 1):
+		var target := _native_values(tracker, level)
+		if not target.is_empty():
+			var result := BreachForecast.forecast(profile, target, margin)
+			scan[level] = result.p_success if result.status == "reliable" else -1.0
+	_level_scans[key] = scan
+	return scan
+
+
+## The highest level the forecast is sure of, or -1.
+func _best_raise(tracker: Dictionary, profile: Dictionary, regulator: ThreatRegulator, event: Dictionary) -> int:
+	var scan := _level_scan(tracker, profile, regulator.margin(), event.max_level)
+	for level: int in range(event.max_level, event.level, -1):
+		if scan.get(level, -1.0) >= 1.0 - ThreatActuator.EPSILON and regulator.can_reach(level):
+			return level
+	return -1
+
+
+## The highest level below that should work. If none does, one step down: the next failures go further.
+func _best_lower(tracker: Dictionary, profile: Dictionary, regulator: ThreatRegulator, event: Dictionary) -> int:
+	var scan := _level_scan(tracker, profile, 0.0, event.level)
+	for level: int in range(event.level - 1, -1, -1):
+		if scan.get(level, -1.0) >= regulator.required_success() - ThreatActuator.EPSILON:
+			return level
+	return event.level - 1
 
 
 ## Remembers the hits seen at this power, and lets the forecasts count on them.

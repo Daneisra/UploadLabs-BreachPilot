@@ -12,7 +12,6 @@ const Policy := preload("action_policy.gd")
 const NORMAL_TICK_SPEED := 0.05
 const SPEED_TOLERANCE := 1e-6
 const EPSILON := 1e-6
-const LEVEL_STEP := 1
 ## Attempts in a row without a safe window before it is reported as a problem.
 const STARVING_AFTER := 5
 ## Seconds of the game's timer to see the next attack end, after which the action is not proven clean.
@@ -157,7 +156,7 @@ func request(type: String, direction: String, level: int, power: Dictionary, exp
 		refused_counts[reason] = refused_counts.get(reason, 0) + 1
 		return reason
 	_pending = {
-		"type": type, "direction": direction, "from": level, "to": level + (1 if direction == "raise" else -1),
+		"type": type, "direction": direction, "from": level, "to": decision.get("assumed_level", level + (1 if direction == "raise" else -1)),
 		"power": power, "expected": expected, "decision": decision, "attempts": 0,
 	}
 	return ""
@@ -318,7 +317,7 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 	_last_cycle = cycle_key
 	_since_action = 0.0
 	actions_done += 1
-	_call_native(window, pending.direction)
+	_call_native(window, pending.direction, absi(pending.to - pending.from))
 	_in_call = false
 
 	var level_after := int(window.data.level)
@@ -338,14 +337,14 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 
 
 ## The single entry point to the game's level methods.
-func _call_native(window: Node, direction: String) -> void:
+func _call_native(window: Node, direction: String, steps: int = 1) -> void:
 	if not is_armed():
 		halt("native_call_without_arming")
 		return
 	if direction == "raise":
-		window.level_up(LEVEL_STEP)
+		window.level_up(steps)
 	elif direction == "lower":
-		window.level_down(LEVEL_STEP)
+		window.level_down(steps)
 
 
 func _judge_next_attack(event: Dictionary) -> Dictionary:
