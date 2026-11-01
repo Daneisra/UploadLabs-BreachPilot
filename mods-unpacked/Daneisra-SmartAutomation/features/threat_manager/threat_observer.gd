@@ -84,6 +84,8 @@ var _traced_events: Dictionary = {}
 var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0}
 var _actuator: ThreatActuator
 var _emergency := false
+## An anomaly lasts until the game restarts: restarting the observer must not clear it.
+var _session_halt := ""
 var _last_refusal: Dictionary = {}
 var _tick_index := 0
 var _state: RegulationState = RegulationState.new()
@@ -150,6 +152,8 @@ func start() -> void:
 		_actuator = _new_actuator(_regulation.mode == "active")
 		if _emergency:
 			_actuator.halt("emergency_stop")
+		elif not _session_halt.is_empty():
+			_actuator.halt(_session_halt)
 	_signals.tick.connect(_on_tick)
 	_signals.breached.connect(_on_breached)
 	_signals.window_created.connect(_bind_window)
@@ -182,6 +186,8 @@ func stop() -> void:
 	_detach_controls()
 	if _actuator != null:
 		_log.info(_actuator.summary())
+		if not _actuator.halt_reason.is_empty():
+			_session_halt = _actuator.halt_reason
 		_actuator = null
 	_last_refusal.clear()
 	_log_regulators()

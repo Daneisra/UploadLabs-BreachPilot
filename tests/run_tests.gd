@@ -1058,6 +1058,16 @@ func _test_actions_in_observer() -> void:
 	lowering.queue_free()
 	await process_frame
 
+	# An anomaly survives a restart of the observer, not a restart of the game.
+	var halted := _armed_setup(game, {})
+	halted._actuator.halt("verification_failed:duration_out_of_range")
+	halted.stop()
+	halted.start()
+	_check(halted._actuator.halt_reason == "verification_failed:duration_out_of_range", "restarting the observer does not clear an anomaly")
+	halted.stop()
+	halted.queue_free()
+	await process_frame
+
 	# No safe window: the action waits, and is never forced.
 	corps.calls.clear()
 	corps.data.level = 3.0
