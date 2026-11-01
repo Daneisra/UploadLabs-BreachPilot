@@ -12,6 +12,10 @@ enum State { UNBOUND, IDLE, ATTACKING, SUSPENDED }
 
 const THRESHOLD_TICKS := 2.0
 const THRESHOLD_STEPS := 1.5
+const CONTINUOUS_MARGIN := 1.5
+const EPSILON_DAMAGE := 1e-6
+const TRACE_POINTS := 64
+const TRACE_STEP := 0.25
 
 var state: State = State.UNBOUND
 
@@ -62,17 +66,17 @@ func on_breached(sample: Dictionary) -> Array[Dictionary]:
 	if not observed_start:
 		_open_cycle(sample, true)
 		_cycle.observed_start = false
-	if _dealt(sample) > _cycle.last_progress:
-		_cycle.volleys += 1
+	if _is_volley(sample, _dealt(sample) - _cycle.last_progress):
+		_note_volley(sample)
 	_record_hit(sample)
-	if sample.damage_rate != _cycle.damage_rate:
-		_cycle.damage_changed = true
+	_cycle.infection_end = sample.infection_count
+	_check_conditions(sample)
 	var used: float = sample.max_time - sample.time
 	var event := _base_event("success", sample)
 	event.time_left = sample.time
 	event.used = used
 	event.ratio = used / sample.max_time if sample.max_time > 0.0 else 0.0
-	event.complete = not _cycle.partial and not _cycle.paused_seen and not _cycle.level_mismatch and not _cycle.damage_changed
+	event.complete = not _cycle.partial and not _cycle.paused_seen and not _cycle.level_mismatch and not _cycle.damage_changed and not _cycle.speed_changed
 	event.level_after = sample.level
 	_set_hits(event)
 	_cycle = {}
@@ -134,6 +138,8 @@ func _classify_reset(sample: Dictionary) -> Dictionary:
 		clues.append("level_mismatch")
 	if _cycle.damage_changed:
 		clues.append("damage_changed")
+	if _cycle.speed_changed:
+		clues.append("speed_changed")
 	if not clues.is_empty():
 		return _unknown_reset(clues)
 	var failure := _base_event("failure_power", _previous)
@@ -160,11 +166,27 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"level_mismatch": false,
 		"progressed": false,
 		"volleys": 0,
+		"first_volley_time": -1.0,
+		"last_volley_time": -1.0,
+		"start_time": sample.time,
+		"infection_rate": sample.infection_rate,
+		"vulnerability": sample.vulnerability,
+		"infection_offset": 0.0 if sample.infection_count > 0.0 else -1.0,
 		"damage_rate": sample.damage_rate,
 		"damage_changed": false,
+		"tick_speed": sample.tick_speed,
+		"speed_changed": false,
+		"trace": PackedStringArray(),
+		"trace_next_time": sample.time,
 		"min_hit": -1.0,
 		"max_hit": -1.0,
+		"low_hit": -1.0,
 		"last_breached": sample.breached,
+		"breach_variation": sample.breach_variation,
+		"infection_variation": sample.infection_variation,
+		"infection_start": sample.infection_count,
+		"infection_end": sample.infection_count,
+		"infection_integral": 0.0,
 		"last_progress": _dealt(sample),
 		"last_progress_time": sample.time,
 		"max_step": 0.0,
@@ -174,7 +196,8 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 	}
 	if _dealt(sample) > 0.0:
 		_cycle.progressed = true
-		_cycle.volleys = 1
+		if _is_volley(sample, _dealt(sample)):
+			_note_volley(sample)
 	_next_cycle_id += 1
 
 
@@ -184,17 +207,24 @@ func _update_cycle(sample: Dictionary) -> void:
 		_cycle.max_step = maxf(_cycle.max_step, step)
 		_cycle.step_sum += step
 		_cycle.steps += 1
+		_cycle.infection_integral += sample.infection_count * step
+	_cycle.breach_variation |= sample.breach_variation
+	_cycle.infection_variation |= sample.infection_variation
+	_cycle.infection_end = sample.infection_count
 	if sample.paused:
 		_cycle.paused_seen = true
 	if sample.level != _cycle.level:
 		_cycle.level_mismatch = true
-	if sample.damage_rate != _cycle.damage_rate:
-		_cycle.damage_changed = true
+	_check_conditions(sample)
+	if _cycle.infection_offset < 0.0 and sample.infection_count > 0.0:
+		_cycle.infection_offset = _cycle.start_time - sample.time
+	_record_trace(sample)
 	_record_hit(sample)
 	var dealt := _dealt(sample)
 	if dealt > _cycle.last_progress:
 		_cycle.progressed = true
-		_cycle.volleys += 1
+		if _is_volley(sample, dealt - _cycle.last_progress):
+			_note_volley(sample)
 		_cycle.last_progress = dealt
 		_cycle.last_progress_time = sample.time
 
@@ -203,23 +233,86 @@ func _dealt(sample: Dictionary) -> float:
 	return sample.max_firewall - sample.firewall + sample.breached
 
 
+## Power, damage or speed moving during an attack make it useless as a measure.
+func _check_conditions(sample: Dictionary) -> void:
+	if sample.damage_rate != _cycle.damage_rate or sample.infection_rate != _cycle.infection_rate or sample.vulnerability != _cycle.vulnerability:
+		_cycle.damage_changed = true
+	if sample.tick_speed != _cycle.tick_speed:
+		_cycle.speed_changed = true
+
+
+func _note_volley(sample: Dictionary) -> void:
+	_cycle.volleys += 1
+	if _cycle.first_volley_time < 0.0:
+		_cycle.first_volley_time = sample.time
+	_cycle.last_volley_time = sample.time
+
+
+## Keeps time:infection:firewall:breached points, to compare infection with a model afterwards.
+func _record_trace(sample: Dictionary) -> void:
+	if sample.infection_count <= 0.0 or sample.time > _cycle.trace_next_time or _cycle.trace.size() >= TRACE_POINTS:
+		return
+	_cycle.trace.append("%.2f:%.2f:%.2f:%.2f" % [sample.time, sample.infection_count, sample.firewall, sample.breached])
+	_cycle.trace_next_time = sample.time - TRACE_STEP
+
+
+## What infection should deal during one tick. It is an estimate until measured in the game.
+func _continuous_damage(sample: Dictionary) -> float:
+	return sample.infection_count * (1.0 + sample.vulnerability) * sample.tick_speed
+
+
+## Separates volleys from damage over time, which also raises the bars at every tick.
+func _is_volley(sample: Dictionary, delta: float) -> bool:
+	if sample.infection_count <= 0.0:
+		return delta > 0.0
+	return delta > CONTINUOUS_MARGIN * _continuous_damage(sample) + EPSILON_DAMAGE
+
+
 ## Hits on the breach bar show the real damage: unlike firewall hits, they are not cut short.
 func _record_hit(sample: Dictionary) -> void:
-	var hit: float = sample.breached - _cycle.last_breached
+	var delta: float = sample.breached - _cycle.last_breached
 	_cycle.last_breached = sample.breached
-	if hit <= 0.0:
+	if not _is_volley(sample, delta):
 		return
+	var hit := delta - _continuous_damage(sample)
 	_cycle.min_hit = hit if _cycle.min_hit < 0.0 else minf(_cycle.min_hit, hit)
 	_cycle.max_hit = maxf(_cycle.max_hit, hit)
+	# A hit that empties the bar is cut to what was left: it says nothing about the hit's real size.
+	if sample.breached < sample.max_breach - EPSILON_DAMAGE:
+		_cycle.low_hit = hit if _cycle.low_hit < 0.0 else minf(_cycle.low_hit, hit)
 
 
 func _set_hits(event: Dictionary) -> void:
 	if _cycle.max_hit >= 0.0:
 		event.min_hit = _cycle.min_hit
 		event.max_hit = _cycle.max_hit
+	if _cycle.low_hit >= 0.0:
+		event.low_hit = _cycle.low_hit
 
 
 func _base_event(event_name: String, sample: Dictionary) -> Dictionary:
+	var event := _core_event(event_name, sample)
+	event.infection_rate = sample.infection_rate
+	event.tick_speed = sample.tick_speed
+	if _cycle.volleys >= 2:
+		event.interval = (_cycle.first_volley_time - _cycle.last_volley_time) / (_cycle.volleys - 1)
+	if _cycle.infection_offset >= 0.0:
+		event.infection_offset = _cycle.infection_offset
+	if _cycle.breach_variation != 0:
+		event.breach_variation = _cycle.breach_variation
+	if _cycle.infection_variation != 0:
+		event.infection_variation = _cycle.infection_variation
+	if _cycle.infection_integral > 0.0 or _cycle.infection_start > 0.0 or _cycle.infection_end > 0.0:
+		event.infection_start = _cycle.infection_start
+		event.infection_end = _cycle.infection_end
+		event.infection_integral = _cycle.infection_integral
+		event.dealt_total = _dealt(sample)
+	if not _cycle.trace.is_empty():
+		event.trace = ";".join(_cycle.trace)
+	return event
+
+
+func _core_event(event_name: String, sample: Dictionary) -> Dictionary:
 	var steps: int = _cycle.steps
 	return {
 		"event": event_name,

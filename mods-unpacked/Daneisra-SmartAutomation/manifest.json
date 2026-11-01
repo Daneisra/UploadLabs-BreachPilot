@@ -1,8 +1,8 @@
 {
 	"name": "SmartAutomation",
 	"namespace": "Daneisra",
-	"version_number": "0.1.0",
-	"description": "Modular QoL automation. This version only observes Breach attacks and writes logs; it changes nothing in the game.",
+	"version_number": "0.2.0",
+	"description": "Hacking automation. Keeps Breach threat levels at the highest level your power can handle, with pause and resume on the nodes. Off by default.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
 	"dependencies": [],
 	"extra": {
@@ -35,6 +35,30 @@
 					"debug_toggle_hotkey": {
 						"type": "boolean",
 						"default": false
+					},
+					"regulation_mode": {
+						"type": "string",
+						"enum": ["off", "dry_run", "active"],
+						"default": "off"
+					},
+					"regulation_profile": {
+						"type": "string",
+						"enum": ["conservative", "balanced", "aggressive"],
+						"default": "balanced"
+					},
+					"max_allowed_level": {
+						"type": "integer",
+						"minimum": -1,
+						"default": -1
+					},
+					"gap_probe": {
+						"type": "boolean",
+						"default": false
+					},
+					"min_level": {
+						"type": "integer",
+						"minimum": 0,
+						"default": 0
 					}
 				}
 			},
