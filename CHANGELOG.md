@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-dev.1 – en cours : relevé pour le Smart Hacking Advisor
+
+### Ajouté
+
+- `Ctrl+Alt+F8` écrit dans le journal un relevé unique de ce que le jeu expose sur le hacking. Il ne fait que lire des propriétés : aucune méthode du jeu n'est appelée, et ce qui touche au compte ou aux sauvegardes est écarté. Testé en simulation seulement.
+
 ## 0.2.0 – 2026-11-01 : régulation normale
 
 Le mode `active` est une option normale, désactivée par défaut. Les archives d'essai, les marqueurs et les limites d'actions sont retirés.

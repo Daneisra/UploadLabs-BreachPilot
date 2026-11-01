@@ -2,10 +2,11 @@ extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.2.0"
+const BUILD := "0.3.0-dev.1"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
+const AdvisorInventory := preload("features/hacking_advisor/advisor_inventory.gd")
 
 var _log: SaLog
 var _observer: ThreatObserver
@@ -59,6 +60,18 @@ func _input(event: InputEvent) -> void:
 			_observer.stop()
 		else:
 			_observer.start()
+	elif key.keycode == KEY_F8:
+		_log_inventory()
+
+
+## Read-only, one snapshot per key press: it only serves to learn what the advisor could rely on.
+func _log_inventory() -> void:
+	var root := get_tree().root
+	var lines := AdvisorInventory.new().snapshot(root, root.get_node("Globals").desktop)
+	_log.info("advisor_inventory begin lines=%d" % lines.size())
+	for line: String in lines:
+		_log.info("advisor_inventory %s" % line)
+	_log.info("advisor_inventory end")
 
 
 func _read_settings() -> Dictionary:

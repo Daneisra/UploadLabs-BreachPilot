@@ -15,6 +15,27 @@
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
+## Smart Hacking Advisor : faisabilité
+
+Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule, sans branchement ni achat automatique.
+
+| Besoin | Disponible | À vérifier en jeu |
+|---|---|---|
+| Durée et réussite d'une attaque à chaque niveau | Oui : prévisions de la `0.2.0`, vérifiées en jeu | Rien |
+| Récompenses et XP par niveau | Probable : `get_reward` et `get_experience_reward` existent | Valeurs et unités |
+| Puissance partagée | En partie : deux entrées divisent la puissance par 2 (89 devient 45) | Règle générale, chaîne réelle |
+| Branchements de la chaîne | Inconnu : `containers` et `pairs` existent sur les nœuds | Lien entre deux nœuds |
+| Coût et effet des améliorations | Inconnu | Où le jeu les expose, sans décompilation |
+
+**Jalons :**
+
+1. Relevé `Ctrl+Alt+F8` : savoir ce qui est lisible. Sans cela, aucune comparaison n'est promise.
+2. Premier conseil utile, sur le seul nœud : pour la puissance actuelle, niveau atteignable, durée, fiabilité, récompense et XP par minute, puis ce qu'apporterait un gain de puissance.
+3. Si le relevé le permet : scénarios de branchement (« actuel » contre « recommandé ») et goulet d'étranglement.
+4. Si le relevé le permet : priorité des améliorations, par coût et gain réel.
+
+Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte ce qu'il retire au lanceur.
+
 ## Décisions
 
 | Sujet | Décision |
