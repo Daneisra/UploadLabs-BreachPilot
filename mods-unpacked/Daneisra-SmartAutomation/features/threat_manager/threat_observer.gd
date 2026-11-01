@@ -710,8 +710,8 @@ func _levels_text() -> String:
 func _action_trace(pending: Dictionary) -> String:
 	var decision: Dictionary = pending.decision
 	var expected: Dictionary = pending.expected
-	return "direction=%s level=%d target=%d reason=%s profile=%s margin=%s window_attacks=%d window_failures=%d successes_in_row=%d failures_needed=%s risk=%s forecast_status=%s forecast_outcome=%s forecast_p=%s used_max=%s" % [
-		pending.direction, pending.from, pending.to, decision.reason, decision.profile, _format_value(decision.margin),
+	return "direction=%s level=%d target=%d reason=%s certain=%s profile=%s margin=%s window_attacks=%d window_failures=%d successes_in_row=%d failures_needed=%s risk=%s forecast_status=%s forecast_outcome=%s forecast_p=%s used_max=%s" % [
+		pending.direction, pending.from, pending.to, decision.reason, decision.get("certain", false), decision.profile, _format_value(decision.margin),
 		decision.window_attacks, decision.window_failures, decision.successes_in_row, decision.get("needed", "none"),
 		_format_value(decision.get("risk", -1.0)), expected.get("status", "none"), expected.get("outcome", "none"),
 		_format_value(expected.get("p_success", -1.0)), _format_value(expected.get("used_max", -1.0)),

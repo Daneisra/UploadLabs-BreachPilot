@@ -1061,11 +1061,11 @@ func _test_actions_in_observer() -> void:
 	corps.time = corps.max_time - 0.05
 	corps.firewall = corps.max_firewall * 0.5
 	game.Signals.tick.emit()
-	corps.data.level = 5.0
+	corps.data.level = 2.0
 	corps._rearm()
 	corps.detected = false
 	game.Signals.tick.emit()
-	_check(_count("automation_pause type=breach_corps reason=player_level_change level=5") == 1, "the player's change pauses the type")
+	_check(_count("automation_pause type=breach_corps reason=player_level_change level=2") == 1, "the player's change pauses the type")
 	observer.stop()
 	observer.queue_free()
 	await process_frame
@@ -1273,7 +1273,10 @@ func _test_trial_in_observer() -> void:
 	_check(_control_of(corps).shown().text == "Auto : désactivé", "the other type says it is left out")
 
 	# Up from 0 to 3, one verified step at a time, then a deliberate hold.
+	var attacks_before := _count("event=success type=breach_government")
 	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= 3)
+	var climb_attacks := _count("event=success type=breach_government") - attacks_before
+	_check(climb_attacks <= 6, "a certain climb takes one attack per level, after stabilizing: %d" % climb_attacks)
 	_check(government.calls == ["up:1", "up:1", "up:1"] and government.data.level == 3.0, "three raises to level 3: %s, %s" % [str(government.calls), _last("active type=breach_government")])
 	await _play_until(game, observer, government, func() -> bool: return _count("from=2 to=3 outcome=verified") == 1, 8)
 	_check(_count("outcome=verified") == 3, "each one is verified: %s" % _last("action_verification"))

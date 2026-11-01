@@ -84,6 +84,7 @@ func run(check: Callable) -> void:
 	_test_verification()
 	_test_stop_rules()
 	_test_trial_limits()
+	_test_certain_actions()
 	_test_regulator_support()
 	_test_closed_loop()
 
@@ -458,6 +459,37 @@ func _test_trial_limits() -> void:
 	_check(level_4.status == "reliable" and level_4.p_success < 1.0, "level 4 does not, so the raises stop at 3: %s" % str(level_4))
 
 
+## A certain raise is checked on one attack, and the trial's delay is for doubts only.
+func _test_certain_actions() -> void:
+	DirAccess.remove_absolute(MARKER)
+	var setup := _trial(1.0)
+	var power := {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}
+	var safe := {"status": "reliable", "p_success": 1.0}
+	for level: int in [1, 2]:
+		setup.actuator.action_type = "breach_government"
+		setup.actuator.request("breach_government", "raise", level, power, safe, {"reason": "conditions_met", "certain": true})
+		var result: Dictionary = setup.actuator.attempt("breach_government", setup.window, "1|%d" % level, 1, true, true, false)
+		_check(result.outcome == "acted", "a certain raise acts right away: %s" % str(result))
+		setup.actuator.claims_level_change("breach_government", level + 1)
+		_check(setup.actuator.note_event("breach_government", _attack(level + 1), false).outcome == "verified", "one normal attack verifies it")
+	_check(setup.window.data.level == 3.0, "two levels in two attacks")
+	var doubt := {"reason": "conditions_met"}
+	setup.actuator.request("breach_government", "raise", 3, power, safe, doubt)
+	_check(setup.actuator.attempt("breach_government", setup.window, "1|3", 1, true, true, false).reason == "too_soon_after_last_action", "a doubt still waits")
+	_free(setup)
+
+	DirAccess.remove_absolute(MARKER)
+	var bad := _trial(1.0)
+	bad.actuator.action_type = "breach_government"
+	bad.actuator.request("breach_government", "raise", 1, power, safe, {"reason": "conditions_met", "certain": true})
+	bad.actuator.attempt("breach_government", bad.window, "1|1", 1, true, true, false)
+	bad.actuator.claims_level_change("breach_government", 2)
+	_check(bad.actuator.note_event("breach_government", {"event": "reset_unknown", "level": 2}, false).outcome == "failed", "a disturbed attack still stops everything")
+	_check(not bad.actuator.halt_reason.is_empty(), "at once")
+	_free(bad)
+	DirAccess.remove_absolute(MARKER)
+
+
 func _setup_summary() -> String:
 	var setup := _setup()
 	_request(setup)
@@ -487,7 +519,7 @@ func _test_regulator_support() -> void:
 
 	var proposing := Regulator.new("aggressive")
 	var first: Dictionary = _feed(proposing, 10, "success", 4, {}, reliable).filter(func(d: Dictionary) -> bool: return d.decision == "raise")[0]
-	_check(first.window_attacks > 0 and first.successes_in_row >= 2 and first.margin == 0.0, "a decision carries its evidence")
+	_check(first.window_attacks > 0 and first.successes_in_row >= 1 and first.margin == 0.0 and first.certain, "a decision carries its evidence")
 	proposing.cancel_last_action()
 	_check(proposing._actions.is_empty(), "a cancelled action costs no budget")
 	var retry := _feed(proposing, 1, "success", 4, {}, reliable)

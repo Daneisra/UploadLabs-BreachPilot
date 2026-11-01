@@ -56,9 +56,12 @@ var _refuted := false
 var _checks_in := 0
 var _checks_out := 0
 var _undo: Dictionary = {}
+var _fast_raises: bool
+var _certainty_lost := false
 
 
-func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0) -> void:
+func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
+	_fast_raises = fast_raises
 	profile_name = profile if PROFILES.has(profile) else "balanced"
 	_profile = PROFILES[profile_name]
 	_max_allowed = max_allowed
@@ -184,6 +187,7 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 		_blocked.clear()
 		_block_length.clear()
 		_undo = {}
+		_certainty_lost = false
 		_checks_in = 0
 		_checks_out = 0
 		if not first:
@@ -231,12 +235,22 @@ func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
 	_refuted = true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
+	_certainty_lost = _certainty_lost or _refuted
 	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_refuted": _refuted})
+
+
+## A raise the forecast is sure of needs no waiting: one success here, and it goes up. The profile's
+## delays are for doubts. A refuted forecast brings them back until the power changes.
+func _is_certain(next: Dictionary) -> bool:
+	if not _fast_raises or _certainty_lost or next.get("status") != "reliable" or next.get("p_success", -1.0) < 1.0 - RISK_EPSILON:
+		return false
+	return not next.get("infected", false) or model_trust() == "verified"
 
 
 func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	var target: int = attack.level + 1
-	if _consecutive < _profile.raise_after:
+	var certain := _is_certain(next)
+	if _consecutive < (1 if certain else _profile.raise_after):
 		return _decision("hold", "gathering_successes", attack, {"successes": _consecutive})
 	if target > attack.max_level:
 		return _decision("hold", "at_game_maximum", attack)
@@ -255,9 +269,9 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	if next.p_success < _profile.p - RISK_EPSILON:
 		return _decision("hold", "forecast_too_risky", attack, {"p": next.p_success})
 
-	if _timer - _last_raise < _profile.raise_delay:
+	if not certain and _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)
-	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal})
+	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain})
 
 
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:
@@ -271,13 +285,14 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 	var reversals := 0
 	var previous := ""
 	for action: Array in _actions:
-		if _timer - action[0] <= BUDGET_WINDOW:
+		if _timer - action[0] <= BUDGET_WINDOW and not action[2]:
 			recent += 1
 		if _timer - action[0] <= REVERSAL_WINDOW:
 			if not previous.is_empty() and action[1] != previous:
 				reversals += 1
 			previous = action[1]
-	if recent >= BUDGET:
+	var certain: bool = details.get("certain", false)
+	if recent >= BUDGET and not certain:
 		return _decision("hold", "budget_exhausted", attack)
 	if not previous.is_empty() and direction != previous:
 		reversals += 1
@@ -287,7 +302,7 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 
 	_undo = {"last_raise": _last_raise, "last_lower": _last_lower, "blocked": _blocked.duplicate(), "block_length": _block_length.duplicate()}
 	_proposal = key
-	_actions.append([_timer, direction])
+	_actions.append([_timer, direction, certain])
 	if direction == "raise":
 		_last_raise = _timer
 	else:

@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.5 – en cours : actionneur, essais actifs et pause sur le nœud
+## 0.2.0-beta.1-dev.6 – en cours : actionneur, essais actifs et pause sur le nœud
 
-**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée de 2 à 3 et baisse de 5 à 4 validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
+**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée, baisse et 4 actions successives validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
+
+### Modifié
+
+- Voie rapide : quand le niveau suivant est certain, une seule réussite suffit pour monter, sans délai de profil, et une seule attaque vérifie l'action. Testée en simulation seulement.
 
 ### Ajouté
 

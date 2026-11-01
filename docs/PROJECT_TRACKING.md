@@ -197,12 +197,14 @@ Décisions appliquées à un jeu simulé, 5 tirages de 20 000 attaques (environ 
 
 | Scénario | Profil | Inversions | Baisses injustifiées | Échecs | Au meilleur niveau |
 |---|---|---|---|---|---|
-| Stable | Les 3 | 0 | 0 | 0 | 99,1 à 99,2 % |
-| Niveau à 97 % | Conservateur | 0 | 0 | 0 | 99,6 % |
-| Niveau à 97 % | Équilibré | 0 | 0 | 0 | 99,8 % |
-| Niveau à 97 % | Agressif | 12 | 6 | 2 953 | 99,0 % |
-| Prévision fausse | Les 3 | 25 | 0 | 40 à 95 | 99,0 à 99,2 % |
-| Puissance changeante | Les 3 | 5 | 0 | 40 à 115 | 99,4 à 99,7 % |
+| Stable | Les 3 | 0 | 0 | 0 | 100 % |
+| Niveau à 97 % | Conservateur, équilibré | 0 | 0 | 0 | 100 % |
+| Niveau à 97 % | Agressif | 12 | 6 | 2 977 | 99,7 % |
+| Prévision fausse | Les 3 | 25 | 0 | 30 | 99,9 % |
+| Puissance changeante | Conservateur, équilibré | 5 | 0 | 40 | 99,9 % |
+| Puissance changeante | Agressif | 5 | 0 | 115 | 99,8 % |
+
+Ces chiffres incluent la voie rapide des montées certaines.
 
 Avec une prévision fausse, le niveau réfuté est retenté une fois à chaque changement de puissance, soit 3 essais par tirage dans ce scénario.
 

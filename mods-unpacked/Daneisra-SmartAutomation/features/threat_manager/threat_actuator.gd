@@ -71,7 +71,7 @@ func _trial_refusal(pending: Dictionary) -> String:
 		return "action_limit"
 	if actions_done == 0 and FileAccess.file_exists(_marker_path):
 		return "trial_already_used"
-	if _since_action < Policy.TRIAL_MIN_GAP:
+	if not pending.decision.get("certain", false) and _since_action < Policy.TRIAL_MIN_GAP:
 		return "too_soon_after_last_action"
 	return ""
 
@@ -313,7 +313,7 @@ func _perform(window: Node, pending: Dictionary, cycle_key: String) -> Dictionar
 		halt("state_disturbed_by_action")
 	else:
 		_claim = {"type": pending.type, "to": pending.to}
-		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0, "remaining": _verify_attacks}
+		_verifying = {"type": pending.type, "from": pending.from, "to": pending.to, "expected": pending.expected, "waited": 0.0, "remaining": 1 if pending.decision.get("certain", false) else _verify_attacks}
 	if actions_done >= action_limit:
 		halt("action_limit_reached")
 	return result
