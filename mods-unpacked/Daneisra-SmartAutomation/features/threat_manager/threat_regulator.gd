@@ -3,9 +3,9 @@ extends RefCounted
 ## and only returns hypothetical decisions. Time values are seconds of the game's timer.
 
 const PROFILES := {
-	"conservative": {"p": 1.0, "margin": 0.20, "raise_after": 5, "raise_delay": 60.0, "block": 600.0},
-	"balanced": {"p": 0.99, "margin": 0.10, "raise_after": 3, "raise_delay": 30.0, "block": 300.0},
-	"aggressive": {"p": 0.95, "margin": 0.0, "raise_after": 2, "raise_delay": 15.0, "block": 120.0},
+	"conservative": {"p": 1.0, "margin": 0.20, "raise_after": 5, "raise_delay": 60.0, "block": 600.0, "probes": false},
+	"balanced": {"p": 0.99, "margin": 0.10, "raise_after": 3, "raise_delay": 30.0, "block": 300.0, "probes": true},
+	"aggressive": {"p": 0.95, "margin": 0.0, "raise_after": 2, "raise_delay": 15.0, "block": 120.0, "probes": true},
 }
 const WINDOW := 20
 const STABILIZE_ATTACKS := 1
@@ -26,12 +26,14 @@ const RISK_EPSILON := 1e-9
 ## Attacks that verify an action: one when it is certain or a lower, more when it rests on doubts.
 const VERIFY_CERTAIN := 1
 const FAILURES_IN_ROW_TO_LOWER := 2
+## Successes here before trying a level that may work but is not sure.
+const PROBE_AFTER := 2
 const VERIFY_CAREFUL := 3
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
 const MAX_UNEXPLAINED := 0.05
 const EXPLAINED_CLUES: Array[String] = ["damage_changed", "speed_changed", "partial_cycle"]
-const MIN_VERIFIED_CHECKS := 3
+const MIN_VERIFIED_CHECKS := 1
 const MAX_OUT_OF_RANGE := 0.05
 
 var profile_name: String
@@ -66,6 +68,7 @@ var _certainty_lost := false
 var _raises_suspended := false
 var _just_contradicted := false
 var _action_busy := false
+var _probed_level := -1
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
@@ -309,7 +312,9 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 			return _decision("hold", "raises_suspended", attack)
 		_raises_suspended = false
 	var certain := _is_certain(next)
-	if _consecutive < (1 if certain else _profile.raise_after):
+	# Being at the maximum is worth a try: if the level fails, it goes back down and waits before trying again.
+	var probing: bool = not certain and _fast_raises and _profile.probes and attack.get("probe_possible", false)
+	if _consecutive < (1 if certain else (PROBE_AFTER if probing else _profile.raise_after)):
 		return _decision("hold", "gathering_successes", attack, {"successes": _consecutive})
 	if target > attack.max_level:
 		return _decision("hold", "at_game_maximum", attack)
@@ -317,6 +322,9 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 		return _decision("hold", "at_allowed_maximum", attack)
 	if _blocked.get(target, -INF) > _timer:
 		return _decision("hold", "level_blocked", attack, {"blocked_for": _blocked[target] - _timer})
+	if probing:
+		_probed_level = target
+		return _act("raise", attack, {"certain": false, "probe": true, "verify_attacks": VERIFY_CERTAIN, "target": target})
 
 	var status: String = next.get("status", "invalid")
 	if next.get("infected", false) and status != "invalid" and model_trust() != "verified":
@@ -348,14 +356,16 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 	for action: Array in _actions:
 		if _timer - action[0] <= BUDGET_WINDOW and not action[2]:
 			recent += 1
-		if _timer - action[0] <= REVERSAL_WINDOW:
+		if _timer - action[0] <= REVERSAL_WINDOW and not action[3]:
 			if not previous.is_empty() and action[1] != previous:
 				reversals += 1
 			previous = action[1]
-	var certain: bool = details.get("certain", false)
-	if recent >= BUDGET and not certain:
+	# A try and its way back are expected: they must not freeze the regulator.
+	var tried: bool = details.get("probe", false) or (direction == "lower" and attack.level == _probed_level)
+	var free: bool = details.get("certain", false) or tried
+	if recent >= BUDGET and not free:
 		return _decision("hold", "budget_exhausted", attack)
-	if not previous.is_empty() and direction != previous:
+	if not tried and not previous.is_empty() and direction != previous:
 		reversals += 1
 	if reversals >= REVERSALS:
 		_frozen_until = _timer + FREEZE
@@ -363,7 +373,7 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 
 	_undo = {"last_raise": _last_raise, "last_lower": _last_lower, "blocked": _blocked.duplicate(), "block_length": _block_length.duplicate()}
 	_proposal = key
-	_actions.append([_timer, direction, certain])
+	_actions.append([_timer, direction, free, tried])
 	if direction == "raise":
 		_last_raise = _timer
 	else:

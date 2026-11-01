@@ -413,7 +413,7 @@ func _test_trial_limits() -> void:
 	var policy := Actuator.Policy
 	_check(policy.TRIAL_TYPES == ["breach_government", "breach_corps"] and policy.TRIAL_MIN_LEVEL == 0 and policy.TRIAL_MAX_LEVEL == -1, "the trial is the authorized one")
 	_check(policy.TRIAL_MAX_ACTIONS == 40 and policy.TRIAL_PROFILE == "balanced", "with 40 actions, in the balanced profile")
-	_check(policy.TRIAL_MARKER.ends_with("trial_8_used.json"), "earlier markers are left alone")
+	_check(policy.TRIAL_MARKER.ends_with("trial_9_used.json"), "earlier markers are left alone")
 	DirAccess.remove_absolute(MARKER)
 	var other_type := _trial(2.0)
 	other_type.actuator.action_types = ["breach_government", "breach_corps", "breach_bank"]

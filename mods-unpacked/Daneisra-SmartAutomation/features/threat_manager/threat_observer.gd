@@ -636,6 +636,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		if best > event.level:
 			attack.best_level = best
 			attack.best_forecast = _forecast_for(profile, _native_values(tracker, best), regulator.margin())
+		else:
+			attack.probe_possible = _may_work(tracker, profile, event)
 	elif event.complete and event.event == "failure_power":
 		attack.target_down = _best_lower(tracker, profile, regulator, event)
 	var decision := regulator.on_attack(attack, current, next)
@@ -644,6 +646,9 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		var aimed := _native_values(tracker, decision.assumed_level)
 		# The margin is a caution against going up: without it, this says whether a lower level works.
 		assumed = {} if aimed.is_empty() else _forecast_for(profile, aimed, regulator.margin() if decision.decision == "raise" else 0.0)
+		# A try has no promise to keep, and without a hit seen the durations would rest on the announced figure.
+		if decision.get("probe", false) or profile.get("hits_unseen", false):
+			assumed = {"status": assumed.get("status", "none"), "outcome": assumed.get("outcome", "none"), "p_success": assumed.get("p_success", -1.0)}
 	decision.hypothetical = not _actuator.can_act()
 	if decision.get("forecast_contradicted", false):
 		_log.warning("forecast_contradicted type=%s level=%d status=%s p=%s power=%s: raises suspended, no lower on this failure alone" % [type, event.level, current.get("status", "none"), _format_value(current.get("p_success", -1.0)), profile.signature])
@@ -949,6 +954,27 @@ func _level_scan(tracker: Dictionary, profile: Dictionary, margin: float, top: i
 	return scan
 
 
+## Could the next level work with some luck? Strong hits count for a quarter of the gap above the lowest.
+func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> bool:
+	var seen: Dictionary = _observed_hits.get(tracker.type, {})
+	var key := "may|%s|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, event.level, profile.interval, seen.get("lowest", -1.0), seen.get("highest", 0.0)]
+	if _level_scans.has(key):
+		return _level_scans[key]
+	if _level_scans.size() >= FORECAST_CACHE_SIZE:
+		_level_scans.clear()
+	var answer := false
+	var target := _native_values(tracker, event.level + 1)
+	if not target.is_empty() and event.level + 1 <= event.max_level:
+		var hopeful := profile.duplicate()
+		hopeful.erase("hit_spread")
+		if profile.get("hit_spread", false) and seen.get("lowest", -1.0) > 0.0 and profile.interval > 0.0:
+			hopeful.damage_rate = (seen.lowest + (seen.highest - seen.lowest) * 0.25) / profile.interval
+		var result := BreachForecast.forecast(hopeful, target, 0.0)
+		answer = result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
+	_level_scans[key] = answer
+	return answer
+
+
 ## The highest level the forecast is sure of, or -1.
 func _best_raise(tracker: Dictionary, profile: Dictionary, regulator: ThreatRegulator, event: Dictionary) -> int:
 	var scan := _level_scan(tracker, profile, regulator.margin(), event.max_level)
@@ -973,9 +999,10 @@ func _apply_observed_hits(type: String, event: Dictionary, profile: Dictionary) 
 	if seen.get("signature") != profile.signature:
 		seen = {"signature": profile.signature, "lowest": -1.0, "highest": 0.0}
 		_observed_hits[type] = seen
-	if event.complete and event.has("min_hit"):
-		seen.lowest = event.min_hit if seen.lowest < 0.0 else minf(seen.lowest, event.min_hit)
+	if event.complete and event.has("max_hit"):
 		seen.highest = maxf(seen.highest, event.max_hit)
+	if event.complete and event.has("low_hit"):
+		seen.lowest = event.low_hit if seen.lowest < 0.0 else minf(seen.lowest, event.low_hit)
 	PowerProfile.apply_observed_hits(profile, seen.lowest, seen.highest)
 	if profile.get("hit_spread", false) and not seen.get("logged", false):
 		seen.logged = true
@@ -995,7 +1022,7 @@ func _forecast_for(profile: Dictionary, target: Dictionary, margin: float) -> Di
 
 ## Compares what happened with what the forecast allowed. Anything outside is signaled for analysis.
 func _check_forecast(type: String, regulator: ThreatRegulator, event: Dictionary, profile: Dictionary, current: Dictionary) -> void:
-	if not event.complete or current.status == "invalid":
+	if not event.complete or current.status == "invalid" or profile.get("hits_unseen", false):
 		return
 	if event.event != "success" and event.event != "failure_power":
 		return

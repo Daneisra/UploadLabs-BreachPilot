@@ -27,7 +27,10 @@ static func from_event(event: Dictionary, last_interval: float = 0.0) -> Diction
 ## while most hits stay low. A forecast must count on the lowest hits really seen. The signature stays.
 static func apply_observed_hits(profile: Dictionary, lowest: float, highest: float) -> void:
 	var announced: float = profile.damage_rate * profile.interval
-	if announced <= 0.0 or lowest <= 0.0:
+	if lowest <= 0.0:
+		profile.hits_unseen = true
+		return
+	if announced <= 0.0:
 		return
 	if lowest < floorf(announced) * HIT_TOLERANCE:
 		profile.damage_rate = lowest / profile.interval

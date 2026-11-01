@@ -95,6 +95,7 @@ class ActingBreach extends FakeBreach:
 	var calls: Array[String] = []
 	var fixed_time := 0.0
 	var true_hit := 0.0
+	var cut_hits := false
 
 	func _init() -> void:
 		var main := VBoxContainer.new()
@@ -240,6 +241,7 @@ func _run() -> void:
 	await _test_actions_in_observer()
 	await _test_trial_in_observer()
 	await _test_automation_control()
+	await _test_cut_hits()
 	await _test_descent_in_observer()
 	await _test_announced_damage_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
@@ -1206,7 +1208,7 @@ func _play_volleys(game: Dictionary, breach: FakeBreach, restart: bool = false) 
 		breach.time = start - 0.05 - volley
 		breach.firewall = firewall
 		# As measured: the last hit shows in full, it is not cut to what the bar had left.
-		breach.breached = breached
+		breach.breached = minf(breached, breach.max_breach) if breach is ActingBreach and breach.cut_hits else breached
 		game.Signals.tick.emit()
 		if breached >= breach.max_breach:
 			breach.time -= 0.05
@@ -1467,6 +1469,51 @@ func _test_descent_in_observer() -> void:
 	_check(_count("action_refused") == 0, "without any refusal: %s" % _last("action_refused"))
 	_check(_count("regulation_stopped") == 0, "a failing level is not an anomaly")
 	_check(_count("outcome=verified") == 1, "it is verified: %s" % _last("action_verification"))
+	observer.stop()
+	observer.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(MARKER_PATH)
+	await _remove_fake_game(game)
+
+
+## Seen in the game: at level 0 a hit of 53 shows as 20, the size of the bar, and held the node at level 2.
+func _test_cut_hits() -> void:
+	var classifier := Classifier.new()
+	classifier.observe(_sample())
+	classifier.observe(_sample({"time": 9.95, "detected": true, "firewall": 0.0, "max_firewall": 20.0, "max_breach": 20.0}))
+	var cut: Dictionary = classifier.on_breached(_sample({"time": 9.0, "detected": true, "firewall": 0.0, "max_firewall": 20.0, "breached": 20.0, "max_breach": 20.0}))[0]
+	_check(not cut.has("low_hit") and cut.max_hit == 20.0, "a hit that empties the bar does not count as the lowest: %s" % str(cut.get("low_hit", "none")))
+	var whole := Classifier.new()
+	whole.observe(_sample())
+	whole.observe(_sample({"time": 9.95, "detected": true, "firewall": 0.0, "max_firewall": 20.0, "max_breach": 100.0}))
+	whole.observe(_sample({"time": 8.95, "detected": true, "firewall": 0.0, "max_firewall": 20.0, "breached": 53.0, "max_breach": 100.0}))
+	var seen: Dictionary = whole.on_breached(_sample({"time": 7.95, "detected": true, "firewall": 0.0, "max_firewall": 20.0, "breached": 100.0, "max_breach": 100.0}))[0]
+	_check(seen.low_hit == 53.0, "a hit that does not empty it does: %s" % str(seen.get("low_hit", "none")))
+
+	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
+	DirAccess.remove_absolute(MARKER_PATH)
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var government := ActingBreach.new()
+	government.window = "breach_government"
+	government.fixed_time = 6.0
+	game.desktop.windows.add_child(government)
+	government.breach_damage.production = 87.0
+	government.true_hit = 53.0
+	government.cut_hits = true
+	government.infection_damage.production = 0.0
+	government.data.level = 0.0
+	government._rearm()
+	var observer := TrialObserver.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	game.Signals.tick.emit()
+	for attack: int in 12:
+		await _play_volleys(game, government)
+	_check(government.data.level >= 4.0, "from level 0, cut hits do not hold it low: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	_check(_count("regulation_stopped") == 0, "and nothing stops: %s" % _last("regulation_stopped"))
 	observer.stop()
 	observer.queue_free()
 	await process_frame

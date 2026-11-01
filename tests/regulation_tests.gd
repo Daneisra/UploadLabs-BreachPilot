@@ -28,6 +28,7 @@ func run(check: Callable) -> void:
 	_test_certain_raises()
 	_test_observed_hits()
 	_test_failures_in_row()
+	_test_probes()
 	_test_game_load()
 	_test_pauses()
 
@@ -631,6 +632,74 @@ func _test_failures_in_row() -> void:
 	for i: int in 5:
 		cut.advance(4.0)
 		_check(cut.on_attack({"event": "failure_power", "complete": false, "level": 8, "max_level": 9, "signature": "s"}, _reliable(0.0), {}).decision == "hold", "nor does an incomplete failure")
+
+
+func _test_probes() -> void:
+	var trying := Regulator.new("balanced")
+	var doubtful := {"status": "uncertain"}
+	var attack := {"event": "success", "complete": true, "level": 7, "max_level": 9, "signature": "s", "probe_possible": true}
+	var first := trying.on_attack(attack, {}, doubtful)
+	_check(first.reason == "stabilizing", "a try waits for the stabilization")
+	trying.advance(5.0)
+	_check(trying.on_attack(attack, {}, doubtful).decision == "hold", "and for two successes")
+	trying.advance(5.0)
+	var tried := trying.on_attack(attack, {}, doubtful)
+	_check(tried.decision == "raise" and tried.probe and tried.assumed_level == 8 and not tried.certain, "then it tries a level that may work: %s" % str(tried))
+	trying.on_level_changed(8)
+	trying.advance(5.0)
+	var fails := trying.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s"}, doubtful, {})
+	_check(fails.decision == "hold", "one failure does not end it")
+	trying.advance(5.0)
+	var back := trying.on_attack({"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s"}, doubtful, {})
+	_check(back.decision == "lower" and back.assumed_level == 7, "two do")
+	trying.on_level_changed(7)
+	var later := {"event": "success", "complete": true, "level": 7, "max_level": 9, "signature": "s", "probe_possible": true}
+	for i: int in 3:
+		trying.advance(5.0)
+		trying.on_attack(later, {}, doubtful)
+	trying.advance(5.0)
+	_check(trying.on_attack(later, {}, doubtful).reason == "level_blocked", "it waits before trying that level again")
+	trying.advance(400.0)
+	_check(trying.on_attack(later, {}, doubtful).probe, "and then tries again")
+
+	var repeat := Regulator.new("balanced")
+	var frozen := false
+	var up := {"event": "success", "complete": true, "level": 7, "max_level": 9, "signature": "s", "probe_possible": true}
+	var down := {"event": "failure_power", "complete": true, "level": 8, "max_level": 9, "signature": "s"}
+	for round_index: int in 12:
+		repeat.on_level_changed(7)
+		for i: int in 4:
+			repeat.advance(4000.0 if i == 0 else 5.0)
+			frozen = frozen or repeat.on_attack(up, {}, doubtful).reason.begins_with("frozen")
+		repeat.on_level_changed(8)
+		for i: int in 2:
+			repeat.advance(5.0)
+			frozen = frozen or repeat.on_attack(down, doubtful, {}).reason.begins_with("frozen")
+	_check(not frozen, "repeated tries do not freeze the regulator")
+
+	var careful := Regulator.new("conservative")
+	var none: Array[Dictionary] = []
+	for i: int in 30:
+		careful.advance(70.0)
+		none.append(careful.on_attack(attack, {}, doubtful))
+	_check(_kinds(none, "raise") == 0, "the conservative profile never tries")
+	var no_hope := Regulator.new("balanced")
+	var none_either: Array[Dictionary] = []
+	for i: int in 30:
+		no_hope.advance(70.0)
+		none_either.append(no_hope.on_attack({"event": "success", "complete": true, "level": 7, "max_level": 9, "signature": "s", "probe_possible": false}, {}, _reliable(0.0)))
+	_check(_kinds(none_either, "raise") == 0, "a level with no chance is not tried")
+	var at_top := Regulator.new("balanced")
+	var top_list: Array[Dictionary] = []
+	for i: int in 10:
+		at_top.advance(70.0)
+		top_list.append(at_top.on_attack({"event": "success", "complete": true, "level": 9, "max_level": 9, "signature": "s", "probe_possible": true}, {}, doubtful))
+	_check(_kinds(top_list, "raise") == 0, "nor above the game's maximum")
+
+	# The unseen hit: nothing to count on, so the announced figure stands, and it says so.
+	var unseen := _profile({"damage_rate": 87.3867})
+	PowerProfile.apply_observed_hits(unseen, -1.0, 20.0)
+	_check(unseen.hits_unseen and is_equal_approx(unseen.damage_rate, 87.3867), "without an uncut hit, the announced figure stands")
 
 
 func _test_game_load() -> void:

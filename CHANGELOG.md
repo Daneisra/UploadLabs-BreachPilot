@@ -1,14 +1,22 @@
 # Changelog
 
-## 0.2.0-dev.1 – en cours : régulation rapide
+## 0.2.0-dev.2 – en cours : régulation rapide
 
 **Le code du dépôt ne peut toujours changer aucun niveau.** Testé en simulation seulement.
+
+### Corrigé
+
+- Un coup coupé à la taille de la barre ne compte plus comme le coup le plus faible. Il bloquait le nœud au niveau 2 après un départ au niveau 0.
+
+### Ajouté
+
+- Essais : en profil équilibré ou agressif, le mod essaie aussi un niveau qui peut réussir. Il y reste si cela réussit, redescend sinon et attend avant de réessayer.
 
 ### Modifié
 
 - Le mod va directement au meilleur niveau, en une seule action, vers le haut comme vers le bas.
 - Une baisse se fait dès le premier échec si la prévision l'annonçait et qu'aucune réussite n'a été vue à ce niveau.
-- Stabilisation réduite à 1 attaque, 3 comparaisons pour le modèle d'infection, 1 attaque de vérification pour toute action certaine et toute baisse.
+- Stabilisation réduite à 1 attaque, 1 comparaison pour le modèle d'infection, 1 attaque de vérification pour toute action certaine et toute baisse.
 
 ## 0.2.0-beta.1 – 2026-11-01 : actionneur, essais actifs et pause sur le nœud
 
