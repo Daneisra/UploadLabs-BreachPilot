@@ -1,14 +1,24 @@
 extends RefCounted
 ## Compares ways of connecting the hacking chain. Pure calculations on the values read by HackingChain:
-## nothing here touches the game. Damage counts on normal hits, like the regulation: critical hits
-## can only do better than what is shown.
+## nothing here touches the game. Attacks are drawn at random with the game's critical hits, because
+## at the limit a level often only works thanks to them, and XP doubles with each level.
 
-const BreachForecast := preload("../threat_manager/breach_forecast.gd")
-
-## Time from the end of an attack to the start of the next, as measured on most attacks.
-const ATTACK_GAP := 1.0
 const NORMAL_TICK := 0.05
-const EPSILON := 1e-6
+## Time from the end of an attack to the start of the next: measured 0.65 and 0.77 s on the longest runs.
+const ATTACK_GAP := 0.7
+const SAMPLES := 150
+const EARLY_SAMPLES := 30
+## From this chance on, the regulation holds a level long enough for it to count. Two failures in a row lower it.
+const MIN_HOLD := 0.8
+## An elite level can fail between two that work, but not two levels in a row.
+const FAILED_IN_ROW_STOP := 2
+const SEED := 20261101
+## How late the infection starts, in intervals. The lag is fitted on the logs: it gives 50 % for the 48 and 47 %
+## measured over 40 attacks at the limit, and 4.59 s for the 4.59 s measured over 225 attacks. The logs show
+## an extra 0.35 in about one attack in seven.
+const INFECTION_LAG := 0.25
+const LATE_INFECTION := 0.35
+const LATE_INFECTION_CHANCE := 0.15
 ## How far from the announced value the chain can be before its rules are said not to apply.
 const CHAIN_TOLERANCE := 0.05
 
@@ -30,6 +40,10 @@ func scenarios() -> Array[Dictionary]:
 		for infection: Array in infection_sets:
 			list.append({"payload": payload, "infection": infection})
 	return list
+
+
+func current_scenario() -> Dictionary:
+	return {"payload": _chain.current.payload, "infection": _chain.current.infection}
 
 
 func is_current(scenario: Dictionary) -> bool:
@@ -69,50 +83,94 @@ func evaluate(scenario: Dictionary) -> Dictionary:
 	return row
 
 
-## Above the highest unlocked level, a level only opens once the one before it works.
+## The highest level likely to hold. Above the highest unlocked level, one only opens once the one before it works.
 func _best_level(type: String, hit: float, stack: float) -> Dictionary:
 	var key := "%s|%s|%s" % [type, hit, stack]
 	if _results.has(key):
 		return _results[key]
 	var target: Dictionary = _chain.targets[type]
-	var best := {"level": -1, "used": -1.0, "reward_rate": 0.0, "xp_rate": 0.0, "hit": hit, "stack": stack, "invalid": false}
-	if hit > 0.0 or stack > 0.0:
-		var profile := {
-			"damage_rate": hit / _chain.interval,
-			"infection_rate": stack / _chain.interval,
-			"vulnerability": target.vulnerability,
-			"breach_variation": target.breach_variation,
-			"infection_variation": target.infection_variation,
-			"interval": _chain.interval,
-			"tick_speed": NORMAL_TICK,
-			"infection_offset": -1.0,
-			"hit_spread": _chain.has_crit,
-		}
+	var best := {"level": -1, "chance": 0.0, "used": -1.0, "reward_rate": 0.0, "xp_rate": 0.0, "hit": hit, "stack": stack, "invalid": false}
+	if target.vulnerability > 0.0 or target.breach_variation != 0 or target.infection_variation != 0:
+		# Stealth, growing infection and vulnerability have never been measured: no figure rather than a wrong one.
+		best.invalid = true
+	elif hit > 0.0 or stack > 0.0:
 		var levels: Array = target.levels.keys()
 		levels.sort()
+		var failed_in_row := 0
 		for level: int in levels:
 			var values: Dictionary = target.levels[level]
-			var forecast := BreachForecast.forecast(profile, values, _chain.margin)
-			if forecast.status == "invalid":
-				best.invalid = true
-				break
-			if _passes(forecast):
-				var used: float = forecast.used_max if forecast.used_max >= 0.0 else forecast.used_nominal
-				var cycle: float = used + ATTACK_GAP
+			var outcome := attack_outcome(values, hit, stack)
+			if outcome.chance >= MIN_HOLD:
+				failed_in_row = 0
+				var time: float = values.time * _chain.time_factor
+				var cycle: float = outcome.chance * outcome.used + (1.0 - outcome.chance) * time + ATTACK_GAP
 				best.level = level
-				best.used = used
-				best.reward_rate = values.reward / cycle * 60.0
-				best.xp_rate = values.xp / cycle * 60.0
-			elif level > target.max_level:
-				break
+				best.chance = outcome.chance
+				best.used = outcome.used
+				best.reward_rate = outcome.chance * values.reward / cycle * 60.0
+				best.xp_rate = outcome.chance * values.xp / cycle * 60.0
+			else:
+				failed_in_row += 1
+				if level > target.max_level or failed_in_row >= FAILED_IN_ROW_STOP:
+					break
 	_results[key] = best
 	return best
 
 
-func _passes(forecast: Dictionary) -> bool:
-	if forecast.status != "reliable" or forecast.outcome != "pass" and forecast.outcome != "mixed":
-		return false
-	return forecast.p_success >= _chain.required_success - EPSILON
+## chance of success and average duration of the attacks that succeed. The same seed gives two
+## scenarios the same luck, so that a small gap between them is not just noise.
+func attack_outcome(values: Dictionary, hit: float, stack: float) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var time: float = values.time * _chain.time_factor
+	var successes := 0
+	var total_used := 0.0
+	var samples := 0
+	while samples < SAMPLES:
+		samples += 1
+		var used := _attack(rng, values.firewall, values.breach, time, hit, stack)
+		if used >= 0.0:
+			successes += 1
+			total_used += used
+		if samples == EARLY_SAMPLES and successes == 0:
+			break
+	return {"chance": float(successes) / samples, "used": total_used / successes if successes > 0 else -1.0}
+
+
+## One attack, tick by tick, as BreachForecast.attack_time, with whole random hits and critical hits.
+func _attack(rng: RandomNumberGenerator, firewall: float, breach: float, max_time: float, hit: float, stack_gain: float) -> float:
+	var interval: float = _chain.interval
+	var next_volley := 0.0
+	var next_pulse: float = (INFECTION_LAG + (LATE_INFECTION if rng.randf() < LATE_INFECTION_CHANCE else 0.0)) * interval
+	var stack := 0.0
+	var time := 0.0
+	while time < max_time:
+		var volley := 0.0
+		while time >= next_volley - 1e-9:
+			if hit > 0.0:
+				volley += _whole(rng, hit) * (1.0 + _chain.crit_multiplier if rng.randf() < _chain.crit_chance else 1.0)
+			next_volley += interval
+		while time >= next_pulse - 1e-9:
+			if stack_gain > 0.0:
+				stack += _whole(rng, stack_gain)
+			next_pulse += interval
+		var over_time := stack * NORMAL_TICK
+		if firewall > 0.0:
+			firewall = maxf(firewall - volley, 0.0)
+			volley = 0.0
+		if firewall > 0.0:
+			firewall = maxf(firewall - over_time, 0.0)
+			over_time = 0.0
+		breach -= volley + over_time
+		if breach <= 0.0:
+			return time
+		time += NORMAL_TICK
+	return -1.0
+
+
+func _whole(rng: RandomNumberGenerator, value: float) -> float:
+	var low := floorf(value)
+	return low + 1.0 if rng.randf() < value - low else low
 
 
 func _subsets(types: Array, with_empty: bool) -> Array:

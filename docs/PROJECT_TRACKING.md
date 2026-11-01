@@ -25,7 +25,8 @@ Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule,
 | Récompenses et XP par niveau | Oui : `cur_reward`, `cur_experience` ; `get_reward` et `get_experience_reward` à comparer en jeu | Accord des deux au niveau courant |
 | Puissance partagée | Oui : partage égal entre les sorties. 231,1 donne 115,55, × 1,1 pour le lanceur (127,11), × 0,5 pour l'infection (57,78) | Rien |
 | Branchements de la chaîne | Oui : `id`, `input_id`, `outputs_id` et `production` sur chaque conteneur | Rien |
-| Coût et effet des améliorations | Probable : `Data.upgrades` donne coût et attributs, `Globals.upgrades` les niveaux | Relevé détaillé des `hack_*` |
+| Coût et effet des améliorations | Oui : `Data.upgrades` et `Data.perks` donnent coût et effets, `Globals` les niveaux, `Attributes` les valeurs | Rien |
+| Coups critiques | Oui : `breach_critical_chance` 0,1 et `breach_critical_multiplier` 1,5, soit 2,5 fois le coup normal (63 et 159 mesurés) | Rien |
 
 **Jalons :**
 
@@ -35,6 +36,8 @@ Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule,
 4. Si le relevé le permet : priorité des améliorations, par coût et gain réel.
 
 Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte ce qu'il retire au lanceur.
+
+**Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Jérémy, corrigés.
 
 ## Décisions
 

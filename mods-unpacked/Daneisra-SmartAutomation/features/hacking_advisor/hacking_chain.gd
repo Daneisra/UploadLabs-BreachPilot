@@ -10,7 +10,7 @@ const LEVELS_AHEAD := 4
 
 
 ## error is empty when the chain can be compared. intervals gives the attack interval seen for each type.
-static func read(desktop: Variant, intervals: Dictionary, margin: float, required_success: float) -> Dictionary:
+static func read(desktop: Variant, intervals: Dictionary, attributes: Variant) -> Dictionary:
 	if not is_instance_valid(desktop) or not is_instance_valid(desktop.get("windows")):
 		return {"error": "no_desktop"}
 	var by_type := {}
@@ -47,8 +47,9 @@ static func read(desktop: Variant, intervals: Dictionary, margin: float, require
 		"has_crit": critical != null,
 		"crit_factor": 1.0,
 		"other_consumers": maxi(outputs.size() - fed, 0),
-		"margin": margin,
-		"required_success": required_success,
+		"crit_chance": 0.0,
+		"crit_multiplier": 0.0,
+		"time_factor": 1.0,
 		"interval": 0.0,
 		"targets": {},
 		"current": {"payload": [], "infection": []},
@@ -56,6 +57,13 @@ static func read(desktop: Variant, intervals: Dictionary, margin: float, require
 	}
 	if critical != null and critical.payload_in.production > 0.0:
 		chain.crit_factor = float(critical.payload_out.production / critical.payload_in.production)
+	if critical != null:
+		var table: Variant = attributes.get("attributes") if is_instance_valid(attributes) else null
+		if table is Dictionary and table.has("breach_critical_chance") and table.has("breach_critical_multiplier"):
+			chain.crit_chance = float(table.breach_critical_chance.value)
+			chain.crit_multiplier = float(table.breach_critical_multiplier.value)
+		else:
+			problems.append("crit_unknown")
 
 	for type: String in TARGET_LABELS:
 		for window: Node in by_type.get(type, []):

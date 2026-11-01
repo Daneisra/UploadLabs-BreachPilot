@@ -1,8 +1,10 @@
 extends Node
-## Ctrl+Alt+F8: compares the ways of connecting the hacking chain. Read-only: the player decides.
+## Ctrl+Alt+F8: compares the ways of connecting the hacking chain, and what each purchase would bring.
+## Read-only: the player decides.
 
 const HackingChain := preload("hacking_chain.gd")
 const HackingModel := preload("hacking_model.gd")
+const HackingUpgrades := preload("hacking_upgrades.gd")
 const AdvisorPanel := preload("advisor_panel.gd")
 
 const ERROR_TEXTS := {
@@ -12,23 +14,23 @@ const ERROR_TEXTS := {
 	"no_payload": "Aucune cible ne reçoit de Payload : rien à comparer pour l'instant.",
 	"no_attack_seen": "Le mod n'a pas encore vu d'attaque : réessayez dans quelques secondes.",
 }
+const REWARD_NAMES := {"breach_corps": "Données", "breach_government": "Renseign."}
+const SHORT_NAMES := {"breach_corps": "E", "breach_government": "G", "breach_bank": "B", "breach_anonymous": "A"}
 
 var _log: Variant
 var _observer: Variant
-var _margin := 0.1
-var _required_success := 0.99
 var _panel: AdvisorPanel
 var _chain: Dictionary
 var _model: HackingModel
 var _pending: Array[Dictionary] = []
 var _rows: Array[Dictionary] = []
+var _upgrades: Array[Dictionary] = []
+var _upgrade_rows: Array[Dictionary] = []
 
 
-func configure(logger: Variant, observer: Variant, margin: float, required_success: float) -> void:
+func configure(logger: Variant, observer: Variant) -> void:
 	_log = logger
 	_observer = observer
-	_margin = margin
-	_required_success = required_success
 
 
 func _ready() -> void:
@@ -43,8 +45,8 @@ func toggle() -> void:
 		_panel.visible = false
 		return
 	_panel.show_message("Calcul en cours…")
-	var desktop: Variant = get_tree().root.get_node("Globals").desktop
-	_chain = HackingChain.read(desktop, _observer.attack_intervals(), _margin, _required_success)
+	var root := get_tree().root
+	_chain = HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), root.get_node("Attributes"))
 	if _chain.error != "":
 		_log.info("advisor_compare result=%s" % _chain.error)
 		_panel.show_message(ERROR_TEXTS.get(_chain.error, _chain.error))
@@ -52,119 +54,168 @@ func toggle() -> void:
 	_model = HackingModel.new(_chain)
 	_pending = _model.scenarios()
 	_rows = []
+	_upgrades = HackingUpgrades.read(root)
+	_upgrade_rows = []
 	set_process(true)
 
 
-## One scenario per frame: the game must not stutter for a panel.
+## One calculation per frame: the game must not stutter for a panel.
 func _process(_delta: float) -> void:
 	if not _panel.visible:
 		set_process(false)
 		return
-	_rows.append(_model.evaluate(_pending.pop_back()))
 	if not _pending.is_empty():
+		_rows.append(_model.evaluate(_pending.pop_back()))
+		return
+	if _upgrade_rows.size() < _upgrades.size():
+		var upgrade: Dictionary = _upgrades[_upgrade_rows.size()]
+		var model := HackingModel.new(HackingUpgrades.apply(_chain, upgrade.changes))
+		_upgrade_rows.append({"upgrade": upgrade, "row": model.evaluate(_model.current_scenario())})
 		return
 	set_process(false)
 	_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.xp_rate > b.xp_rate)
 	var problems := _model.chain_problems()
-	_log_rows(_chain, _rows, problems)
-	_show(_chain, _rows, problems)
+	var current := _model.evaluate(_model.current_scenario())
+	_upgrade_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _gain_per_cost(a, current) > _gain_per_cost(b, current))
+	_log_rows(current, problems)
+	_show(current, problems)
 
 
-func _show(chain: Dictionary, rows: Array[Dictionary], problems: PackedStringArray) -> void:
-	var types: Array = chain.targets.keys()
-	var table: Array = []
-	var kinds: Array = []
-	var header := ["Payload vers", "Infection vers"]
+func _show(current: Dictionary, problems: PackedStringArray) -> void:
+	var types: Array = _chain.targets.keys()
+	var header := ["", "Payload vers", "Infection vers"]
 	for type: String in types:
-		header.append(chain.targets[type].label)
+		header.append(_chain.targets[type].label)
 	header.append("XP/min")
 	for type: String in types:
-		header.append("Gains %s/min" % chain.targets[type].label)
-	table.append(header)
-	kinds.append("header")
-
-	for index: int in rows.size():
-		var row: Dictionary = rows[index]
-		var cells := [_names(chain, row.scenario.payload), _names(chain, row.scenario.infection)]
+		header.append("%s/min" % REWARD_NAMES.get(type, _chain.targets[type].label))
+	var table: Array = [header]
+	var kinds: Array = ["header"]
+	for picked: Dictionary in _picked_rows(current, types):
+		var row: Dictionary = picked.row
+		var cells := [picked.label, _names(row.scenario.payload), _names(row.scenario.infection)]
 		for type: String in types:
 			cells.append(_level_text(row.targets[type]))
-		cells.append(_number(row.xp_rate))
+		cells.append(_with_change(row.xp_rate, current.xp_rate, picked.kind == "current"))
 		for type: String in types:
-			cells.append(_number(row.targets[type].reward_rate))
+			cells.append(_with_change(row.targets[type].reward_rate, current.targets[type].reward_rate, picked.kind == "current"))
 		table.append(cells)
-		kinds.append("current" if row.current else ("best" if index == 0 else ""))
-	_panel.show_table(_summary(chain, rows[0], _current_row(rows), problems), table, kinds, _note(chain))
+		kinds.append(picked.kind)
+
+	var upgrade_table: Array = [["Achat", "Coût", "Niveaux", "XP/min", "Gain XP"]]
+	var upgrade_kinds: Array = ["header"]
+	for item: Dictionary in _upgrade_rows:
+		var levels := PackedStringArray()
+		for type: String in types:
+			levels.append("%s %d" % [SHORT_NAMES[type], item.row.targets[type].level])
+		upgrade_table.append([item.upgrade.name, item.upgrade.cost_text, ", ".join(levels), _number(item.row.xp_rate), _percent(item.row.xp_rate, current.xp_rate)])
+		upgrade_kinds.append("" if item.upgrade.affordable else "muted")
+
+	_panel.show_tables(_summary(current, problems), table, kinds, upgrade_table, upgrade_kinds, _note())
 
 
-func _summary(chain: Dictionary, best: Dictionary, current: Variant, problems: PackedStringArray) -> String:
+## The player's connections, then the best for each thing a chain can bring. One row can win several titles.
+func _picked_rows(current: Dictionary, types: Array) -> Array[Dictionary]:
+	var picked: Array[Dictionary] = [{"label": "Actuel", "kind": "current", "row": current}]
+	var titles: Array = [["Meilleur XP", func(row: Dictionary) -> float: return row.xp_rate]]
+	for type: String in types:
+		var name: String = REWARD_NAMES.get(type, _chain.targets[type].label)
+		titles.append(["Meilleur %s" % name, func(row: Dictionary) -> float: return row.targets[type].reward_rate])
+	for title: Array in titles:
+		var best: Dictionary = _rows[0]
+		for row: Dictionary in _rows:
+			if title[1].call(row) > title[1].call(best):
+				best = row
+		if _model.is_current(best.scenario):
+			picked[0].label += ", " + title[0].to_lower()
+			continue
+		var found := false
+		for entry: Dictionary in picked:
+			if entry.row.scenario == best.scenario:
+				entry.label += ", " + title[0].to_lower()
+				found = true
+		if not found:
+			picked.append({"label": title[0], "kind": "best" if picked.size() == 1 else "", "row": best})
+	return picked
+
+
+func _summary(current: Dictionary, problems: PackedStringArray) -> String:
 	var lines := PackedStringArray()
 	if not problems.is_empty():
-		lines.append("Attention : votre chaîne ne suit pas tout à fait les règles mesurées (%s). Les chiffres sont à prendre avec prudence." % ", ".join(problems))
-	if current == null:
-		lines.append("Votre branchement actuel ne figure pas parmi ces scénarios.")
-	elif best == current:
+		lines.append("Attention : votre chaîne ne suit pas les règles mesurées (%s). Chiffres à prendre avec prudence." % ", ".join(problems))
+	var best: Dictionary = _rows[0]
+	if _model.is_current(best.scenario):
 		lines.append("Votre branchement est déjà le meilleur pour l'XP.")
 	else:
-		var parts := PackedStringArray()
-		if current.xp_rate > 0.0:
-			parts.append("XP %s" % _change(best.xp_rate, current.xp_rate))
-		for type: String in chain.targets:
-			if current.targets[type].reward_rate > 0.0:
-				parts.append("%s %s" % [chain.targets[type].label, _change(best.targets[type].reward_rate, current.targets[type].reward_rate)])
-		lines.append("Meilleur pour l'XP : Payload vers %s, infection vers %s (%s)." % [_names(chain, best.scenario.payload), _names(chain, best.scenario.infection), ", ".join(parts)])
+		lines.append("Pour plus d'XP : Payload vers %s, infection vers %s (%s XP)." % [_names(best.scenario.payload), _names(best.scenario.infection), _percent(best.xp_rate, current.xp_rate)])
+	for item: Dictionary in _upgrade_rows:
+		if item.upgrade.affordable and item.row.xp_rate > current.xp_rate:
+			lines.append("Achat le plus rentable, sur votre branchement : %s (%s, %s XP)." % [item.upgrade.name, item.upgrade.cost_text, _percent(item.row.xp_rate, current.xp_rate)])
+			break
 	return "\n".join(lines)
 
 
-func _note(chain: Dictionary) -> String:
+func _note() -> String:
 	var levels := PackedStringArray()
-	for type: String in chain.targets:
-		levels.append("%s %d/%d" % [chain.targets[type].label, chain.targets[type].level, chain.targets[type].max_level])
-	return "Niveaux réels : %s. En bleu : votre branchement. En vert : le meilleur pour l'XP.\nEstimations prudentes, avec les coups normaux : les coups critiques et les essais de niveau peuvent faire mieux. « aucune » pour l'infection suppose aussi de la débrancher de l'Interface, ce qui rend sa puissance au Lanceur." % ", ".join(levels)
+	for type: String in _chain.targets:
+		levels.append("%s %d/%d" % [_chain.targets[type].label, _chain.targets[type].level, _chain.targets[type].max_level])
+	return "Niveaux réels : %s. Estimations : attaques tirées au hasard avec les critiques du jeu. Le pourcentage est la chance de réussir une attaque. Infection vers « aucune » suppose de la débrancher aussi de l'Interface, ce qui rend sa puissance au Lanceur." % ", ".join(levels)
 
 
-func _current_row(rows: Array[Dictionary]) -> Variant:
-	for row: Dictionary in rows:
-		if row.current:
-			return row
-	return null
+func _gain_per_cost(item: Dictionary, current: Dictionary) -> float:
+	if not item.upgrade.affordable or item.upgrade.cost <= 0.0:
+		return -1.0
+	return (item.row.xp_rate - current.xp_rate) / item.upgrade.cost
 
 
-func _names(chain: Dictionary, types: Array) -> String:
+func _names(types: Array) -> String:
 	if types.is_empty():
 		return "aucune"
 	var names := PackedStringArray()
 	for type: String in types:
-		names.append(chain.targets[type].label)
+		names.append(_chain.targets[type].label)
 	return " + ".join(names)
 
 
 func _level_text(target: Dictionary) -> String:
 	if target.invalid:
-		return "non calculable"
+		return "non mesuré"
 	if target.level < 0:
 		return "–"
-	return "niv. %d, %.1f s" % [target.level, target.used]
+	return "niv. %d, %d %%" % [target.level, roundi(target.chance * 100.0)]
 
 
-func _change(value: float, reference: float) -> String:
+func _with_change(value: float, reference: float, is_reference: bool) -> String:
+	if is_reference or reference <= 0.0:
+		return _number(value)
+	return "%s (%s)" % [_number(value), _percent(value, reference)]
+
+
+func _percent(value: float, reference: float) -> String:
+	if reference <= 0.0:
+		return "–"
 	return "%+d %%" % roundi((value / reference - 1.0) * 100.0)
 
 
 func _number(value: float) -> String:
-	if value >= 10000.0:
-		return "%.1fk" % (value / 1000.0)
-	return "%d" % roundi(value)
+	var whole := roundi(value)
+	if whole < 1000:
+		return str(whole)
+	return "%d %03d" % [whole / 1000, whole % 1000]
 
 
-func _log_rows(chain: Dictionary, rows: Array[Dictionary], problems: PackedStringArray) -> void:
-	_log.info("advisor_compare result=ok power=%s launcher_ratio=%s infection_ratio=%s crit_factor=%s others=%d interval=%s problems=%s" % [chain.power, chain.launcher_ratio, chain.infection_ratio, chain.crit_factor, chain.other_consumers, chain.interval, ",".join(problems)])
-	for type: String in chain.targets:
-		var target: Dictionary = chain.targets[type]
-		var at_level: Dictionary = target.levels[target.level]
-		_log.info("advisor_target type=%s level=%d max_level=%d reward=%s cur_reward=%s xp=%s cur_xp=%s" % [type, target.level, target.max_level, at_level.reward, target.cur_reward, at_level.xp, target.cur_experience])
-	for row: Dictionary in rows:
-		var parts := PackedStringArray()
-		for type: String in row.targets:
-			var target: Dictionary = row.targets[type]
-			parts.append("%s=%d/%.2fs/%.0f" % [type, target.level, target.used, target.reward_rate])
-		_log.info("advisor_row current=%s payload=%s infection=%s xp_rate=%.0f %s" % [row.current, ",".join(row.scenario.payload), ",".join(row.scenario.infection), row.xp_rate, " ".join(parts)])
+func _log_rows(current: Dictionary, problems: PackedStringArray) -> void:
+	_log.info("advisor_compare result=ok power=%s launcher_ratio=%s infection_ratio=%s crit=%s/%s others=%d interval=%s problems=%s" % [_chain.power, _chain.launcher_ratio, _chain.infection_ratio, _chain.crit_chance, _chain.crit_multiplier, _chain.other_consumers, _chain.interval, ",".join(problems)])
+	for row: Dictionary in _rows:
+		_log.info("advisor_row current=%s payload=%s infection=%s %s" % [row.current, ",".join(row.scenario.payload), ",".join(row.scenario.infection), _row_text(row)])
+	for item: Dictionary in _upgrade_rows:
+		_log.info("advisor_upgrade name=%s cost=%s affordable=%s %s" % [item.upgrade.name, item.upgrade.cost, item.upgrade.affordable, _row_text(item.row)])
+	_log.info("advisor_current %s" % _row_text(current))
+
+
+func _row_text(row: Dictionary) -> String:
+	var parts := PackedStringArray(["xp_rate=%.0f" % row.xp_rate])
+	for type: String in row.targets:
+		var target: Dictionary = row.targets[type]
+		parts.append("%s=%d/%.2f/%.2fs/%.0f" % [type, target.level, target.chance, target.used, target.reward_rate])
+	return " ".join(parts)

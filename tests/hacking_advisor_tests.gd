@@ -5,6 +5,7 @@ extends RefCounted
 const ADVISOR := "res://mods-unpacked/Daneisra-SmartAutomation/features/hacking_advisor/"
 const HackingModel := preload(ADVISOR + "hacking_model.gd")
 const HackingChain := preload(ADVISOR + "hacking_chain.gd")
+const HackingUpgrades := preload(ADVISOR + "hacking_upgrades.gd")
 
 var _check: Callable
 
@@ -62,6 +63,8 @@ func run(check: Callable) -> void:
 	_test_scenarios()
 	_test_power_split()
 	_test_levels()
+	_test_upgrades()
+	_test_upgrade_table()
 	_test_problems()
 	_test_reader()
 
@@ -85,7 +88,7 @@ func _target(label: String, firewall: float, breach: float, payload: float, infe
 func _chain() -> Dictionary:
 	return {
 		"error": "", "power": 231.1, "launcher_ratio": 1.1, "has_infection": true, "infection_ratio": 0.5,
-		"has_crit": true, "crit_factor": 1.65, "other_consumers": 0, "margin": 0.1, "required_success": 0.99, "interval": 1.0,
+		"has_crit": true, "crit_factor": 1.65, "crit_chance": 0.1, "crit_multiplier": 1.5, "time_factor": 1.0, "other_consumers": 0, "interval": 1.0,
 		"targets": {
 			"breach_corps": _target("Entreprises", 137.0, 546.0, 104.86, 28.89),
 			"breach_government": _target("Gouvernement", 341.5, 341.5, 104.86, 28.89),
@@ -128,12 +131,30 @@ func _test_power_split() -> void:
 
 
 func _test_levels() -> void:
+	var both := {"payload": ["breach_corps", "breach_government"], "infection": ["breach_corps", "breach_government"]}
+	var shared := HackingModel.new(_chain()).evaluate(both)
+	_check.call(shared.targets.breach_government.level == 7, "Government holds level 7 with half the infection, as measured")
+	_check.call(shared.targets.breach_corps.level == 7, "Corps holds level 7 with half the infection, as measured")
+	_check.call(shared.targets.breach_government.used >= 4.0 and shared.targets.breach_government.used <= 5.2, "the duration stays near the 4.6 s measured")
+	_check.call(absf(shared.xp_rate - 2926.0) / 2926.0 < 0.15, "the XP rate stays near the 2926 per minute measured at 7 and 7")
+
+	# Measured over 461 and 21 and 19 attacks: 98 %, 48 % and 47 %.
 	var model := HackingModel.new(_chain())
-	var shared := model.evaluate({"payload": ["breach_corps", "breach_government"], "infection": ["breach_corps", "breach_government"]})
-	var government: Dictionary = shared.targets.breach_government
-	_check.call(government.level == 7, "Government level 7 is reachable, as measured")
-	_check.call(government.used >= 4.0 and government.used <= 5.4, "the duration stays near the 4.65 s measured")
-	_check.call(government.xp_rate > 0.0 and government.reward_rate > 0.0, "rates come out of the chosen level")
+	var corps: Dictionary = _chain().targets.breach_corps
+	var government: Dictionary = _chain().targets.breach_government
+	_check.call(model.attack_outcome(corps.levels[9], 63.55, 57.78).chance >= 0.85, "Corps level 9 with the whole infection mostly succeeds, as measured")
+	_check.call(absf(model.attack_outcome(corps.levels[8], 63.55, 28.89).chance - 0.48) < 0.2, "Corps level 8 with half the infection is a coin toss, as measured")
+	_check.call(absf(model.attack_outcome(government.levels[8], 63.55, 28.89).chance - 0.47) < 0.2, "Government level 8 with half the infection is a coin toss, as measured")
+	_check.call(model.attack_outcome(corps.levels[9], 63.55, 28.89).chance < 0.3, "Corps level 9 with half the infection fails, as measured")
+
+	var corps_only := HackingModel.new(_chain()).evaluate({"payload": ["breach_corps", "breach_government"], "infection": ["breach_corps"]})
+	_check.call(corps_only.targets.breach_corps.level == 9, "Corps holds level 9 with the whole infection, as measured")
+	_check.call(absf(corps_only.targets.breach_corps.xp_rate - 4655.0) / 4655.0 < 0.2, "the XP rate stays near the 4655 per minute measured at level 9")
+
+	var no_crit := _chain()
+	no_crit.crit_chance = 0.0
+	var plain := HackingModel.new(no_crit)
+	_check.call(plain.attack_outcome(corps.levels[8], 63.55, 28.89).chance < model.attack_outcome(corps.levels[8], 63.55, 28.89).chance, "critical hits make a level at the limit easier")
 
 	var locked := _chain()
 	locked.targets.breach_government.max_level = 2
@@ -149,7 +170,95 @@ func _test_levels() -> void:
 	var unmeasured := _chain()
 	unmeasured.targets.breach_government.vulnerability = 1.0
 	var invalid := HackingModel.new(unmeasured).evaluate({"payload": ["breach_government"], "infection": []})
-	_check.call(invalid.targets.breach_government.invalid and invalid.targets.breach_government.level == -1, "what the forecast has not measured is never estimated")
+	_check.call(invalid.targets.breach_government.invalid and invalid.targets.breach_government.level == -1, "what was never measured is never estimated")
+
+	var first := HackingModel.new(_chain()).evaluate(both)
+	_check.call(first.xp_rate == shared.xp_rate, "two calculations give the same figures")
+
+
+func _test_upgrades() -> void:
+	var chain := _chain()
+	var changes := {
+		"breach_damage_multiplier": {"ratio": 1.2, "added": 0.2},
+		"breach_speed_multiplier": {"ratio": 1.25, "added": 0.25},
+		"breach_critical_chance": {"ratio": 1.2, "added": 0.02},
+		"breach_time_multiplier": {"ratio": 1.5, "added": 0.5},
+		"hack_specialization_multiplier": {"ratio": 2.0, "added": 1.0},
+	}
+	var changed := HackingUpgrades.apply(chain, changes)
+	_check.call(is_equal_approx(changed.launcher_ratio, 1.32) and is_equal_approx(changed.infection_ratio, 0.5), "a purchase only changes what it touches")
+	_check.call(is_equal_approx(changed.interval, 0.8) and is_equal_approx(changed.crit_chance, 0.12), "speed shortens the interval, and chance adds up")
+	_check.call(is_equal_approx(changed.power, 462.2) and is_equal_approx(changed.time_factor, 1.5), "power and time follow")
+	_check.call(chain.power == 231.1 and chain.launcher_ratio == 1.1, "the chain read from the game stays as it was")
+	var both := {"payload": ["breach_corps", "breach_government"], "infection": ["breach_corps", "breach_government"]}
+	var before := HackingModel.new(chain).evaluate(both)
+	var after := HackingModel.new(HackingUpgrades.apply(chain, {"hack_specialization_multiplier": {"ratio": 2.0, "added": 1.0}})).evaluate(both)
+	_check.call(after.xp_rate > before.xp_rate, "more power brings more XP")
+
+
+class FakeAttribute extends RefCounted:
+	var default := 1.0
+	var added := 0.0
+	var multiplier := 1.0
+	var value := 1.0
+
+	func _init(start: float, extra: float = 0.0) -> void:
+		default = start
+		added = extra
+		value = start + extra
+
+
+class FakeTable extends Node:
+	var upgrades := {}
+	var perks := {}
+	var unlocks := {}
+	var attributes := {}
+
+
+func _test_upgrade_table() -> void:
+	var root := Node.new()
+	var data := FakeTable.new()
+	data.name = "Data"
+	data.upgrades = {
+		"hack_breach_damage": {"cost": 1.0, "limit": 0.0, "attribute_cost": "hack_points", "requirement": [], "attributes": {"breach_damage_multiplier": [0.1, 0.0, 0.0]}},
+		"hack_breach_critical_multiplier": {"cost": 2.0, "limit": 5.0, "attribute_cost": "hack_points", "requirement": ["research.critical_payload"], "attributes": {"breach_critical_multiplier": [0.0, 0.12, 0.0]}},
+		"hack_infection_specialist": {"cost": 4.0, "limit": 1.0, "attribute_cost": "hack_points", "requirement": [], "attributes": {"breach_damage_multiplier": [0.0, 0.0, 0.6], "infection_damage_multiplier": [0.0, 0.0, 2.0]}},
+		"hack_sneak_attack": {"cost": 9.0, "limit": 5.0, "attribute_cost": "hack_points", "requirement": [], "attributes": {"breach_time_multiplier": [0.2, 0.0, 0.0]}},
+		"hack_breach_speed": {"cost": 1.0, "limit": 2.0, "attribute_cost": "hack_points", "requirement": [], "attributes": {}},
+		"hack_infection_damage": {"cost": 1.0, "limit": 0.0, "attribute_cost": "hack_points", "requirement": ["research.locked"], "attributes": {}},
+	}
+	data.perks = {"hack_specialization": {"cost": 5.0, "cost_e": 2.0, "cost_inc": 1.0, "limit": 4.0, "requirement": [], "attributes": {"hack_specialization_multiplier": [0.25, 0.0, 0.0]}}}
+	root.add_child(data)
+	var globals := FakeTable.new()
+	globals.name = "Globals"
+	globals.upgrades = {"hack_breach_damage": 1, "hack_breach_speed": 2, "hack_sneak_attack": 1}
+	globals.perks = {"hack_specialization": 1}
+	globals.unlocks = {"research.locked": false, "research.critical_payload": true}
+	root.add_child(globals)
+	var attributes := FakeTable.new()
+	attributes.name = "Attributes"
+	attributes.attributes = {
+		"hack_points": FakeAttribute.new(6.0),
+		"breach_damage_multiplier": FakeAttribute.new(1.0, 0.1),
+		"infection_damage_multiplier": FakeAttribute.new(1.0),
+		"breach_critical_multiplier": FakeAttribute.new(1.5),
+		"breach_time_multiplier": FakeAttribute.new(1.0, 0.2),
+		"hack_specialization_multiplier": FakeAttribute.new(1.0, 0.25),
+	}
+	root.add_child(attributes)
+
+	var by_name := {}
+	for item: Dictionary in HackingUpgrades.read(root):
+		by_name[item.name] = item
+	_check.call(not by_name.has("Vitesse d'intrusion"), "an upgrade at its limit is left out")
+	_check.call(not by_name.has("Dégâts d'infection"), "a locked upgrade is left out")
+	_check.call(absf(by_name["Dégâts Payload"].changes.breach_damage_multiplier.ratio - 1.2 / 1.1) < 0.001, "an added value is measured against the current one")
+	_check.call(absf(by_name["Multiplicateur de critique"].changes.breach_critical_multiplier.ratio - 1.12) < 0.001, "a multiplier gives 12 %, as the game says")
+	_check.call(absf(by_name["Spécialiste d'infection"].changes.breach_damage_multiplier.ratio - 0.6) < 0.001 and absf(by_name["Spécialiste d'infection"].changes.infection_damage_multiplier.ratio - 2.0) < 0.001, "the specialist cuts one and doubles the other, as the game says")
+	_check.call(absf(by_name["Attaque furtive"].changes.breach_time_multiplier.ratio - 1.4 / 1.2) < 0.001, "the sneak attack adds a second to 6, as the game says")
+	_check.call(not by_name["Attaque furtive"].affordable and by_name["Dégâts Payload"].affordable, "the points held decide what is affordable")
+	_check.call(absf(by_name["Spécialisation de hack"].cost - 500.0) < 0.001 and absf(by_name["Spécialisation de hack"].changes.hack_specialization_multiplier.ratio - 1.2) < 0.001, "the perk costs 500 tokens for 20 %, as the game says")
+	root.free()
 
 
 func _test_problems() -> void:
@@ -188,7 +297,7 @@ func _test_reader() -> void:
 		desktop.windows.add_child(node)
 
 	_check_read_error(desktop, "no_attack_seen", "no comparison before an attack was seen")
-	var chain := HackingChain.read(desktop, {"breach_government": 1.0}, 0.1, 0.99)
+	var chain := HackingChain.read(desktop, {"breach_government": 1.0}, null)
 	_check.call(chain.error == "", "the reader accepts a standard chain")
 	_check.call(chain.other_consumers == 0, "the reader counts the source's consumers")
 	_check.call(absf(chain.launcher_ratio - 1.1) < 0.01 and absf(chain.infection_ratio - 0.5) < 0.01, "the reader measures the nodes' ratios")
@@ -205,4 +314,4 @@ func _test_reader() -> void:
 
 
 func _check_read_error(desktop: Node, expected: String, message: String) -> void:
-	_check.call(HackingChain.read(desktop, {}, 0.1, 0.99).error == expected, message)
+	_check.call(HackingChain.read(desktop, {}, null).error == expected, message)

@@ -2,13 +2,12 @@ extends Node
 
 const MOD_ID := "Daneisra-SmartAutomation"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.3.0-dev.2"
+const BUILD := "0.3.0-dev.3"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
 const AdvisorInventory := preload("features/hacking_advisor/advisor_inventory.gd")
 const HackingAdvisor := preload("features/hacking_advisor/hacking_advisor.gd")
-const ThreatRegulator := preload("features/threat_manager/threat_regulator.gd")
 
 var _log: SaLog
 var _observer: ThreatObserver
@@ -45,10 +44,9 @@ func _ready() -> void:
 	if settings.threat_observer_enabled:
 		_observer.start()
 
-	var profile: Dictionary = ThreatRegulator.PROFILES.get(settings.regulation_profile, ThreatRegulator.PROFILES.balanced)
 	_advisor = HackingAdvisor.new()
 	_advisor.name = "HackingAdvisor"
-	_advisor.configure(_log, _observer, profile.margin, profile.p)
+	_advisor.configure(_log, _observer)
 	add_child(_advisor)
 
 	_hotkey_enabled = settings.debug_toggle_hotkey
