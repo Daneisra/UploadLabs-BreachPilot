@@ -11,23 +11,6 @@ var _check_call: Callable
 var _thread_result := {}
 
 
-class ArmedActuator extends Actuator:
-	func _build_allows_actions() -> bool:
-		return true
-
-	func _trial_refusal(_pending: Dictionary) -> String:
-		return ""
-
-	func _consume_trial() -> bool:
-		return true
-
-
-## Only the build's lock is opened: the trial's own limits stay real.
-class TrialActuator extends Actuator:
-	func _build_allows_actions() -> bool:
-		return true
-
-
 class FakeResource:
 	var production := 30.0
 	var count := 0.0
@@ -75,7 +58,7 @@ class FakeSettings extends Node:
 
 func run(check: Callable) -> void:
 	_check_call = check
-	_test_shipped_build_cannot_act()
+	_test_unarmed_cannot_act()
 	_test_refusals()
 	_test_not_main_thread()
 	_test_no_forced_action()
@@ -84,7 +67,7 @@ func run(check: Callable) -> void:
 	_test_verification()
 	_test_jumps()
 	_test_stop_rules()
-	_test_trial_limits()
+	_test_limits()
 	_test_certain_actions()
 	_test_regulator_support()
 	_test_closed_loop()
@@ -97,9 +80,7 @@ func _check(condition: bool, label: String) -> void:
 func _setup(armed: bool = true, options: Dictionary = {}) -> Dictionary:
 	var settings := FakeSettings.new()
 	var window := FakeWindow.new()
-	var merged := {"action_limit": 5, "action_type": "breach_corps"}
-	merged.merge(options, true)
-	var actuator: Actuator = ArmedActuator.new(armed, {"attributes": settings, "data": settings}, merged)
+	var actuator := Actuator.new(armed, {"attributes": settings, "data": settings}, options)
 	return {"actuator": actuator, "window": window, "settings": settings}
 
 
@@ -123,22 +104,19 @@ func _attack(level: int, event: String = "success", complete: bool = true, used:
 	return {"event": event, "level": level, "complete": complete, "observed_start": true, "used": used}
 
 
-func _test_shipped_build_cannot_act() -> void:
+func _test_unarmed_cannot_act() -> void:
 	var settings := FakeSettings.new()
 	var window := FakeWindow.new()
-	var shipped := Actuator.new(true, {"attributes": settings, "data": settings}, {"action_limit": 5, "action_type": "breach_corps"})
-	_check(not shipped.is_armed(), "this build's actuator cannot be armed, even when asked")
+	var shipped := Actuator.new(false, {"attributes": settings, "data": settings})
+	_check(not shipped.is_armed(), "the dry run's actuator is not armed")
 	shipped.request("breach_corps", "raise", 4, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {}, {})
 	var result := shipped.attempt("breach_corps", window, "1|1", 1, true, true, false)
 	_check(result.outcome == "would_act" and window.calls.is_empty(), "all checks can pass and still nothing is called")
 	shipped._call_native(window, "raise")
 	_check(window.calls.is_empty() and shipped.halt_reason == "native_call_without_arming", "a direct call stops everything instead of acting")
-	_check(not Actuator.Policy.ACTIONS_ENABLED, "the repository's policy keeps actions closed")
-	var policy_source := FileAccess.get_file_as_string(MOD + "features/threat_manager/action_policy.gd")
-	_check(policy_source.count("const ACTIONS_ENABLED := false") == 1, "the lock is closed in the source")
 	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(MOD + "manifest.json"))
-	var modes: Array = manifest.extra.godot.config_schema.properties.regulation_mode.enum
-	_check(modes == ["off", "dry_run"], "the options offer no active mode")
+	var mode_option: Dictionary = manifest.extra.godot.config_schema.properties.regulation_mode
+	_check(mode_option.enum == ["off", "dry_run", "active"] and mode_option.default == "off", "the options offer the three modes, off by default")
 	window.free()
 	settings.free()
 
@@ -188,12 +166,6 @@ func _test_refusals() -> void:
 	_check(_attempt(bottom).reason == "target_out_of_bounds", "the minimum level is never crossed")
 	_free(bottom)
 
-	var typed := _setup(true, {"action_type": "breach_government"})
-	_check(_request(typed) == "type_not_allowed", "only the allowed type can act")
-	_free(typed)
-	var untyped := _setup(true, {"action_type": ""})
-	_check(_request(untyped) == "no_action_type", "an armed actuator needs an explicit type")
-	_free(untyped)
 
 
 func _attempt_on_thread(setup: Dictionary) -> void:
@@ -363,15 +335,6 @@ func _test_jumps() -> void:
 
 
 func _test_stop_rules() -> void:
-	var single := _setup(true, {"action_limit": 1})
-	_request(single)
-	_attempt(single)
-	_check(single.actuator.halt_reason == "action_limit_reached", "the limit stops the regulation right after the action")
-	_check(single.actuator.is_verifying(), "the verification still goes on")
-	_check(single.actuator.note_event("breach_corps", _attack(5), false).outcome == "verified", "and it still concludes")
-	_check(_request(single, "raise", 5) == "halted" and single.window.calls.size() == 1, "and no second action can follow")
-	_free(single)
-
 	var stopped := _setup()
 	_request(stopped)
 	stopped.actuator.halt("emergency_stop")
@@ -390,16 +353,11 @@ func _test_stop_rules() -> void:
 	_check(summary.contains("deferred_no_safe_window=1") and summary.contains("armed=true"), "the summary counts the reports")
 
 
-const MARKER := "user://smart_automation_test/trial_used.json"
-
-
 func _trial(window_level: float) -> Dictionary:
 	var settings := FakeSettings.new()
 	var window := FakeWindow.new()
 	window.data.level = window_level
-	var actuator := TrialActuator.new(true, {"attributes": settings, "data": settings}, {
-		"action_limit": Actuator.Policy.TRIAL_MAX_ACTIONS, "action_types": Actuator.Policy.TRIAL_TYPES, "marker_path": MARKER, "verify_attacks": 3,
-	})
+	var actuator := Actuator.new(true, {"attributes": settings, "data": settings}, {"verify_attacks": 3})
 	return {"actuator": actuator, "window": window, "settings": settings}
 
 
@@ -409,109 +367,53 @@ func _trial_attempt(setup: Dictionary, type: String, direction: String, level: i
 	return setup.actuator.attempt(type, setup.window, "1|%d" % setup.actuator.actions_done, 1, true, true, false)
 
 
-func _test_trial_limits() -> void:
-	var policy := Actuator.Policy
-	_check(policy.TRIAL_TYPES == ["breach_government", "breach_corps"] and policy.TRIAL_MIN_LEVEL == 0 and policy.TRIAL_MAX_LEVEL == -1, "the trial is the authorized one")
-	_check(policy.TRIAL_MAX_ACTIONS == 40 and policy.TRIAL_PROFILE == "balanced", "with 40 actions, in the balanced profile")
-	_check(policy.TRIAL_MARKER.ends_with("trial_9_used.json"), "earlier markers are left alone")
-	DirAccess.remove_absolute(MARKER)
-	var other_type := _trial(2.0)
-	other_type.actuator.action_types = ["breach_government", "breach_corps", "breach_bank"]
-	_check(_trial_attempt(other_type, "breach_bank", "raise", 2).reason == "outside_trial" and other_type.window.calls.is_empty(), "the trial refuses a type it does not list")
-	_check(_trial(2.0).actuator.request("breach_bank", "raise", 2, {}, {}, {}) == "type_not_allowed", "even before the attempt")
-	_check(not FileAccess.file_exists(MARKER), "a refusal does not use up the trial")
-	_free(other_type)
-	var bottom := _trial(0.0)
-	_check(_trial_attempt(bottom, "breach_government", "lower", 0).reason == "outside_trial" and bottom.window.calls.is_empty(), "the trial refuses to go below 0")
-	_free(bottom)
+func _test_limits() -> void:
 	var game_top := _trial(6.0)
 	_check(_trial_attempt(game_top, "breach_government", "raise", 6).reason == "target_out_of_bounds" and game_top.window.calls.is_empty(), "the game's maximum stays")
 	_free(game_top)
-
-	for expected: Dictionary in [{}, {"status": "uncertain", "p_success": 1.0}, {"status": "invalid"}, {"status": "reliable", "p_success": 0.98}, {"status": "reliable", "p_success": 0.0}]:
-		var weak := _trial(2.0)
-		var result := _trial_attempt(weak, "breach_government", "raise", 2, expected)
-		_check(result.reason == "target_forecast_not_reliable" and weak.window.calls.is_empty(), "no change towards a level not forecast safe: %s" % str(expected))
-		_free(weak)
+	var bottom := _trial(0.0)
+	_check(_trial_attempt(bottom, "breach_government", "lower", 0).reason == "target_out_of_bounds" and bottom.window.calls.is_empty(), "there is nothing below 0")
+	_free(bottom)
+	var many := _trial(0.0)
+	many.window.data.max_level = 100.0
+	for action: int in 60:
+		_check(_trial_attempt(many, "breach_government", "raise", action).outcome == "acted", "there is no limit on actions in a session: %d" % action) if action in [0, 59] else _trial_attempt(many, "breach_government", "raise", action)
+		many.actuator.claims_level_change("breach_government", action + 1)
+		for attack: int in 3:
+			many.actuator.note_event("breach_government", _attack(action + 1), false)
+	_check(many.window.data.level == 60.0, "the session goes on as long as all is well")
+	_free(many)
 
 	# Going down needs no safe target: this is how it gets out of several levels that fail.
 	var descent := _trial(5.0)
 	_check(_trial_attempt(descent, "breach_government", "lower", 5, {"status": "reliable", "outcome": "mixed", "p_success": 0.0}).outcome == "acted" and descent.window.data.level == 4.0, "a lower does not need the level below to be safe")
 	_free(descent)
-	DirAccess.remove_absolute(MARKER)
 
 	var busy := _trial(2.0)
 	busy.window.detected = true
-	_check(_trial_attempt(busy, "breach_government", "raise", 2).outcome == "deferred", "the trial waits for a safe window")
-	_check(busy.window.calls.is_empty() and not FileAccess.file_exists(MARKER), "waiting does not use up the trial")
+	_check(_trial_attempt(busy, "breach_government", "raise", 2).outcome == "deferred" and busy.window.calls.is_empty(), "an action waits for a safe window")
 	_free(busy)
-
-	# All the changes of the budget, whatever the type, with a verification and a delay between each.
-	var chain := _trial(0.0)
-	chain.window.data.max_level = 60.0
-	for action: int in policy.TRIAL_MAX_ACTIONS:
-		var level: int = chain.window.data.level
-		var result := _trial_attempt(chain, "breach_government", "raise", level)
-		_check(result.outcome == "acted", "change %d is made: %s" % [action + 1, str(result)])
-		_check(FileAccess.file_exists(MARKER), "the marker is written")
-		if action == policy.TRIAL_MAX_ACTIONS - 1:
-			break
-		_check(chain.actuator.halt_reason.is_empty(), "the regulation goes on after change %d" % (action + 1))
-		_check(_trial_attempt(chain, "breach_government", "raise", level + 1).is_empty() or chain.actuator.is_verifying(), "no change before the verification")
-		chain.actuator.claims_level_change("breach_government", level + 1)
-		for attack: int in 3:
-			chain.actuator.note_event("breach_government", _attack(level + 1), false)
-		_check(not chain.actuator.is_verifying(), "it concludes after 3 attacks")
-		_check(_trial_attempt(chain, "breach_government", "raise", level + 1).reason == "too_soon_after_last_action", "the next change must wait")
-		_check(chain.window.calls.size() == action + 1, "and nothing happens")
-		chain.actuator.advance(Actuator.Policy.TRIAL_MIN_GAP + 1.0)
-	_check(chain.window.calls.size() == policy.TRIAL_MAX_ACTIONS and chain.window.data.level == policy.TRIAL_MAX_ACTIONS, "as many calls as the budget, and no more: %d" % chain.window.calls.size())
-	_check(chain.actuator.halt_reason == "action_limit_reached", "the regulation stops at the limit")
-	_check(_trial_attempt(chain, "breach_government", "lower", policy.TRIAL_MAX_ACTIONS) == {} and chain.window.calls.size() == policy.TRIAL_MAX_ACTIONS, "one more change is impossible")
-	_check(chain.actuator.request("breach_corps", "raise", 2, {}, {}, {}) == "halted", "on any type")
-	var marker_text := FileAccess.get_file_as_string(MARKER)
-	_check(marker_text.contains("\"actions\":%d" % policy.TRIAL_MAX_ACTIONS), "the marker counts them: %s" % marker_text)
-	_free(chain)
-
-	var restarted := _trial(2.0)
-	_check(_trial_attempt(restarted, "breach_government", "raise", 2).reason == "trial_already_used", "a new session cannot act, even with actions left")
-	_check(restarted.window.calls.is_empty(), "and nothing moves")
-	_free(restarted)
-	DirAccess.remove_absolute(MARKER)
 
 	var paused := _trial(2.0)
 	paused.actuator.request("breach_government", "raise", 2, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {"status": "reliable", "p_success": 1.0}, {})
 	_check(paused.actuator.attempt("breach_government", paused.window, "1|1", 1, true, true, true).reason == "manual_pause", "a pause is checked right before the call")
-	_check(paused.window.calls.is_empty() and not FileAccess.file_exists(MARKER), "and nothing is called")
+	_check(paused.window.calls.is_empty(), "and nothing is called")
 	_free(paused)
 
-	var unwritable := _trial(2.0)
-	unwritable.actuator._marker_path = "user://smart_automation_test/trial_used.json/not_a_folder/marker.json"
-	DirAccess.make_dir_recursive_absolute("user://smart_automation_test")
-	var marker_file := FileAccess.open(MARKER, FileAccess.WRITE)
-	marker_file.close()
-	var refused := _trial_attempt(unwritable, "breach_government", "raise", 2)
-	_check(refused.reason == "trial_marker_unwritable" and unwritable.window.calls.is_empty(), "no marker, no action")
-	_check(unwritable.actuator.halt_reason == "trial_marker_unwritable", "and it stops")
-	_free(unwritable)
-	DirAccess.remove_absolute(MARKER)
-
 	# The player's real figures, read from the session logs.
-	var profile := {"damage_rate": 35.3078, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0}
-	profile.damage_rate = 42.369
+	var profile := {"damage_rate": 42.369, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0}
 	var level_4 := Forecast.forecast(profile, {"firewall": 101.0, "breach": 101.0, "time": 6.0}, 0.1)
 	_check(level_4.status == "reliable" and is_equal_approx(level_4.p_success, 1.0), "level 4 respects the balanced margin at 42.37 damage: %s" % str(level_4))
 	var level_5 := Forecast.forecast(profile, {"firewall": 757.5, "breach": 757.5, "time": 12.0}, 0.1)
-	_check(level_5.status == "reliable" and level_5.p_success == 0.0, "level 5 does not, so the raises stop at 4: %s" % str(level_5))
+	_check(level_5.status == "reliable" and level_5.p_success == 0.0, "level 5 does not, so it does not count as certain: %s" % str(level_5))
 	# A sure forecast rests on the worst hits, not the average: 35 or 36 per hit, and 70.5 points to break.
 	profile.damage_rate = 35.5
 	var mixed := Forecast.forecast(profile, {"firewall": 70.5, "breach": 70.5, "time": 4.0}, 0.0)
 	_check(mixed.p_success < 1.0, "when the lowest hits would miss, it is not certain: %s" % str(mixed))
 
 
-## A certain raise is checked on one attack, and the trial's delay is for doubts only.
+## A certain raise is checked on one attack.
 func _test_certain_actions() -> void:
-	DirAccess.remove_absolute(MARKER)
 	var setup := _trial(1.0)
 	var power := {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}
 	var safe := {"status": "reliable", "p_success": 1.0}
@@ -522,12 +424,8 @@ func _test_certain_actions() -> void:
 		setup.actuator.claims_level_change("breach_government", level + 1)
 		_check(setup.actuator.note_event("breach_government", _attack(level + 1), false).outcome == "verified", "one normal attack verifies it")
 	_check(setup.window.data.level == 3.0, "two levels in two attacks")
-	var doubt := {"reason": "conditions_met"}
-	setup.actuator.request("breach_government", "raise", 3, power, safe, doubt)
-	_check(setup.actuator.attempt("breach_government", setup.window, "1|3", 1, true, true, false).reason == "too_soon_after_last_action", "a doubt still waits")
 	_free(setup)
 
-	DirAccess.remove_absolute(MARKER)
 	var bad := _trial(1.0)
 	bad.actuator.request("breach_government", "raise", 1, power, safe, {"reason": "conditions_met", "certain": true, "verify_attacks": 1})
 	bad.actuator.attempt("breach_government", bad.window, "1|1", 1, true, true, false)
@@ -535,7 +433,6 @@ func _test_certain_actions() -> void:
 	_check(bad.actuator.note_event("breach_government", {"event": "reset_unknown", "level": 2}, false).outcome == "failed", "a disturbed attack still stops everything")
 	_check(not bad.actuator.halt_reason.is_empty(), "at once")
 	_free(bad)
-	DirAccess.remove_absolute(MARKER)
 
 	# Infection, an elite level or fresh power: the same raise is watched longer.
 	var careful := _trial(1.0)
@@ -546,7 +443,6 @@ func _test_certain_actions() -> void:
 		_check(careful.actuator.note_event("breach_corps", _attack(2), false).is_empty(), "the careful verification goes on: %d" % attack)
 	_check(careful.actuator.note_event("breach_corps", _attack(2), false).outcome == "verified", "and ends after 3 attacks")
 	_free(careful)
-	DirAccess.remove_absolute(MARKER)
 
 	# Power moving during a verification is not an anomaly: the next attacks decide.
 	var moving := _trial(1.0)
@@ -561,7 +457,6 @@ func _test_certain_actions() -> void:
 	new_power.damage_rate = 60.0
 	_check(moving.actuator.note_event("breach_government", new_power, false).outcome == "verified", "a complete attack at the new power concludes, whatever its duration")
 	_free(moving)
-	DirAccess.remove_absolute(MARKER)
 
 	var unexplained := _trial(1.0)
 	unexplained.actuator.request("breach_government", "raise", 1, power, safe, {"reason": "conditions_met", "certain": true, "verify_attacks": 1})
@@ -572,7 +467,6 @@ func _test_certain_actions() -> void:
 	same_power.infection_rate = 30.0
 	_check(unexplained.actuator.note_event("breach_government", same_power, false).outcome == "inconclusive", "an attack cut at the same power stops everything")
 	_free(unexplained)
-	DirAccess.remove_absolute(MARKER)
 
 
 func _setup_summary() -> String:

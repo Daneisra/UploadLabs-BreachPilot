@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.0-dev.2 – en cours : régulation rapide
+## 0.2.0-rc.1 – en cours : régulation normale
 
-**Le code du dépôt ne peut toujours changer aucun niveau.** Testé en simulation seulement.
+Le mode `active` est une option normale, désactivée par défaut. Les archives d'essai, les marqueurs et les limites d'actions sont retirés.
 
 ### Corrigé
 

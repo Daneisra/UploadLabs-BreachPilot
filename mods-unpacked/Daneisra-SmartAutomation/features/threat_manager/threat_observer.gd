@@ -1,6 +1,6 @@
 extends Node
 ## Connects the classifier to the game. It reads the game: only threat_actuator.gd can change a threat
-## level, and only in an archive built for an authorized trial (see action_policy.gd).
+## level, in the active mode.
 
 const ApiGuard := preload("../../core/api_guard.gd")
 const SaLog := preload("../../core/sa_log.gd")
@@ -14,7 +14,6 @@ const ThreatRegulator := preload("threat_regulator.gd")
 const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
 const ThreatActuator := preload("threat_actuator.gd")
-const Policy := preload("action_policy.gd")
 const AutomationControl := preload("automation_control.gd")
 
 const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
@@ -49,7 +48,6 @@ const BLOCK_TEXTS := {
 	"speed": "vitesse de jeu différente de la normale",
 	"native_methods": "méthodes du jeu inutilisables",
 	"classifier": "trop de réinitialisations inexpliquées",
-	"action_limit_reached": "nombre maximal d'actions atteint",
 }
 ## Far from what the game should use, so these hooks run first and last among the frame's _process.
 const HOOK_PRIORITY := 1000000
@@ -83,7 +81,7 @@ var _stealth_mask := 0
 var _ticks_since_scan := 0
 var _last_tick_speed := -1.0
 var _traced_events: Dictionary = {}
-var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0, "action_limit": 1, "action_type": "", "action_types": []}
+var _regulation: Dictionary = {"mode": "off", "profile": "balanced", "max_allowed_level": -1, "min_level": 0}
 var _actuator: ThreatActuator
 var _emergency := false
 var _last_refusal: Dictionary = {}
@@ -114,48 +112,21 @@ var _probe_ticks_this_frame := 0
 var _probe_ticks_per_frame_max := 0
 
 
-## This build's first lock. Without it, the configuration cannot lead to anything but off or dry_run.
-func _actions_allowed() -> bool:
-	return Policy.ACTIONS_ENABLED
-
-
-## Whether mode active can come without the trial's own settings. Only the tests can answer yes.
-func _accepts_active_without_trial() -> bool:
-	return false
-
-
 func _new_actuator(armed: bool) -> ThreatActuator:
 	return ThreatActuator.new(armed, {"attributes": _attributes, "data": _data}, {
-		"action_limit": _regulation.action_limit, "action_type": _regulation.action_type, "action_types": _regulation.action_types,
 		"min_level": _regulation.min_level, "max_allowed": _regulation.max_allowed_level,
-		"verify_attacks": Policy.TRIAL_VERIFY_ATTACKS,
 	})
 
 
-## The trial sets everything itself: nothing in the options can widen what it is allowed to do.
-func _apply_trial() -> void:
-	_regulation.mode = "active"
-	_regulation.profile = Policy.TRIAL_PROFILE
-	_regulation.action_type = ""
-	_regulation.action_types = Policy.TRIAL_TYPES
-	_regulation.action_limit = Policy.TRIAL_MAX_ACTIONS
-	_regulation.max_allowed_level = Policy.TRIAL_MAX_LEVEL
-	_regulation.min_level = Policy.TRIAL_MIN_LEVEL
-
-
-## regulation.mode can only be off or dry_run, unless this archive and the explicit trial option both
-## allow the trial. An old configuration has no such option.
+## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio
 	_api_dump = api_dump
 	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
-	var active_allowed := _actions_allowed() and _accepts_active_without_trial()
-	if _regulation.mode != "dry_run" and not (_regulation.mode == "active" and active_allowed):
+	if not _regulation.mode in ["off", "dry_run", "active"]:
 		_regulation.mode = "off"
-	if _actions_allowed() and typeof(regulation.get("active_trial")) == TYPE_BOOL and regulation.active_trial:
-		_apply_trial()
 
 
 func regulation_mode() -> String:
@@ -843,10 +814,10 @@ func _block_reason(type: String) -> String:
 
 ## What the node shows: a pause and a block are two separate things, and both can be true.
 func _automation_view(type: String) -> Dictionary:
-	if _actuator == null or not _actuator.type_allowed(type):
+	if _actuator == null:
 		return {"kind": "disabled", "text": "Auto : désactivé", "button": "", "tooltip": ""}
 	var block := _block_reason(type)
-	var block_text: String = BLOCK_TEXTS.get(block, block)
+	var block_text: String = BLOCK_TEXTS.get(block, "anomalie détectée, redémarrez le jeu pour relancer la régulation (%s)" % block)
 	if _state.is_paused(type):
 		var note := "" if block.is_empty() else "Reste bloqué après la reprise : %s" % block_text
 		return {"kind": "pause", "text": "Pause manuelle", "button": "Reprendre l'automatisation", "tooltip": note}

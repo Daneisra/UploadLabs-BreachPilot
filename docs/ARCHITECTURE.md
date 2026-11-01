@@ -74,28 +74,21 @@ Le régulateur ne fait que retourner des décisions hypothétiques : **rien dans
 
 ## Actionneur
 
-**Le code du dépôt ne peut changer aucun niveau.** `action_policy.gd` garde `ACTIONS_ENABLED` à faux, ce qui ferme les verrous de l'observateur et de l'actionneur. Seule l'archive construite par `tools/build_zip.py --trial` l'ouvre, pour un essai autorisé, et la construction échoue si du code réservé aux tests s'y trouve. En `dry_run`, tous les contrôles s'exécutent et le journal indique ce qui aurait été fait (`action_would_apply`).
-
-**Essai actif :** même dans une archive d'essai, il faut l'option `active_trial` à vrai. Une ancienne configuration ne contient pas cette option, et `regulation_mode` ne peut demander que `off` ou `dry_run`. L'essai fixe lui-même ses limites, dans `action_policy.gd` : type, sens, niveaux, profil conservateur, 1 action, vérification sur 3 attaques. Un fichier propre à chaque essai (`user://smart_automation/trial_used.json`, `trial_2_used.json`, `trial_3_used.json`, `trial_4_used.json`), écrit avant chaque appel et séparé des sauvegardes, interdit toute action après un redémarrage, même s'il reste du budget.
-
-**Marge et baisse :** la marge du profil ne s'applique qu'aux montées. Pour une baisse, le niveau cible doit être annoncé fiable et réussi à 100 % sans marge.
+`regulation_mode` vaut `off` (par défaut), `dry_run` ou `active`. Toute autre valeur revient à `off`. En `dry_run`, tous les contrôles s'exécutent, et le journal indique ce qui aurait été fait (`action_would_apply`). Seul `active` arme l'actionneur.
 
 | Étape | Règle |
 |---|---|
 | Décision | Le régulateur propose. Une baisse exige une prévision fiable et assez d'échecs observés |
 | Occasion | Fin d'attaque uniquement : au tick où l'échec est déduit, ou dans un appel différé après `breached`. Le report n'est qu'un moyen d'arriver après la réinitialisation |
-| Refus | Thread, arrêt, limite, nœud absent, option native, vitesse, plusieurs nœuds, classificateur, même attaque, niveau, bornes, plafond, puissance. L'action est abandonnée et le budget rendu si rien n'a bougé |
+| Refus | Thread, arrêt, nœud absent, option native, vitesse, plusieurs nœuds, classificateur, même attaque, niveau, bornes, plafond, puissance. L'action est abandonnée et le budget rendu si rien n'a bougé |
 | Report | Attaque, dégâts, pause ou minuteur non réarmé : `action_deferred_no_safe_window`, nouvelle tentative à la fin d'attaque suivante, `action_starving` après 5 reports |
 | Action | Contrôles et appel dans le même appel, sans attente. Un seul niveau, un seul point d'entrée (`_call_native`) |
 | Après | Relecture immédiate du niveau et de l'état, puis vérification de l'attaque suivante (`action_verification`). Une attaque perturbée, incomplète ou absente, ou un rechargement, arrête la régulation |
 
 - **Origine d'un changement :** `origin=mod` seulement pour le niveau attendu après une action du mod, et une seule fois. Tout autre changement est celui du joueur (pause du type, action en attente abandonnée), ou de l'option native si elle est active.
 - **Arrêt d'urgence :** `Ctrl+Alt+F10`, toujours actif, sans option. Il dure jusqu'au redémarrage du jeu.
-- **Limite d'actions :** `action_limit`, 1 par défaut. Elle arrête la régulation juste après l'action, et la vérification continue.
-- **Un seul type :** un actionneur armé exige `action_type`, sans valeur par défaut.
+- **Anomalie :** elle arrête la régulation des deux types jusqu'au redémarrage du jeu. La cause apparaît dans l'infobulle de `Auto : bloqué`.
 - **Vitesse :** toute vitesse autre que 0,05 ou illisible empêche l'action. Un changement de vitesse efface la fenêtre d'attaques et relance la stabilisation.
-
-**Limite :** tout cela n'est testé que sur un faux jeu, qui suit notre compréhension de `level_up` et `level_down`. Leur effet réel et le sens de leur argument ne sont pas vérifiés.
 
 ## Contrôle sur le nœud
 
@@ -107,7 +100,7 @@ Une rangée, créée à l'exécution, est ajoutée en dernier enfant de `MainCon
 | `Auto : simulation` | Même état, dans un build qui ne peut pas agir | `Pause` |
 | `Pause manuelle` | Geste ou clic du joueur. L'infobulle signale un blocage éventuel | `Reprendre l'automatisation` |
 | `Auto : bloqué` | Arrêt d'urgence, anomalie, budget, option native, vitesse, API, classificateur. Cause dans l'infobulle | Aucun |
-| `Auto : désactivé` | Régulation coupée, ou type hors de l'essai | Aucun |
+| `Auto : désactivé` | Régulation coupée | Aucun |
 
 La pause et le blocage sont indépendants : reprendre ne lève jamais un blocage. Une prévision insuffisante est un maintien, pas un blocage. Les textes ne sont qu'en français pour l'instant.
 

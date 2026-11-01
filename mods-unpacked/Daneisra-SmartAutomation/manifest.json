@@ -2,7 +2,7 @@
 	"name": "SmartAutomation",
 	"namespace": "Daneisra",
 	"version_number": "0.2.0",
-	"description": "Modular QoL automation. Pre-release 0.2.0-beta.1: it observes Breach attacks, can log the decisions it would take and measure the time between attacks; it changes a threat level only in an archive built for an authorized trial, with its option turned on.",
+	"description": "Modular QoL automation. Keeps Breach threat levels at the highest level your power can handle, with pause and resume on the nodes. Off by default.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
 	"dependencies": [],
 	"extra": {
@@ -38,7 +38,7 @@
 					},
 					"regulation_mode": {
 						"type": "string",
-						"enum": ["off", "dry_run"],
+						"enum": ["off", "dry_run", "active"],
 						"default": "off"
 					},
 					"regulation_profile": {
@@ -50,10 +50,6 @@
 						"type": "integer",
 						"minimum": -1,
 						"default": -1
-					},
-					"active_trial": {
-						"type": "boolean",
-						"default": false
 					},
 					"gap_probe": {
 						"type": "boolean",

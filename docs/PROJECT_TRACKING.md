@@ -321,6 +321,8 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 
 **Test de baisse, 2026-11-01, build `trial.7`, 11 min :** réussi, 7 actions, 0 anomalie. Infection débranchée à 16:41:12 : Entreprises 8→7→6→5→4 en 88 s. Rebranchée à 16:45:14 : 4→5→6→7 en 51 s. Niveaux finaux 7/9 et 4/5. **Remarque de Jérémy :** fonctionnel, mais trop lent partout.
 
+**Régulation rapide, 2026-11-01, build `trial.8` puis `trial.9` :** saut direct, baisse dès le premier échec annoncé, essais de niveau, coups coupés par la barre ignorés. Essai final, 13 min : Gouvernement 2→4 et Entreprises 7→8→9 (niveau jamais atteint auparavant), adaptation à un gain de puissance (87,39 à 104,86), 3 actions, aucune anomalie. Validé par Jérémy.
+
 **Limites connues de `v0.2.0-beta.1` :** une prévision certaine démentie n'est couverte qu'en simulation. Le mod compte sur le coup le plus faible observé : avec `Payload critique`, il peut rester sous un niveau qui réussit en pratique (7 au lieu de 8). Une anomalie arrête la régulation des deux types jusqu'au redémarrage. Plafonds et pauses : session uniquement. Vitesse × 5 : régulation suspendue. Toutes les mesures viennent d'une seule partie.
 
 **Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.

@@ -2,7 +2,7 @@
 
 Mod de confort modulaire pour [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/), basé sur le Godot Mod Loader intégré au jeu.
 
-> **Version actuelle : 0.2.0-beta.1.** L'archive standard observe et simule sans changer aucun niveau. Les changements automatiques n'existent que dans des archives d'essai construites à la demande. La régulation normale arrive avec la 0.2.0.
+> **Version en préparation : 0.2.0.** Le mod maintient Infiltrer Entreprises et Infiltrer Gouvernement au plus haut niveau que votre puissance permet. Il est **désactivé par défaut** : réglez `regulation_mode` sur `active` dans les options.
 
 ## Objectif
 
@@ -14,7 +14,7 @@ Automatiser des tâches répétitives en respectant les mécaniques normales du 
 | Mesures pour la régulation (lecture seule) | 0.2.0-alpha.1 | Validé en jeu |
 | Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | Validé en jeu |
 | Actionneur, pause sur le nœud, essais réels | 0.2.0-beta.1 | Validé en jeu |
-| Auto Threat Manager (régulation de la menace) | 0.2.0 | Non commencé |
+| Auto Threat Manager (régulation de la menace) | 0.2.0 | En préparation |
 | Auto Data Lab Supply : observateur, puis répartiteur | Ultérieure | Non commencé |
 
 ## Ce que fait la version 0.1.0
