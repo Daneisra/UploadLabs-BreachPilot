@@ -272,7 +272,25 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 
 **Sauvegardes :** Jérémy a enregistré par erreur dans le Slot 1 local et le Slot 2 cloud pendant ce contrôle. Rien n'a été restauré. Il reste l'ancien Slot 1 dans `2026-10-31_23-48-53_avant-essai-actif-2`, le Slot 9 intact, et l'état proche du Slot 2 cloud d'origine (21:51:13) dans `savegame.dat` de `2026-10-31_22-39-50_avant-controle-essai-actif` (21:51:16).
 
-**Troisième essai, autorisé le 2026-11-01 :** Gouvernement seul, de 0 à 4, 4 actions au plus, profil conservateur, 60 s au moins entre deux actions, vérification sur 3 attaques, nouveau marqueur `trial_3_used.json`.
+**Troisième essai, 2026-11-01, build `0.2.0-beta.1-trial.3` : réussi.** Gouvernement seul, de 0 à 4, 4 actions au plus, profil conservateur, 60 s au moins entre deux actions, vérification sur 3 attaques, marqueur `trial_3_used.json`, à 35,31 dégâts.
+
+| Heure | Événement | Détail |
+|---|---|---|
+| 00:57:54 | Montée 0→1 | 15 s après la liaison, 5 réussites, 8 attaques au niveau 0, vérifiée à 00:58:00 |
+| 00:58:56 | Montée 1→2 | 62 s après, 31 attaques au niveau 1, vérifiée à 00:59:08 |
+| 01:00:00 | Montée 2→3 | 64 s après, vérifiée à 01:00:12 |
+| 01:00:20 | Maintien à 3 | `forecast_too_risky` : niveau 4 à 5,0 s, marge de 20 % non respectée. `Auto : actif`, plus de 3 min sans action |
+| 01:04:05 | Baisse à 2 par le joueur | `origin=player`, `automation_pause`, aucune remontée pendant 2 min 20 |
+| Entre les deux | `Ctrl+Z` | Selon Jérémy, niveau inchangé et pause conservée. Aucun événement de niveau au journal, ce qui concorde |
+| 01:06:25 | Reprise | Niveau inchangé, 2 attaques de stabilisation, puis 5 réussites |
+| 01:06:52 | Montée 2→3 | 27 s après la reprise, 4e et dernière action, vérifiée à 01:07:04 |
+| 01:06:52 | Arrêt | `regulation_stopped reason=action_limit_reached actions=4`, `Auto : bloqué` sur la capture |
+
+Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprises à 5 avant et après. 0 réinitialisation due à une action, 0 fenêtre manquée, 0 erreur du mod. Attaques suivantes conformes : niveau 1 à 1,0 s et 2 salves (31), niveaux 2 et 3 à 3,0 s et 4 salves (58 et 109).
+
+**Remarque de Jérémy :** les temps sont respectés, mais c'est trop lent quand le niveau suivant est certain. Le journal le confirme : 31 attaques au niveau 1 pour une prévision certaine dès la première.
+
+**Puissance :** l'Interface est montée à 42,37 dégâts par nœud à 01:13:39, pendant une pause. Le changement est bien détecté, sans action.
 
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 
