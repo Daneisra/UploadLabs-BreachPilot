@@ -11,6 +11,7 @@ static func from_event(event: Dictionary, last_interval: float = 0.0) -> Diction
 		interval = last_interval
 	var profile := {
 		"damage_rate": event.get("damage_rate", 0.0),
+		"announced_rate": event.get("damage_rate", 0.0),
 		"infection_rate": event.get("infection_rate", 0.0),
 		"vulnerability": event.get("vulnerability", 0.0),
 		"breach_variation": event.get("breach_variation", 0),

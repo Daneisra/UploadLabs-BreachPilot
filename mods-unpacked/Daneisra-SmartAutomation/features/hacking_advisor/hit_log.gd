@@ -25,7 +25,8 @@ func add(type: String, chain_key: String, event: Dictionary) -> void:
 	if event.event == "success":
 		stats.successes += 1
 		stats.used += event.get("used", 0.0)
-	var announced: float = event.get("damage_rate", 0.0)
+	# The game announces a rate: what one shot brings is that rate over the time between two shots.
+	var announced: float = event.get("damage_rate", 0.0) * event.get("interval", 0.0)
 	if announced <= 0.0:
 		return
 	var bonus: float = 1.0 + event.get("vulnerability", 0.0)

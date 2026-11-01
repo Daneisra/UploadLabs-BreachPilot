@@ -134,7 +134,7 @@ func _chain() -> Dictionary:
 
 func _test_hit_log() -> void:
 	var log := HitLog.new()
-	log.add("corps", "a", {"event": "success", "level": 8, "complete": true, "used": 5.0, "damage_rate": 100.0, "vulnerability": 0.25, "hits": PackedFloat32Array([125.0, 250.0])})
+	log.add("corps", "a", {"event": "success", "level": 8, "complete": true, "used": 5.0, "damage_rate": 100.0, "interval": 1.0, "vulnerability": 0.25, "hits": PackedFloat32Array([125.0, 250.0])})
 	log.add("corps", "a", {"event": "failure_power", "level": 8, "complete": true, "damage_rate": 100.0, "vulnerability": 0.25})
 	log.add("corps", "a", {"event": "success", "level": 8, "complete": false, "used": 9.0, "damage_rate": 100.0, "hits": PackedFloat32Array([999.0])})
 	var kept := log.multipliers("a")
@@ -144,6 +144,9 @@ func _test_hit_log() -> void:
 	_check.call(log.attack_stats("corps", "a", 8, HitLog.power_key(130.0, 0.0)).attacks == 0, "attacks at another power do not compare")
 	_check.call(is_equal_approx(log.last_vulnerability("corps"), 0.25) and log.last_vulnerability("other") == 0.0, "the last attack's vulnerability is kept")
 	_check.call(log.multipliers("b").is_empty(), "another chain starts a new measure")
+	var faster := HitLog.new()
+	faster.add("corps", "f", {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "interval": 0.5, "hits": PackedFloat32Array([50.0])})
+	_check.call(is_equal_approx(faster.multipliers("f")[0], 1.0), "a shot is a rate times the interval")
 	_check.call(log.multipliers("a").size() == 2, "the old chain's measures stay")
 	for index: int in HitLog.MAX_CHAINS + 2:
 		log.add("corps", "other%d" % index, {"event": "success", "level": 1, "complete": true, "damage_rate": 1.0})
@@ -152,7 +155,7 @@ func _test_hit_log() -> void:
 	var big := PackedFloat32Array()
 	big.resize(HitLog.MAX_HITS + 50)
 	big.fill(10.0)
-	many.add("corps", "x", {"event": "success", "level": 1, "complete": true, "damage_rate": 10.0, "hits": big})
+	many.add("corps", "x", {"event": "success", "level": 1, "complete": true, "damage_rate": 10.0, "interval": 1.0, "hits": big})
 	_check.call(many.multipliers("x").size() == HitLog.MAX_HITS, "the measure stays bounded")
 
 
@@ -230,7 +233,7 @@ func _test_graph_any_chain() -> void:
 	var hits := PackedFloat32Array()
 	for index: int in 40:
 		hits.append(50.0)
-	log.add("zz_alpha", key, {"event": "success", "level": 1, "complete": true, "used": 2.0, "damage_rate": 50.0, "hits": hits})
+	log.add("zz_alpha", key, {"event": "success", "level": 1, "complete": true, "used": 2.0, "damage_rate": 50.0, "interval": 1.0, "hits": hits})
 
 	var chain := HackingChain.read(desktop, {"zz_alpha": 1.0}, log, null, null)
 	_check.call(chain.error == "" and chain.targets.size() == 2, "targets are found by what they expose, whatever their names")
@@ -364,6 +367,17 @@ func _test_measured_rates() -> void:
 	stronger.power_factor = 1.2
 	var more := HackingModel.new(stronger).evaluate(_chain().current)
 	_check.call(absf(more.xp_rate - 5694.0) / 5694.0 < 0.15, "the XP rate stays near the 5694 measured with more power")
+
+	var quick := _chain()
+	quick.targets.corps.interval = 0.5
+	quick.targets.gov.interval = 0.5
+	var quick_model := HackingModel.new(quick)
+	var scales: Dictionary = quick_model._scales("corps", quick.current)
+	_check.call(is_equal_approx(scales.hit * quick_model._shot_time("corps"), 104.865 * 0.5), "a rate gives less per shot when shots come sooner")
+	var sped_up := _chain()
+	sped_up.interval_factor = 1.25
+	var sped_model := HackingModel.new(sped_up)
+	_check.call(is_equal_approx(sped_model._interval("corps"), 0.8) and is_equal_approx(sped_model._shot_time("corps"), 1.0), "buying speed makes shots come sooner, each one the same")
 
 	var doubled := PackedFloat32Array()
 	for index: int in 99:
@@ -564,6 +578,23 @@ func _test_trial_without_forecast() -> void:
 	stealth.breach_variation = 1
 	stealth.signature = "s"
 	_check.call(observer._may_work(tracker, stealth, {"level": 7, "max_level": 8}), "a mechanic never measured does not block a trial")
+	var measured := Observer.new()
+	var strong_hits := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "interval": 1.0, "hits": PackedFloat32Array()}
+	for index: int in HackingModel.MIN_HITS:
+		strong_hits.hits.append(100.0)
+	measured.hit_log().add("any", "chain", strong_hits)
+	var with_hits := profile.duplicate()
+	with_hits.vulnerability = 0.0
+	with_hits.announced_rate = 100.0
+	with_hits.signature = "h"
+	var known := {"type": "any", "window": window, "getters": {}, "chain_key": "chain"}
+	_check.call(measured._may_work(known, with_hits, {"level": 7, "max_level": 8}), "the hits measured say a level is worth trying")
+	var hopeless := with_hits.duplicate()
+	hopeless.announced_rate = 1.0
+	hopeless.signature = "h2"
+	_check.call(not measured._may_work(known, hopeless, {"level": 7, "max_level": 8}), "the hits measured spare a hopeless try")
+	measured.free()
+
 	var weak := profile.duplicate()
 	weak.vulnerability = 0.0
 	weak.damage_rate = 11.0

@@ -18,6 +18,8 @@ const INSUFFICIENT_TEXTS := {
 	HackingModel.REASON_UNMEASURED: "mécanique jamais mesurée (furtivité, infection qui grandit)",
 }
 const CHANCE_NOT_FOLLOWED := "effet non chiffré"
+## How often an open panel looks at the chain. A second is quick enough for a player plugging a cable.
+const REFRESH_SECONDS := 1.0
 
 var _log: Variant
 var _observer: Variant
@@ -29,6 +31,9 @@ var _rows: Array[Dictionary] = []
 var _current: Dictionary
 var _upgrades: Array[Dictionary] = []
 var _upgrade_rows: Array[Dictionary] = []
+var _shown_state := ""
+var _computing := false
+var _since_check := 0.0
 ## Kept for the session: the player's choice should survive closing the panel.
 var _objective := HackingAdvice.BALANCED
 
@@ -45,29 +50,64 @@ func _ready() -> void:
 
 
 func toggle() -> void:
-	set_process(false)
 	if _panel.visible:
 		_panel.visible = false
+		set_process(false)
 		return
 	_panel.show_message("Calcul en cours…")
+	_shown_state = ""
+	set_process(true)
+	_look_at_chain()
+
+
+## Starts a calculation when the chain changed. What is shown stays until the new figures are ready.
+func _look_at_chain() -> void:
+	_since_check = 0.0
 	var root := get_tree().root
-	_chain = HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"))
-	if _chain.error != "":
-		_log.info("advisor_compare result=%s" % _chain.error)
-		_panel.show_message(ERROR_TEXTS.get(_chain.error, _chain.error))
+	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"))
+	var upgrades := HackingUpgrades.read(root)
+	var state := _state_of(chain, upgrades)
+	if state == _shown_state:
 		return
+	_shown_state = state
+	if chain.error != "":
+		_computing = false
+		_log.info("advisor_compare result=%s" % chain.error)
+		_panel.show_message(ERROR_TEXTS.get(chain.error, chain.error))
+		return
+	_chain = chain
 	_model = HackingModel.new(_chain)
 	_pending = _model.scenarios()
 	_rows = []
-	_upgrades = HackingUpgrades.read(root)
+	_upgrades = upgrades
 	_upgrade_rows = []
-	set_process(true)
+	_computing = true
+
+
+## What the figures depend on: connections, power, levels, and whether enough has been measured.
+func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
+	if chain.error != "":
+		return chain.error
+	var parts := PackedStringArray([str(chain.current)])
+	for key: String in chain.targets:
+		var target: Dictionary = chain.targets[key]
+		parts.append("%s:%d:%d:%.2f:%.2f:%.2f" % [key, target.level, target.max_level, target.interval, target.vulnerability, target.real.attacks / HackingModel.MIN_ATTACKS_TO_CHECK])
+	for stream: Dictionary in chain.streams.values():
+		parts.append("%s:%.2f:%d" % [stream.id, stream.production, stream.multipliers.size() / HackingModel.MIN_HITS])
+	for upgrade: Dictionary in upgrades:
+		parts.append("%s:%.2f:%.2f" % [upgrade.name, upgrade.cost, upgrade.held])
+	return "|".join(parts)
 
 
 ## One calculation per frame: the game must not stutter for a panel.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _panel.visible:
 		set_process(false)
+		return
+	if not _computing:
+		_since_check += delta
+		if _since_check >= REFRESH_SECONDS:
+			_look_at_chain()
 		return
 	if not _pending.is_empty():
 		_rows.append(_model.evaluate(_pending.pop_back()))
@@ -75,7 +115,7 @@ func _process(_delta: float) -> void:
 	if _upgrade_rows.size() < _upgrades.size():
 		_upgrade_rows.append(_evaluate_upgrade(_upgrades[_upgrade_rows.size()]))
 		return
-	set_process(false)
+	_computing = false
 	_current = _model.evaluate(_model.current_scenario())
 	_log_rows()
 	_render()

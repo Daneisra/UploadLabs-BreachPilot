@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.4 – en cours : conseiller générique
+## 0.4.0-dev.5 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -8,6 +8,7 @@
 - Recommandations en clair pour le branchement et pour les achats : quoi changer, pourquoi, le gain et l'inconvénient.
 - Achats classés selon vos ressources : ce que vous pouvez payer d'abord, par ressource, avec ce qu'il manque pour le reste.
 - Bouton `Conseil` sur les nœuds d'infiltration, en plus de `Ctrl+Alt+F8`.
+- Le panneau ouvert se met à jour de lui-même quand la chaîne change, en une seconde.
 - Lecture générique de la chaîne : n'importe quels nœuds et branchements, sans liste de noms. Un nœud inconnu ne bloque plus rien, et ses effets sont pris en compte par les coups réellement mesurés sur la chaîne.
 - Les noms viennent du jeu, et tout achat lié au hacking apparaît seul. Un achat dont l'effet ne peut pas être suivi est listé sans chiffre.
 
@@ -17,6 +18,7 @@
 - Sans prévision possible, quelle qu'en soit la raison, le mod passe par des essais de niveau réels en profil équilibré ou agressif, au lieu de ne plus monter.
 - « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
 - Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
+- Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
 
 ### Corrigé

@@ -65,6 +65,10 @@ Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la ca
 
 Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au niveau 9. **Défaut trouvé :** la vulnérabilité lue sur le nœud retombe à 0 un instant entre deux attaques : ouvert à ce moment, le panneau annonçait 86 % au lieu de 100 % et se disait contredit. Corrigé en retenant la valeur de la dernière attaque.
 
+**Premier rebranchement suivi d'un conseil, 2026-11-01 :** injection retirée comme conseillé. Annoncé : niveaux 9 et 9, 12 659 XP/min (+6 %). Réel : niveaux 9 et 9, environ 14 450 XP/min sur 34 s seulement (16 réussites sur 16), soit 14 % de plus qu'annoncé. Après deux achats : 14 687 XP/min sur 525 s, 251 réussites sur 251.
+
+**Niveau 10 élite, à vérifier :** 2 306 de pare-feu et 9 224 d'infiltration sur Entreprises. Le panneau l'annonce à 99 %, puis le jeu annonce un gain très supérieur au niveau 11 (`get_experience_reward`). Aucune réussite réelle n'a encore confirmé ni la faisabilité ni cette récompense : si elle se confirme, monter au-delà d'un niveau élite pourrait faire perdre de l'XP.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

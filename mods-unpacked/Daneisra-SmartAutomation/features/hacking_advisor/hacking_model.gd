@@ -86,7 +86,7 @@ func contradictions(row: Dictionary) -> Array[Dictionary]:
 		var interval := _interval(key)
 		if (scales.hit <= 0.0 and scales.stack <= 0.0) or interval <= 0.0 or not _measured(key, row.scenario):
 			continue
-		var outcome := attack_outcome(target.levels[target.level], scales.hit, scales.stack, scales.bonus, _multipliers_for(key, row.scenario), interval)
+		var outcome := attack_outcome(target.levels[target.level], scales.hit * _shot_time(key), scales.stack * _shot_time(key), scales.bonus, _multipliers_for(key, row.scenario), interval)
 		var real_chance: float = float(real.successes) / real.attacks
 		var real_used: float = real.used / real.successes if real.successes > 0 else -1.0
 		var used_off: bool = real_used >= 0.0 and outcome.used >= 0.0 and absf(real_used - outcome.used) > USED_TOLERANCE
@@ -167,7 +167,7 @@ func _share(stream_id: String, kind: String, scenario: Dictionary) -> float:
 	return stream.production * _power_ratio(stream, scenario) * _chain.power_factor / maxi(outputs, 1)
 
 
-## hit and stack per shot, before vulnerability, and what vulnerability adds.
+## hit and stack as rates, before vulnerability, and what vulnerability adds.
 func _scales(key: String, scenario: Dictionary) -> Dictionary:
 	return {
 		"hit": _share(scenario.payload[key], "payload", scenario) * _chain.payload_factor,
@@ -182,11 +182,16 @@ func _multipliers_for(key: String, scenario: Dictionary) -> PackedFloat32Array:
 
 
 func _interval(key: String) -> float:
+	return _shot_time(key) / _chain.interval_factor
+
+
+## The time between two shots today. More speed makes shots come sooner without changing what each one brings.
+func _shot_time(key: String) -> float:
 	var interval: float = _chain.targets[key].interval
 	if interval <= 0.0:
 		for target: Dictionary in _chain.targets.values():
 			interval = maxf(interval, target.interval)
-	return interval / _chain.interval_factor
+	return interval
 
 
 func _measured(key: String, scenario: Dictionary) -> bool:
@@ -211,7 +216,8 @@ func _best_level(key: String, scenario: Dictionary) -> Dictionary:
 		elif not _measured(key, scenario):
 			best.insufficient = REASON_HITS
 		else:
-			_scan_levels(best, target, scales, _multipliers_for(key, scenario), interval)
+			var shots := {"hit": scales.hit * _shot_time(key), "stack": scales.stack * _shot_time(key), "bonus": scales.bonus}
+			_scan_levels(best, target, shots, _multipliers_for(key, scenario), interval)
 	_results[memo] = best
 	return best
 
