@@ -294,6 +294,27 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 
 **Puissance :** l'Interface est montée à 42,37 dégâts par nœud à 01:13:39, pendant une pause. Le changement est bien détecté, sans action.
 
+**Quatrième essai, 2026-11-01, build `0.2.0-beta.1-trial.4`, 24 min 49 : réussi.** Gouvernement et Entreprises avec infection, profil équilibré, voie rapide, budget de 12 actions : 8 utilisées. 339 attaques au niveau 4 sur Gouvernement et 329 au niveau 7 sur Entreprises, 0 échec, 0 réinitialisation due à une action, 0 fenêtre manquée, 0 prévision hors plage, 0 erreur du mod.
+
+| Heure | Action | Attaques avant | Prévu au maximum | Observé |
+|---|---|---|---|---|
+| 01:38:33 | Gouvernement 0→1 | 7 s après la liaison | 0,95 s | 1,0 s |
+| 01:38:35 | Gouvernement 1→2 | 1 | 2,85 s | 3,0 s |
+| 01:38:39 | Gouvernement 2→3 | 1 | 3,0 s | 3,0 s |
+| 01:38:43 | Gouvernement 3→4 | 1 | 5,0 s | 5,0 s |
+| 01:39:40 | Entreprises 3→4 | 5 s après la reprise | 2,45 s | 2,0 à 2,2 s |
+| 01:39:48 | Entreprises 4→5 (élite) | 3 | 8,25 s | 7,5 à 7,7 s |
+| 01:40:11 | Entreprises 5→6 | 3 | 4,05 s | 3,8 à 3,85 s |
+| 01:40:24 | Entreprises 6→7 | 3 | 5,35 s | 4,8 à 4,85 s |
+
+- **Voie rapide :** Gouvernement de 0 à 4 en 10 s après la première action, 17 s après la liaison, pour environ 20 s estimées et 2 min 20 pour 0 à 3 au troisième essai. Vérification sur 1 attaque (Gouvernement) et 3 attaques (Entreprises).
+- **Écart :** une durée de 3,0 s et une de 1,0 s dépassent de 0,05 s le maximum annoncé, à cause du tick de fin. Elles restent dans la tolérance de 0,15 s.
+- **Deux types :** chaque action ne change que son type. Pause et reprise d'Entreprises sans effet sur Gouvernement. `previous_action_unverified` refusé 6 fois sur Entreprises, le temps de ses propres vérifications, sans budget consommé.
+- **Infection :** les 10 comparaisons se sont faites pendant la pause, d'où la montée 5 s après la reprise. Aucune montée sur le niveau 8 : d'abord annoncé en échec avec la marge, puis incertain à la nouvelle puissance.
+- **Puissance, changement naturel à 01:43:53 (42,37 à 52,96) :** détecté sur les deux types, attaques à cheval marquées incomplètes, stabilisation, prévisions recalculées, modèle d'infection à revérifier. Aucune action possible ensuite : la première montée après un changement n'a donc pas été observée.
+- **Point mineur :** pendant une vérification, le régulateur repropose une montée, journalisée puis refusée. À clarifier dans le journal.
+- **Non couvert en jeu :** échecs réels en mode actif, baisse en profil équilibré, prévision certaine démentie, première montée après un changement de puissance, rechargement avec régulation active.
+
 **Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
 
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
