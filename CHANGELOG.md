@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0-dev.3 – en cours : Smart Hacking Advisor
+## 0.3.0 – 2026-11-01 : Smart Hacking Advisor
 
 ### Ajouté
 

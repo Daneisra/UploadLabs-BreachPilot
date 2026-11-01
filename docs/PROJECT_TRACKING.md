@@ -11,7 +11,7 @@
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
-| Smart Hacking Advisor, `0.3.0-dev.3` (lecture seule) | Essai en jeu réussi le 2026-11-01 : lisible, sans saccade, niveaux jugés cohérents par Jérémy. Pas encore de tag |
+| Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -40,6 +40,15 @@ Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte 
 **Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Jérémy, corrigés.
 
 **Sortie de la `0.3.0`, décidée par Jérémy :** un achat normal en jeu, puis comparaison du résultat réel avec la prévision du panneau. Si c'est cohérent et sans problème fonctionnel important : tag `v0.3.0` et fusion dans `main`, sans autre campagne.
+
+**Essai de sortie, 2026-11-01, build `0.3.0-dev.3` :** réussi. Critère fixé avant l'essai : les deux nœuds tiennent le niveau annoncé, et l'XP/min réelle reste à moins de 20 % de l'annonce. XP/min réelle calculée à 256 XP par attaque réussie au niveau 8.
+
+| Après | Annoncé | Réel |
+|---|---|---|
+| Dégâts d'infection (28,89 à 31,78), 10 min 14 | Niveaux 8 et 8, 91 et 93 % de réussite, 4 348 XP/min | Niveaux 8 et 8, 102 réussites sur 103 et 103 sur 103, 5 128 XP/min (+18 %) |
+| Spécialisation de hack (dégâts annoncés de 104,86 à 125,84), 24 min 14 | Niveaux 8 et 8, 100 %, 5 288 XP/min | Niveaux 8 et 8, 271 réussites sur 271 et 268 sur 268, 5 694 XP/min (+8 %) |
+
+Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la cause de la hausse est déduite du gain de 20 %. Les deux estimations sont en dessous du réel : le temps entre deux attaques (0,7 s) et la chance juste au-dessus d'un seuil semblent un peu pessimistes.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
