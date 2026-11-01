@@ -26,6 +26,7 @@ const RISK_EPSILON := 1e-9
 ## Attacks that verify a raise: one if nothing about it is new, more with infection, an elite level
 ## or a recent change of power.
 const VERIFY_CERTAIN := 1
+const FAILURES_IN_ROW_TO_LOWER := 2
 const VERIFY_CAREFUL := 3
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
@@ -47,6 +48,7 @@ var _level := -1
 var _signature := ""
 var _history: Array[bool] = []
 var _consecutive := 0
+var _failures_in_row := 0
 var _stabilizing := 0
 var _proposal := ""
 var _actions: Array[Array] = []
@@ -231,6 +233,7 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 	if _history.size() > WINDOW:
 		_history.pop_front()
 	_consecutive = 0 if is_failure else _consecutive + 1
+	_failures_in_row = _failures_in_row + 1 if is_failure else 0
 
 	if _paused:
 		return _decision("hold", "manual_pause", attack)
@@ -251,27 +254,33 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 
 func _try_lower(attack: Dictionary, current: Dictionary) -> Dictionary:
 	var failures := _history.count(true)
-	if current.get("status") != "reliable":
-		return _decision("hold", "forecast_not_reliable", attack, {"failures": failures, "status": current.get("status", "none")})
-	var true_risk: float = 1.0 - current.p_success
-	# One failure against a sure forecast stops the raises. It takes the normal conditions below to lower.
-	if true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON and not _raises_suspended:
+	var known: bool = current.get("status") == "reliable"
+	var true_risk: float = 1.0 - current.p_success if known else 1.0
+	# One failure against a sure forecast stops the raises. It takes more than that to lower.
+	if known and true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON and not _raises_suspended:
 		_raises_suspended = true
 		_certainty_lost = true
 		_just_contradicted = true
+	# Failing twice in a row is enough, unless the forecast knows this level to fail now and then, within
+	# what the profile accepts: chance may then explain it, and the count over the window decides.
+	var accepted_chance: bool = known and true_risk > RISK_EPSILON and true_risk <= 1.0 - _profile.p + RISK_EPSILON
+	var repeated: bool = _failures_in_row >= FAILURES_IN_ROW_TO_LOWER and not accepted_chance
 	# Chance only excuses the risk the profile accepts: a level expected to fail is not "normal".
 	var risk := minf(true_risk, 1.0 - _profile.p)
 	var needed := failures_needed(_history.size(), risk)
-	if risk > REFUTED_BELOW_RISK + RISK_EPSILON and _history.size() < MIN_ATTACKS_WITH_RISK:
-		return _decision("hold", "gathering_attacks", attack, {"failures": failures})
-	if failures < needed:
-		return _decision("hold", "within_expected_failures", attack, {"failures": failures, "needed": needed, "risk": risk})
+	if not repeated:
+		if not known:
+			return _decision("hold", "forecast_not_reliable", attack, {"failures": failures, "status": current.get("status", "none")})
+		if risk > REFUTED_BELOW_RISK + RISK_EPSILON and _history.size() < MIN_ATTACKS_WITH_RISK:
+			return _decision("hold", "gathering_attacks", attack, {"failures": failures})
+		if failures < needed:
+			return _decision("hold", "within_expected_failures", attack, {"failures": failures, "needed": needed, "risk": risk})
 	if attack.level <= _min_level:
 		return _decision("hold", "at_min_level", attack, {"failures": failures, "needed": needed})
 	if _timer - _last_lower < LOWER_DELAY:
 		return _decision("hold", "lower_delay", attack)
-	_refuted = true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
-	return _act("lower", attack, {"failures": failures, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_refuted": _refuted})
+	_refuted = known and true_risk <= REFUTED_BELOW_RISK + RISK_EPSILON
+	return _act("lower", attack, {"failures": failures, "failures_in_row": _failures_in_row, "needed": needed, "risk": risk, "true_risk": true_risk, "forecast_status": current.get("status", "none"), "forecast_refuted": _refuted, "verify_attacks": VERIFY_CERTAIN})
 
 
 ## A raise the forecast is sure of needs no waiting: one success here, and it goes up. The profile's
@@ -370,6 +379,7 @@ func _block(level: int) -> void:
 func _reset_window() -> void:
 	_history.clear()
 	_consecutive = 0
+	_failures_in_row = 0
 
 
 func _decision(kind: String, reason: String, attack: Dictionary, details: Dictionary = {}) -> Dictionary:

@@ -240,6 +240,7 @@ func _run() -> void:
 	await _test_actions_in_observer()
 	await _test_trial_in_observer()
 	await _test_automation_control()
+	await _test_descent_in_observer()
 	await _test_announced_damage_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -1433,6 +1434,40 @@ func _test_announced_damage_in_observer() -> void:
 	_check(_count("hit_spread type=breach_government announced=87.0 lowest=53.0 highest=53.0") == 1, "the gap is noticed: %s" % _last("hit_spread"))
 	_check(government.data.level == 5.0, "a level that passes with the real hits goes up: %s" % _last("active type="))
 	_check(_count("outcome=verified") == 1 and _count("regulation_stopped") == 0, "and it is verified against the real hits: %s" % _last("action_verification"))
+	observer.stop()
+	observer.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(MARKER_PATH)
+	await _remove_fake_game(game)
+
+
+## Weak hits on a high level: every level near it fails too, so the mod must walk down until one works.
+func _test_descent_in_observer() -> void:
+	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
+	DirAccess.remove_absolute(MARKER_PATH)
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var government := ActingBreach.new()
+	government.window = "breach_government"
+	government.fixed_time = 6.0
+	game.desktop.windows.add_child(government)
+	government.breach_damage.production = 12.0
+	government.infection_damage.production = 0.0
+	government.data.level = 4.0
+	government._rearm()
+	var observer := TrialObserver.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	game.Signals.tick.emit()
+	for attack: int in 16:
+		await _play_volleys(game, government)
+		observer._regulator_for("breach_government").advance(11.0)
+	_check(government.calls == ["down:1", "down:1"] and government.data.level == 2.0, "it walks down until a level works: %s, %s" % [str(government.calls), _last("active type=breach_government")])
+	_check(_count("action_refused") == 0, "without any refusal: %s" % _last("action_refused"))
+	_check(_count("regulation_stopped") == 0, "a failing level is not an anomaly")
+	_check(_count("outcome=verified") == 2, "each step is verified: %s" % _last("action_verification"))
 	observer.stop()
 	observer.queue_free()
 	await process_frame

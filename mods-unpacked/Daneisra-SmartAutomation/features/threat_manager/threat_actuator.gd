@@ -67,13 +67,14 @@ func _build_allows_actions() -> bool:
 func _trial_refusal(pending: Dictionary) -> String:
 	if not pending.type in Policy.TRIAL_TYPES or mini(pending.from, pending.to) < Policy.TRIAL_MIN_LEVEL or (Policy.TRIAL_MAX_LEVEL >= 0 and maxi(pending.from, pending.to) > Policy.TRIAL_MAX_LEVEL):
 		return "outside_trial"
-	if pending.expected.get("status") != "reliable" or pending.expected.get("p_success", -1.0) < Policy.TRIAL_MIN_TARGET_SUCCESS - EPSILON:
+	# Going down is the safe way: the level below may fail too, and the next failures will take it further.
+	if pending.direction == "raise" and (pending.expected.get("status") != "reliable" or pending.expected.get("p_success", -1.0) < Policy.TRIAL_MIN_TARGET_SUCCESS - EPSILON):
 		return "target_forecast_not_reliable"
 	if actions_done >= Policy.TRIAL_MAX_ACTIONS:
 		return "action_limit"
 	if actions_done == 0 and FileAccess.file_exists(_marker_path):
 		return "trial_already_used"
-	if not pending.decision.get("certain", false) and _since_action < Policy.TRIAL_MIN_GAP:
+	if pending.direction == "raise" and not pending.decision.get("certain", false) and _since_action < Policy.TRIAL_MIN_GAP:
 		return "too_soon_after_last_action"
 	return ""
 

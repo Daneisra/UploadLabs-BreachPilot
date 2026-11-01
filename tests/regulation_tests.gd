@@ -27,6 +27,7 @@ func run(check: Callable) -> void:
 	_test_long_sequences()
 	_test_certain_raises()
 	_test_observed_hits()
+	_test_failures_in_row()
 	_test_game_load()
 	_test_pauses()
 
@@ -555,6 +556,44 @@ func _test_observed_hits() -> void:
 	_check(hopeless.outcome == "mixed" and hopeless.p_success == 0.0 and hopeless.status == "reliable", "a level needing lucky hits is never certain, but can pass: %s" % str(hopeless))
 	var announced_only := _profile({"damage_rate": 87.3867})
 	_check(Forecast.forecast(announced_only, _target(170.0, 170.0, 4.0), 0.0).p_success > Forecast.forecast(spread, _target(170.0, 170.0, 4.0), 0.0).p_success, "low hits make a level look harder than the announced figure")
+
+
+## Seen in the game: 31 failures in a row at level 8, because level 7 was not safe either.
+func _test_failures_in_row() -> void:
+	var regulator := Regulator.new("balanced")
+	_feed(regulator, 2, "success", 8, {}, _reliable(1.0))
+	for failure_forecast: Dictionary in [{"status": "reliable", "outcome": "mixed", "p_success": 0.0}]:
+		var first := _feed(regulator, 1, "failure_power", 8, {}, failure_forecast)[0]
+		_check(first.decision == "hold", "one failure does not lower")
+		var second := _feed(regulator, 1, "failure_power", 8, {}, failure_forecast)[0]
+		_check(second.decision == "lower" and second.failures_in_row == 2, "two in a row do: %s" % str(second))
+		_check(second.verify_attacks == 1, "and one attack verifies it")
+	regulator.on_level_changed(7)
+	regulator.advance(20.0)
+	var hopeless := {"status": "reliable", "outcome": "mixed", "p_success": 0.0}
+	_check(_feed(regulator, 1, "failure_power", 7, {}, hopeless)[0].decision == "hold", "the count starts again at each level")
+	_check(_feed(regulator, 1, "failure_power", 7, {}, hopeless)[0].decision == "lower", "and it can go down again")
+
+	var interrupted := Regulator.new("balanced")
+	_feed(interrupted, 2, "success", 8, {}, _reliable(0.5))
+	_feed(interrupted, 1, "failure_power", 8, {}, _reliable(0.5))
+	_feed(interrupted, 1, "success", 8, {}, _reliable(0.5))
+	_feed(interrupted, 1, "failure_power", 8, {}, _reliable(0.5))
+	_check(interrupted._failures_in_row == 1, "a success in between starts the count again")
+
+	var accepted := Regulator.new("aggressive")
+	_feed(accepted, 2, "success", 7, {}, _reliable(0.97))
+	_check(_kinds(_feed(accepted, 2, "failure_power", 7, {}, _reliable(0.97)), "lower") == 0, "chance within the accepted risk can still fail twice")
+
+	for event: String in ["failure_starved", "failure_paused", "reset_unknown", "level_changed_reset"]:
+		var other := Regulator.new("balanced")
+		_feed(other, 2, "success", 8, {}, _reliable(1.0))
+		_check(_kinds(_feed(other, 10, event, 8, {}, _reliable(0.0)), "lower") == 0, "%s never counts" % event)
+	var cut := Regulator.new("balanced")
+	_feed(cut, 2, "success", 8, {}, _reliable(1.0))
+	for i: int in 5:
+		cut.advance(4.0)
+		_check(cut.on_attack({"event": "failure_power", "complete": false, "level": 8, "max_level": 9, "signature": "s"}, _reliable(0.0), {}).decision == "hold", "nor does an incomplete failure")
 
 
 func _test_game_load() -> void:

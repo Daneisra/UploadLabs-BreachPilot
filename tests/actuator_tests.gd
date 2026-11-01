@@ -379,7 +379,7 @@ func _test_trial_limits() -> void:
 	var policy := Actuator.Policy
 	_check(policy.TRIAL_TYPES == ["breach_government", "breach_corps"] and policy.TRIAL_MIN_LEVEL == 0 and policy.TRIAL_MAX_LEVEL == -1, "the trial is the authorized one")
 	_check(policy.TRIAL_MAX_ACTIONS == 40 and policy.TRIAL_PROFILE == "balanced", "with 40 actions, in the balanced profile")
-	_check(policy.TRIAL_MARKER.ends_with("trial_6_used.json"), "earlier markers are left alone")
+	_check(policy.TRIAL_MARKER.ends_with("trial_7_used.json"), "earlier markers are left alone")
 	DirAccess.remove_absolute(MARKER)
 	var other_type := _trial(2.0)
 	other_type.actuator.action_types = ["breach_government", "breach_corps", "breach_bank"]
@@ -399,6 +399,12 @@ func _test_trial_limits() -> void:
 		var result := _trial_attempt(weak, "breach_government", "raise", 2, expected)
 		_check(result.reason == "target_forecast_not_reliable" and weak.window.calls.is_empty(), "no change towards a level not forecast safe: %s" % str(expected))
 		_free(weak)
+
+	# Going down needs no safe target: this is how it gets out of several levels that fail.
+	var descent := _trial(5.0)
+	_check(_trial_attempt(descent, "breach_government", "lower", 5, {"status": "reliable", "outcome": "mixed", "p_success": 0.0}).outcome == "acted" and descent.window.data.level == 4.0, "a lower does not need the level below to be safe")
+	_free(descent)
+	DirAccess.remove_absolute(MARKER)
 
 	var busy := _trial(2.0)
 	busy.window.detected = true
@@ -557,10 +563,15 @@ func _test_regulator_support() -> void:
 	var reliable := {"status": "reliable", "outcome": "pass", "p_success": 1.0, "used_nominal": 3.0, "infected": false}
 	for status: Dictionary in [{"status": "uncertain"}, {"status": "invalid"}, {}]:
 		var regulator := Regulator.new("balanced")
-		var decisions := _feed(regulator, 30, "failure_power", 5, status, {})
-		var lowers := decisions.filter(func(d: Dictionary) -> bool: return d.decision == "lower")
-		_check(lowers.is_empty() and decisions.back().reason == "forecast_not_reliable", "no lower without a reliable forecast: %s" % str(status))
-		_check(decisions.back().window_failures >= 2, "the failures stay visible in the log")
+		_feed(regulator, 2, "success", 5, status, {})
+		var decisions := _feed(regulator, 2, "failure_power", 5, status, {})
+		_check(decisions[0].decision == "hold" and decisions[0].reason == "forecast_not_reliable", "one failure without a reliable forecast is not enough: %s" % str(status))
+		_check(decisions[1].decision == "lower" and not decisions[1].forecast_refuted, "two in a row lower the level, and refute nothing: %s" % str(status))
+		var scattered := Regulator.new("balanced")
+		_feed(scattered, 2, "success", 5, status, {})
+		for round_index: int in 5:
+			_feed(scattered, 1, "failure_power", 5, status, {})
+			_check(_feed(scattered, 1, "success", 5, status, {})[0].decision == "hold", "scattered failures do not lower without a reliable forecast")
 
 	var proposing := Regulator.new("aggressive")
 	var first: Dictionary = _feed(proposing, 10, "success", 4, {}, reliable).filter(func(d: Dictionary) -> bool: return d.decision == "raise")[0]

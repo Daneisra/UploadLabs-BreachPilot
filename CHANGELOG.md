@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.9 – en cours : actionneur, essais actifs et pause sur le nœud
+## 0.2.0-beta.1-dev.10 – en cours : actionneur, essais actifs et pause sur le nœud
 
 **Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée, baisse et 4 actions successives validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
 
@@ -15,6 +15,7 @@
 
 ### Corrigé
 
+- 2 échecs d'affilée suffisent maintenant à baisser, même si la prévision est incertaine, et le niveau inférieur n'a plus à être annoncé sûr. Auparavant, le mod restait bloqué sur un niveau qui échoue. Une prévision fiable qui admet ces échecs dans le risque du profil garde la règle statistique.
 - Avec `Payload critique`, le jeu annonce plus de dégâts que la plupart des coups n'en font. Les prévisions comptent maintenant sur les coups les plus faibles réellement observés, à chaque puissance.
 
 ### Ajouté
