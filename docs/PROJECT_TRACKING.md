@@ -315,6 +315,8 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 - **Point mineur :** pendant une vérification, le régulateur repropose une montée, journalisée puis refusée. À clarifier dans le journal.
 - **Non couvert en jeu :** échecs réels en mode actif, baisse en profil équilibré, prévision certaine démentie, première montée après un changement de puissance, rechargement avec régulation active.
 
+**Session finale, première tentative, 2026-11-01, build `trial.5` : arrêtée à juste titre après 4 min.** Jérémy a ajouté un nœud `Payload critique` à 02:35. Dégâts annoncés : 87,39, coups réels : 52 à 53, et 132 environ une fois sur dix. Le mod a jugé le niveau 8 certain d'après la valeur annoncée (5,0 s au plus), l'a appliqué, puis la vérification a mesuré 5,25 s : `verification_failed:duration_out_of_range`, régulation arrêtée sur les deux types, aucune autre action. Le modèle a ensuite été corrigé. Le branchement de l'infection sur les deux nœuds a aussi été observé : infection divisée par 2, 4 échecs au niveau 8, sans baisse puisque la régulation était déjà arrêtée et la prévision incertaine.
+
 **Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
 
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.

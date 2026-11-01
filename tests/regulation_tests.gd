@@ -26,6 +26,7 @@ func run(check: Callable) -> void:
 	_test_trust_and_safety()
 	_test_long_sequences()
 	_test_certain_raises()
+	_test_observed_hits()
 	_test_game_load()
 	_test_pauses()
 
@@ -523,6 +524,37 @@ func _test_certain_raises() -> void:
 	var native := Regulator.new("conservative")
 	native.set_native(true)
 	_check(_kinds(_feed(native, 5, "success", 4, _good_next()), "raise") == 0, "nor the native option")
+
+
+## Seen in the game with a critical node: 87.39 announced, but hits of 53, and 132 one time in ten.
+func _test_observed_hits() -> void:
+	var profile := _profile({"damage_rate": 87.3867, "infection_rate": 48.1469, "infection_offset": 0.35})
+	var signature_before: String = profile.signature
+	PowerProfile.apply_observed_hits(profile, 52.0, 133.0)
+	_check(is_equal_approx(profile.damage_rate, 52.0) and profile.hit_spread, "a forecast counts on the lowest hit seen")
+	_check(profile.signature == signature_before, "and the power stays the same power")
+	var level_8 := Forecast.forecast(profile, _target(205.0, 820.0, 6.0), 0.0)
+	print("level 8 with critical hits: status %s used %s to %s" % [level_8.status, level_8.used_min, level_8.used_max])
+	_check(level_8.used_min == 0.0 and (level_8.used_max < 0.0 or level_8.used_max + 0.15 >= 5.3), "the durations seen in the game fit the forecast: %s" % str(level_8))
+
+	var plain := _profile({"damage_rate": 52.9616})
+	PowerProfile.apply_observed_hits(plain, 52.0, 53.0)
+	_check(is_equal_approx(plain.damage_rate, 52.9616) and not plain.has("hit_spread"), "hits as announced change nothing")
+	var nothing := _profile({"damage_rate": 52.9616})
+	PowerProfile.apply_observed_hits(nothing, -1.0, 0.0)
+	_check(not nothing.has("hit_spread"), "and so do no hits at all")
+	var high_only := _profile({"damage_rate": 52.9616})
+	PowerProfile.apply_observed_hits(high_only, 52.0, 132.0)
+	_check(is_equal_approx(high_only.damage_rate, 52.9616) and high_only.hit_spread, "hits above the announced figure only widen the durations")
+
+	var spread := _profile({"damage_rate": 87.3867})
+	PowerProfile.apply_observed_hits(spread, 53.0, 132.0)
+	var sure := Forecast.forecast(spread, _target(101.0, 101.0, 6.0), 0.1)
+	_check(sure.status == "reliable" and is_equal_approx(sure.p_success, 1.0) and sure.used_min == 0.0, "a level that passes with low hits alone stays certain: %s" % str(sure))
+	var hopeless := Forecast.forecast(spread, _target(757.5, 757.5, 12.0), 0.1)
+	_check(hopeless.outcome == "mixed" and hopeless.p_success == 0.0 and hopeless.status == "reliable", "a level needing lucky hits is never certain, but can pass: %s" % str(hopeless))
+	var announced_only := _profile({"damage_rate": 87.3867})
+	_check(Forecast.forecast(announced_only, _target(170.0, 170.0, 4.0), 0.0).p_success > Forecast.forecast(spread, _target(170.0, 170.0, 4.0), 0.0).p_success, "low hits make a level look harder than the announced figure")
 
 
 func _test_game_load() -> void:

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.8 – en cours : actionneur, essais actifs et pause sur le nœud
+## 0.2.0-beta.1-dev.9 – en cours : actionneur, essais actifs et pause sur le nœud
 
 **Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée, baisse et 4 actions successives validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
 
@@ -12,6 +12,10 @@
 - Un chargement de partie repart d'observations neuves, sans être traité comme une anomalie. Pauses, blocages et budget restent.
 - Rien n'est proposé pendant la vérification d'une action.
 - Session finale : Gouvernement et Entreprises, profil équilibré, 40 actions au plus.
+
+### Corrigé
+
+- Avec `Payload critique`, le jeu annonce plus de dégâts que la plupart des coups n'en font. Les prévisions comptent maintenant sur les coups les plus faibles réellement observés, à chaque puissance.
 
 ### Ajouté
 

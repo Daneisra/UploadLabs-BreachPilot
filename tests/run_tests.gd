@@ -94,6 +94,7 @@ class FakeBreach extends Node:
 class ActingBreach extends FakeBreach:
 	var calls: Array[String] = []
 	var fixed_time := 0.0
+	var true_hit := 0.0
 
 	func _init() -> void:
 		var main := VBoxContainer.new()
@@ -239,6 +240,7 @@ func _run() -> void:
 	await _test_actions_in_observer()
 	await _test_trial_in_observer()
 	await _test_automation_control()
+	await _test_announced_damage_in_observer()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -1077,7 +1079,7 @@ func _test_actions_in_observer() -> void:
 	corps.breach_damage.production = 12.0
 	var lowering := _armed_setup(game, {})
 	for attack: int in 20:
-		await _play_attack(game, corps, false)
+		await _play_volleys(game, corps)
 		if not corps.calls.is_empty():
 			break
 	_check(corps.calls == ["down:1"], "a lower calls the game once: %s, %s" % [str(corps.calls), _last("active type=")])
@@ -1190,6 +1192,8 @@ func _test_actions_in_observer() -> void:
 func _play_volleys(game: Dictionary, breach: FakeBreach, restart: bool = false) -> void:
 	var start: float = breach.max_time
 	var hit: float = breach.breach_damage.production
+	if breach is ActingBreach and breach.true_hit > 0.0:
+		hit = breach.true_hit
 	var firewall: float = breach.max_firewall
 	var breached := 0.0
 	for volley: int in int(start):
@@ -1200,7 +1204,8 @@ func _play_volleys(game: Dictionary, breach: FakeBreach, restart: bool = false) 
 		breach.detected = true
 		breach.time = start - 0.05 - volley
 		breach.firewall = firewall
-		breach.breached = minf(breached, breach.max_breach)
+		# As measured: the last hit shows in full, it is not cut to what the bar had left.
+		breach.breached = breached
 		game.Signals.tick.emit()
 		if breached >= breach.max_breach:
 			breach.time -= 0.05
@@ -1398,6 +1403,38 @@ func _test_trial_in_observer() -> void:
 	_check(government.calls.is_empty(), "nor at the resume")
 	tight.stop()
 	tight.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(MARKER_PATH)
+	await _remove_fake_game(game)
+
+
+## A critical node announces more damage than most hits deal: the level must be judged on the real hits.
+func _test_announced_damage_in_observer() -> void:
+	const MARKER_PATH := "user://smart_automation_test/observer_trial_used.json"
+	DirAccess.remove_absolute(MARKER_PATH)
+	var game := _install_fake_game()
+	game.Globals.desktop = game.desktop
+	var government := ActingBreach.new()
+	government.window = "breach_government"
+	government.fixed_time = 6.0
+	game.desktop.windows.add_child(government)
+	government.breach_damage.production = 87.0
+	government.true_hit = 53.0
+	government.infection_damage.production = 0.0
+	government.data.level = 4.0
+	government._rearm()
+	var observer := TrialObserver.new()
+	observer.configure(SaLog.new("info"), 0.25, false, {"active_trial": true})
+	root.add_child(observer)
+	ModLoaderLog.messages.clear()
+	observer.start()
+	game.Signals.tick.emit()
+	await _play_until(game, observer, government, func() -> bool: return _count("action_verification") >= 1, 12)
+	_check(_count("hit_spread type=breach_government announced=87.0 lowest=53.0 highest=53.0") == 1, "the gap is noticed: %s" % _last("hit_spread"))
+	_check(government.data.level == 5.0, "a level that passes with the real hits goes up: %s" % _last("active type="))
+	_check(_count("outcome=verified") == 1 and _count("regulation_stopped") == 0, "and it is verified against the real hits: %s" % _last("action_verification"))
+	observer.stop()
+	observer.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(MARKER_PATH)
 	await _remove_fake_game(game)

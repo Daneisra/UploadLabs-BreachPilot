@@ -92,6 +92,7 @@ var _state: RegulationState = RegulationState.new()
 var _regulators: Dictionary = {}
 var _forecasts: Dictionary = {}
 var _last_intervals: Dictionary = {}
+var _observed_hits: Dictionary = {}
 var _last_signatures: Dictionary = {}
 var _last_hold_reason: Dictionary = {}
 var _gap_probe := false
@@ -610,6 +611,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	var profile := PowerProfile.from_event(event, _last_intervals.get(type, 0.0))
 	if profile.interval > 0.0 and event.complete:
 		_last_intervals[type] = profile.interval
+	_apply_observed_hits(type, event, profile)
 	if _last_signatures.get(type, profile.signature) != profile.signature:
 		_log.info("power_change type=%s from=%s to=%s" % [type, _last_signatures[type], profile.signature])
 	_last_signatures[type] = profile.signature
@@ -922,8 +924,23 @@ func _regulator_for(type: String) -> ThreatRegulator:
 	return _regulators[type]
 
 
+## Remembers the hits seen at this power, and lets the forecasts count on them.
+func _apply_observed_hits(type: String, event: Dictionary, profile: Dictionary) -> void:
+	var seen: Dictionary = _observed_hits.get(type, {})
+	if seen.get("signature") != profile.signature:
+		seen = {"signature": profile.signature, "lowest": -1.0, "highest": 0.0}
+		_observed_hits[type] = seen
+	if event.complete and event.has("min_hit"):
+		seen.lowest = event.min_hit if seen.lowest < 0.0 else minf(seen.lowest, event.min_hit)
+		seen.highest = maxf(seen.highest, event.max_hit)
+	PowerProfile.apply_observed_hits(profile, seen.lowest, seen.highest)
+	if profile.get("hit_spread", false) and not seen.get("logged", false):
+		seen.logged = true
+		_log.info("hit_spread type=%s announced=%s lowest=%s highest=%s" % [type, _format_value(event.damage_rate), _format_value(seen.lowest), _format_value(seen.highest)])
+
+
 func _forecast_for(profile: Dictionary, target: Dictionary, margin: float) -> Dictionary:
-	var key := "%s|%s|%s|%s|%s|%s|%s|%s" % [profile.signature, profile.interval, profile.tick_speed, profile.infection_offset, target.firewall, target.breach, target.time, margin]
+	var key := "%s|%s|%s|%s|%s|%s|%s|%s|%s|%s" % [profile.signature, profile.damage_rate, profile.get("hit_spread", false), profile.interval, profile.tick_speed, profile.infection_offset, target.firewall, target.breach, target.time, margin]
 	if _forecasts.has(key):
 		return _forecasts[key]
 	if _forecasts.size() >= FORECAST_CACHE_SIZE:

@@ -41,6 +41,11 @@ static func forecast(profile: Dictionary, target: Dictionary, margin: float = 0.
 		_forecast_infected(profile, target, margin, result)
 	else:
 		_forecast_volleys(profile, target, margin, base_hit, result)
+	# With hits above the ones counted on, an attack can always end sooner, or pass despite a failure forecast.
+	if profile.get("hit_spread", false) and result.status == "reliable":
+		result.used_min = 0.0
+		if result.outcome == "fail":
+			result.outcome = "mixed"
 	return result
 
 
