@@ -22,10 +22,10 @@ Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule,
 | Besoin | Disponible | À vérifier en jeu |
 |---|---|---|
 | Durée et réussite d'une attaque à chaque niveau | Oui : prévisions de la `0.2.0`, vérifiées en jeu | Rien |
-| Récompenses et XP par niveau | Probable : `get_reward` et `get_experience_reward` existent | Valeurs et unités |
-| Puissance partagée | En partie : deux entrées divisent la puissance par 2 (89 devient 45) | Règle générale, chaîne réelle |
-| Branchements de la chaîne | Inconnu : `containers` et `pairs` existent sur les nœuds | Lien entre deux nœuds |
-| Coût et effet des améliorations | Inconnu | Où le jeu les expose, sans décompilation |
+| Récompenses et XP par niveau | Oui : `cur_reward`, `cur_experience` ; `get_reward` et `get_experience_reward` à comparer en jeu | Accord des deux au niveau courant |
+| Puissance partagée | Oui : partage égal entre les sorties. 231,1 donne 115,55, × 1,1 pour le lanceur (127,11), × 0,5 pour l'infection (57,78) | Rien |
+| Branchements de la chaîne | Oui : `id`, `input_id`, `outputs_id` et `production` sur chaque conteneur | Rien |
+| Coût et effet des améliorations | Probable : `Data.upgrades` donne coût et attributs, `Globals.upgrades` les niveaux | Relevé détaillé des `hack_*` |
 
 **Jalons :**
 

@@ -66,6 +66,7 @@ func is_relevant(name: String) -> bool:
 func snapshot(root: Node, desktop: Variant) -> PackedStringArray:
 	var lines := PackedStringArray()
 	_describe_autoloads(root, lines)
+	_describe_hacking_details(root, lines)
 	if not is_instance_valid(desktop):
 		lines.append("desktop none")
 		return _finished(lines)
@@ -114,6 +115,25 @@ func _describe_autoloads(root: Node, lines: PackedStringArray) -> void:
 					lines.append("autoload %s.%s size=%d relevant=%s" % [node.name, property.name, value.size(), describe(kept)])
 			elif is_relevant(property.name):
 				lines.append("autoload %s.%s=%s" % [node.name, property.name, describe(value)])
+
+
+## What the general walk cuts short: the upgrades' costs and effects, and the attributes' current values.
+func _describe_hacking_details(root: Node, lines: PackedStringArray) -> void:
+	var data: Node = root.get_node_or_null("Data")
+	var attributes: Node = root.get_node_or_null("Attributes")
+	if is_instance_valid(data):
+		for section: String in ["upgrades", "perks"]:
+			var entries: Variant = data.get(section)
+			if not entries is Dictionary:
+				continue
+			for name: String in entries:
+				if name.begins_with("hack_") or name.begins_with("optimization_breach") or name.begins_with("optimization_critical") or name == "breach_skills":
+					lines.append("detail %s.%s=%s" % [section, name, describe(entries[name])])
+	if is_instance_valid(attributes) and attributes.get("attributes") is Dictionary:
+		for name: String in attributes.attributes:
+			var attribute: Variant = attributes.attributes[name]
+			if is_relevant(name) and not is_sensitive(name) and attribute is Object:
+				lines.append("detail attribute.%s %s" % [name, _script_properties(attribute, false)])
 
 
 func _describe_window(window: Node, type: String, lines: PackedStringArray) -> void:

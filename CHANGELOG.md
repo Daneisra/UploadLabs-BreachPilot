@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.3.0-dev.1 – en cours : relevé pour le Smart Hacking Advisor
+## 0.3.0-dev.2 – en cours : Smart Hacking Advisor
 
 ### Ajouté
 
-- `Ctrl+Alt+F8` écrit dans le journal un relevé unique de ce que le jeu expose sur le hacking. Il ne fait que lire des propriétés : aucune méthode du jeu n'est appelée, et ce qui touche au compte ou aux sauvegardes est écarté. Testé en simulation seulement.
+- `Ctrl+Alt+F8` ouvre un panneau qui compare les branchements du Payload et de l'infection : niveau atteignable, durée, XP et gains par minute, face au branchement actuel. Lecture seule : rien n'est branché ni acheté. Estimations prudentes, sans les coups critiques.
+- `Ctrl+Alt+Maj+F8` écrit dans le journal un relevé de ce que le jeu expose sur le hacking. Il ne fait que lire des propriétés, et ce qui touche au compte ou aux sauvegardes est écarté.
 
 ## 0.2.0 – 2026-11-01 : régulation normale
 
