@@ -11,7 +11,7 @@
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
-| Smart Hacking Advisor (lecture seule) | En étude |
+| Smart Hacking Advisor, `0.3.0-dev.3` (lecture seule) | Essai en jeu réussi le 2026-11-01 : lisible, sans saccade, niveaux jugés cohérents par Jérémy. Pas encore de tag |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 

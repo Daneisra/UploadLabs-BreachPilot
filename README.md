@@ -15,7 +15,7 @@ Rendre le hacking plus confortable en respectant les mécaniques normales du jeu
 | Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | Validé en jeu |
 | Actionneur, pause sur le nœud, essais réels | 0.2.0-beta.1 | Validé en jeu |
 | Auto Threat Manager (régulation de la menace) | 0.2.0 | **Validé en jeu** |
-| Smart Hacking Advisor : conseils en lecture seule | À venir | En étude |
+| Smart Hacking Advisor : branchements et achats comparés, en lecture seule (`Ctrl+Alt+F8`) | 0.3.0 | En test |
 
 ## Ce que fait la version 0.2.0
 
