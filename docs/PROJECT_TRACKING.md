@@ -11,9 +11,54 @@
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
-| Smart Hacking Advisor (lecture seule) | En étude |
+| Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
+
+## Smart Hacking Advisor : faisabilité
+
+Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule, sans branchement ni achat automatique.
+
+| Besoin | Disponible | À vérifier en jeu |
+|---|---|---|
+| Durée et réussite d'une attaque à chaque niveau | Oui : prévisions de la `0.2.0`, vérifiées en jeu | Rien |
+| Récompenses et XP par niveau | Oui : `cur_reward`, `cur_experience` ; `get_reward` et `get_experience_reward` à comparer en jeu | Accord des deux au niveau courant |
+| Puissance partagée | Oui : partage égal entre les sorties. 231,1 donne 115,55, × 1,1 pour le lanceur (127,11), × 0,5 pour l'infection (57,78) | Rien |
+| Branchements de la chaîne | Oui : `id`, `input_id`, `outputs_id` et `production` sur chaque conteneur | Rien |
+| Coût et effet des améliorations | Oui : `Data.upgrades` et `Data.perks` donnent coût et effets, `Globals` les niveaux, `Attributes` les valeurs | Rien |
+| Coups critiques | Oui : `breach_critical_chance` 0,1 et `breach_critical_multiplier` 1,5, soit 2,5 fois le coup normal (63 et 159 mesurés) | Rien |
+
+**Jalons :**
+
+1. Relevé `Ctrl+Alt+F8` : savoir ce qui est lisible. Sans cela, aucune comparaison n'est promise.
+2. Premier conseil utile, sur le seul nœud : pour la puissance actuelle, niveau atteignable, durée, fiabilité, récompense et XP par minute, puis ce qu'apporterait un gain de puissance.
+3. Si le relevé le permet : scénarios de branchement (« actuel » contre « recommandé ») et goulet d'étranglement.
+4. Si le relevé le permet : priorité des améliorations, par coût et gain réel.
+
+Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte ce qu'il retire au lanceur.
+
+**Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Jérémy, corrigés.
+
+**Sortie de la `0.3.0`, décidée par Jérémy :** un achat normal en jeu, puis comparaison du résultat réel avec la prévision du panneau. Si c'est cohérent et sans problème fonctionnel important : tag `v0.3.0` et fusion dans `main`, sans autre campagne.
+
+**Essai de sortie, 2026-11-01, build `0.3.0-dev.3` :** réussi. Critère fixé avant l'essai : les deux nœuds tiennent le niveau annoncé, et l'XP/min réelle reste à moins de 20 % de l'annonce. XP/min réelle calculée à 256 XP par attaque réussie au niveau 8.
+
+| Après | Annoncé | Réel |
+|---|---|---|
+| Dégâts d'infection (28,89 à 31,78), 10 min 14 | Niveaux 8 et 8, 91 et 93 % de réussite, 4 348 XP/min | Niveaux 8 et 8, 102 réussites sur 103 et 103 sur 103, 5 128 XP/min (+18 %) |
+| Spécialisation de hack (dégâts annoncés de 104,86 à 125,84), 24 min 14 | Niveaux 8 et 8, 100 %, 5 288 XP/min | Niveaux 8 et 8, 271 réussites sur 271 et 268 sur 268, 5 694 XP/min (+8 %) |
+
+Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la cause de la hausse est déduite du gain de 20 %. Les deux estimations sont en dessous du réel : le temps entre deux attaques (0,7 s) et la chance juste au-dessus d'un seuil semblent un peu pessimistes.
+
+**Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
+
+1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
+2. Améliorations : classer les achats selon leur rentabilité réelle et les ressources disponibles.
+3. Objectifs : privilégier l'XP de hacking, les données, les renseignements ou un compromis équilibré.
+4. Recommandations : ce qu'il faut modifier, pourquoi, le gain estimé et les inconvénients.
+5. Interface : à terme, consulter les recommandations directement dans le jeu, sans dépendre d'un raccourci ni des journaux.
+
+Jérémy choisit lui-même ses branchements et ses achats.
 
 ## Décisions
 

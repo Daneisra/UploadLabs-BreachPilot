@@ -14,6 +14,8 @@ const ModMain := preload(MOD + "mod_main.gd")
 const RegulationTests := preload("regulation_tests.gd")
 const GapProbeTests := preload("gap_probe_tests.gd")
 const ActuatorTests := preload("actuator_tests.gd")
+const AdvisorInventoryTests := preload("advisor_inventory_tests.gd")
+const HackingAdvisorTests := preload("hacking_advisor_tests.gd")
 const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 
 const TICK := 0.05
@@ -194,6 +196,8 @@ func _run() -> void:
 	GapProbeTests.new().run(_check)
 	await _test_gap_probe_in_observer()
 	ActuatorTests.new().run(_check)
+	AdvisorInventoryTests.new().run(_check)
+	HackingAdvisorTests.new().run(_check)
 	await _test_actions_in_observer()
 	await _test_regulation_in_observer()
 	await _test_automation_control()

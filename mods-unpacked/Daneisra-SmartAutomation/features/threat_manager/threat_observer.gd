@@ -121,6 +121,11 @@ func _new_actuator(armed: bool) -> ThreatActuator:
 
 
 ## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
+## The attack interval last seen for each type: the advisor has no other way to know it.
+func attack_intervals() -> Dictionary:
+	return _last_intervals
+
+
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
 	_log = logger
 	_starvation_ratio = starvation_ratio

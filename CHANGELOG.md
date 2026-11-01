@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 – 2026-11-01 : Smart Hacking Advisor
+
+### Ajouté
+
+- `Ctrl+Alt+F8` ouvre un panneau qui compare les branchements du Payload et de l'infection (niveau atteignable, chance de réussite, XP et gains par minute) et ce que rapporterait chaque achat. Lecture seule : rien n'est branché ni acheté. Estimations par attaques tirées au hasard avec les coups critiques du jeu.
+- `Ctrl+Alt+Maj+F8` écrit dans le journal un relevé de ce que le jeu expose sur le hacking. Il ne fait que lire des propriétés, et ce qui touche au compte ou aux sauvegardes est écarté.
+
 ## 0.2.0 – 2026-11-01 : régulation normale
 
 Le mode `active` est une option normale, désactivée par défaut. Les archives d'essai, les marqueurs et les limites d'actions sont retirés.
