@@ -240,6 +240,8 @@ func _on_desktop_ready() -> void:
 			_cancel_action(type, "game_loaded")
 		_log_verification(_actuator.on_reload())
 		_log_new_halt()
+		for regulator: ThreatRegulator in _regulators.values():
+			regulator.on_game_loaded()
 	_log_save_candidates()
 	_scan_desktop()
 
@@ -622,6 +624,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	if not next_target.is_empty():
 		next = _forecast_for(profile, next_target, regulator.margin()).duplicate()
 		next.elite = next_target.elite
+	regulator.set_action_busy(_actuator.is_busy())
 	var decision := regulator.on_attack({
 		"event": event.event, "complete": event.complete, "level": event.level,
 		"max_level": event.max_level, "signature": profile.signature,

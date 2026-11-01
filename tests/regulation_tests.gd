@@ -26,6 +26,7 @@ func run(check: Callable) -> void:
 	_test_trust_and_safety()
 	_test_long_sequences()
 	_test_certain_raises()
+	_test_game_load()
 	_test_pauses()
 
 
@@ -522,6 +523,28 @@ func _test_certain_raises() -> void:
 	var native := Regulator.new("conservative")
 	native.set_native(true)
 	_check(_kinds(_feed(native, 5, "success", 4, _good_next()), "raise") == 0, "nor the native option")
+
+
+func _test_game_load() -> void:
+	var regulator := Regulator.new("balanced")
+	_feed(regulator, 3, "success", 4, _good_next(), {}, "s", 2.0)
+	regulator.on_level_changed(5)
+	regulator.on_game_loaded()
+	var after := _feed(regulator, 3, "success", 3, _good_next(), {}, "s", 2.0)
+	_check(after[0].reason == "stabilizing" and after[1].reason == "stabilizing", "a load starts observing again: %s" % after[0].reason)
+	_check(after[2].decision == "raise" and after[2].real_level == 3, "and judges the level it finds")
+	var paused := Regulator.new("balanced")
+	paused.set_paused(true)
+	paused.on_game_loaded()
+	_check(_feed(paused, 5, "success", 4, _good_next()).back().reason == "manual_pause", "a load does not lift a pause")
+
+	var busy := Regulator.new("balanced")
+	busy.set_action_busy(true)
+	var waiting := _feed(busy, 5, "success", 4, _good_next())
+	_check(_kinds(waiting, "raise") == 0 and waiting.back().reason == "previous_action_unverified", "nothing is proposed while another action is being verified")
+	_check(busy._actions.is_empty(), "and it costs nothing")
+	busy.set_action_busy(false)
+	_check(_feed(busy, 1, "success", 4, _good_next())[0].decision == "raise", "it goes on after")
 
 
 func _test_pauses() -> void:

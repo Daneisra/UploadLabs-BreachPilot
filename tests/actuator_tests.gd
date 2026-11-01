@@ -323,8 +323,8 @@ func _test_verification() -> void:
 	_free(quiet)
 
 	var loaded := _verified_setup()
-	_check(loaded.actuator.on_reload().reason == "reload_during_verification", "a load during the verification ends it")
-	_check(not loaded.actuator.halt_reason.is_empty(), "and it stops the regulation")
+	_check(loaded.actuator.on_reload().outcome == "interrupted", "a load during the verification ends it")
+	_check(loaded.actuator.halt_reason.is_empty(), "a load is not an anomaly")
 	_free(loaded)
 
 
@@ -378,8 +378,8 @@ func _trial_attempt(setup: Dictionary, type: String, direction: String, level: i
 func _test_trial_limits() -> void:
 	var policy := Actuator.Policy
 	_check(policy.TRIAL_TYPES == ["breach_government", "breach_corps"] and policy.TRIAL_MIN_LEVEL == 0 and policy.TRIAL_MAX_LEVEL == -1, "the trial is the authorized one")
-	_check(policy.TRIAL_MAX_ACTIONS == 12 and policy.TRIAL_PROFILE == "balanced", "with 12 actions, in the balanced profile")
-	_check(policy.TRIAL_MARKER.ends_with("trial_4_used.json"), "earlier markers are left alone")
+	_check(policy.TRIAL_MAX_ACTIONS == 40 and policy.TRIAL_PROFILE == "balanced", "with 40 actions, in the balanced profile")
+	_check(policy.TRIAL_MARKER.ends_with("trial_5_used.json"), "earlier markers are left alone")
 	DirAccess.remove_absolute(MARKER)
 	var other_type := _trial(2.0)
 	other_type.actuator.action_types = ["breach_government", "breach_corps", "breach_bank"]
@@ -406,15 +406,15 @@ func _test_trial_limits() -> void:
 	_check(busy.window.calls.is_empty() and not FileAccess.file_exists(MARKER), "waiting does not use up the trial")
 	_free(busy)
 
-	# Twelve changes on one budget, whatever the type, with a verification and a delay between each.
+	# All the changes of the budget, whatever the type, with a verification and a delay between each.
 	var chain := _trial(0.0)
-	chain.window.data.max_level = 20.0
-	for action: int in 12:
+	chain.window.data.max_level = 60.0
+	for action: int in policy.TRIAL_MAX_ACTIONS:
 		var level: int = chain.window.data.level
 		var result := _trial_attempt(chain, "breach_government", "raise", level)
 		_check(result.outcome == "acted", "change %d is made: %s" % [action + 1, str(result)])
 		_check(FileAccess.file_exists(MARKER), "the marker is written")
-		if action == 11:
+		if action == policy.TRIAL_MAX_ACTIONS - 1:
 			break
 		_check(chain.actuator.halt_reason.is_empty(), "the regulation goes on after change %d" % (action + 1))
 		_check(_trial_attempt(chain, "breach_government", "raise", level + 1).is_empty() or chain.actuator.is_verifying(), "no change before the verification")
@@ -425,12 +425,12 @@ func _test_trial_limits() -> void:
 		_check(_trial_attempt(chain, "breach_government", "raise", level + 1).reason == "too_soon_after_last_action", "the next change must wait")
 		_check(chain.window.calls.size() == action + 1, "and nothing happens")
 		chain.actuator.advance(Actuator.Policy.TRIAL_MIN_GAP + 1.0)
-	_check(chain.window.calls.size() == 12 and chain.window.data.level == 12.0, "twelve calls in all: %s" % str(chain.window.calls))
+	_check(chain.window.calls.size() == policy.TRIAL_MAX_ACTIONS and chain.window.data.level == policy.TRIAL_MAX_ACTIONS, "as many calls as the budget, and no more: %d" % chain.window.calls.size())
 	_check(chain.actuator.halt_reason == "action_limit_reached", "the regulation stops at the limit")
-	_check(_trial_attempt(chain, "breach_government", "lower", 12) == {} and chain.window.calls.size() == 12, "a thirteenth change is impossible")
+	_check(_trial_attempt(chain, "breach_government", "lower", policy.TRIAL_MAX_ACTIONS) == {} and chain.window.calls.size() == policy.TRIAL_MAX_ACTIONS, "one more change is impossible")
 	_check(chain.actuator.request("breach_corps", "raise", 2, {}, {}, {}) == "halted", "on any type")
 	var marker_text := FileAccess.get_file_as_string(MARKER)
-	_check(marker_text.contains("\"actions\":12"), "the marker counts them: %s" % marker_text)
+	_check(marker_text.contains("\"actions\":%d" % policy.TRIAL_MAX_ACTIONS), "the marker counts them: %s" % marker_text)
 	_free(chain)
 
 	var restarted := _trial(2.0)

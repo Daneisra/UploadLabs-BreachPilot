@@ -65,6 +65,7 @@ var _certainty_lost := false
 var _raises_suspended := false
 var _just_contradicted := false
 var _power_fresh := false
+var _action_busy := false
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
@@ -89,6 +90,11 @@ func set_native(active: bool) -> void:
 
 func set_paused(paused: bool) -> void:
 	_paused = paused
+
+
+## An action is waiting or being verified, on any type: nothing new can be proposed.
+func set_action_busy(busy: bool) -> void:
+	_action_busy = busy
 
 
 ## Failures the window must hold before chance stops being a fair explanation.
@@ -155,6 +161,15 @@ func on_level_changed(level: int) -> void:
 func on_resume(level: int) -> void:
 	_paused = false
 	_level = level
+	_reset_window()
+	_stabilizing = STABILIZE_ATTACKS
+	_proposal = ""
+	_undo = {}
+
+
+## A game was loaded: what was seen before says nothing about this one. Pauses, blocks and the budget stay.
+func on_game_loaded() -> void:
+	_level = -1
 	_reset_window()
 	_stabilizing = STABILIZE_ATTACKS
 	_proposal = ""
@@ -300,6 +315,8 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 
 
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:
+	if _action_busy:
+		return _decision("hold", "previous_action_unverified", attack)
 	var key := "%s|%d|%s" % [direction, attack.level, _signature]
 	if key == _proposal:
 		suppressed_repeats += 1

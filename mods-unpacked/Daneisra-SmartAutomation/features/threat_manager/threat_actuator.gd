@@ -113,6 +113,10 @@ func is_verifying() -> bool:
 	return not _verifying.is_empty()
 
 
+func is_busy() -> bool:
+	return is_verifying() or not _pending.is_empty()
+
+
 func pending_direction() -> String:
 	return _pending.get("direction", "")
 
@@ -227,13 +231,13 @@ func advance(seconds: float) -> Dictionary:
 	return _end_verification("inconclusive", "no_attack_after_action", {})
 
 
-## A game was loaded: nothing waiting or being verified still applies.
+## A game was loaded: nothing waiting or being verified still applies. A load is not an anomaly.
 func on_reload() -> Dictionary:
 	_pending = {}
 	_claim = {}
 	if not is_verifying():
 		return {}
-	return _end_verification("inconclusive", "reload_during_verification", {})
+	return _end_verification("interrupted", "reload_during_verification", {})
 
 
 func summary() -> String:

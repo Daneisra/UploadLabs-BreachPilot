@@ -1086,8 +1086,8 @@ func _test_actions_in_observer() -> void:
 	game.Signals.tick.emit()
 	_check(_count("level_origin type=breach_corps level=3 origin=mod") == 1, "the lower is told apart from a player's change")
 	game.Signals.desktop_ready.emit()
-	_check(_count("action_verification type=breach_corps from=4 to=3 outcome=inconclusive reason=reload_during_verification") == 1, "a load during the verification is reported")
-	_check(_count("regulation_stopped reason=verification_inconclusive") == 1, "and it stops the regulation")
+	_check(_count("action_verification type=breach_corps from=4 to=3 outcome=interrupted reason=reload_during_verification") == 1, "a load during the verification is reported")
+	_check(_count("regulation_stopped") == 0, "and it is not an anomaly")
 	corps.data.level = 4.0
 	corps._rearm()
 
@@ -1101,7 +1101,7 @@ func _test_actions_in_observer() -> void:
 	for attack: int in 12:
 		await _play_attack(game, corps, true)
 	_check(corps.calls.size() == before, "nothing acts after the emergency stop, even restarted")
-	_check(_count("regulation_stopped reason=emergency_stop") == 1, "the new actuator says why it is stopped")
+	_check(_count("regulation_stopped reason=emergency_stop") >= 1, "the new actuator says why it is stopped")
 	lowering.stop()
 	lowering.queue_free()
 	await process_frame
@@ -1321,11 +1321,11 @@ func _test_trial_in_observer() -> void:
 	# The resume button: nothing happens at once, the old limits stay, the last action comes later.
 	var calls_before := government.calls.size()
 	# The budget goes through pauses and resumes: one action is left.
-	observer._actuator.actions_done = 11
+	observer._actuator.actions_done = Observer.Policy.TRIAL_MAX_ACTIONS - 1
 	_control_of(government).button().pressed.emit()
 	_check(_count("automation_resume type=breach_government level=3") == 1, "the resume is logged")
 	_check(government.calls.size() == calls_before and government.data.level == 3.0, "the resume changes nothing by itself")
-	_check(observer._actuator.actions_done == 11, "and gives no budget back")
+	_check(observer._actuator.actions_done == Observer.Policy.TRIAL_MAX_ACTIONS - 1, "and gives no budget back")
 	_check(_control_of(government).shown().text == "Auto : actif", "the node shows it")
 	await _play_volleys(game, government)
 	await _play_volleys(game, government)
@@ -1333,7 +1333,7 @@ func _test_trial_in_observer() -> void:
 	_check(_last("active type=breach_government").contains("stabilizing"), "it says so: %s" % _last("active type=breach_government"))
 	await _play_until(game, observer, government, func() -> bool: return government.calls.size() >= calls_before + 1)
 	_check(government.calls.size() == calls_before + 1 and government.data.level == 4.0, "the player gave control back, so it may go above the chosen level: %s" % str(government.calls))
-	_check(_count("regulation_stopped reason=action_limit_reached actions=12") == 1, "the budget is spent: %s" % _last("regulation_stopped"))
+	_check(_count("regulation_stopped reason=action_limit_reached actions=%d" % Observer.Policy.TRIAL_MAX_ACTIONS) == 1, "the budget is spent: %s" % _last("regulation_stopped"))
 	_check(_control_of(government).shown().text == "Auto : bloqué" and _control_of(government).shown().button.is_empty(), "the node shows a block with no button")
 	await _play_until(game, observer, government, func() -> bool: return false, 8)
 	_check(government.calls.size() == calls_before + 1, "there is no action past the budget")

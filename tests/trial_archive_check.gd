@@ -58,7 +58,7 @@ func _check(condition: bool, label: String) -> void:
 
 
 func _attempt(window: FakeWindow, settings: FakeSettings, type: String, direction: String, level: int) -> Dictionary:
-	var actuator := Actuator.new(true, {"attributes": settings, "data": settings}, {"action_limit": 12, "action_types": Actuator.Policy.TRIAL_TYPES + ["breach_bank"], "marker_path": MARKER})
+	var actuator := Actuator.new(true, {"attributes": settings, "data": settings}, {"action_limit": Actuator.Policy.TRIAL_MAX_ACTIONS, "action_types": Actuator.Policy.TRIAL_TYPES + ["breach_bank"], "marker_path": MARKER})
 	actuator.request(type, direction, level, {"damage_rate": 30.0, "infection_rate": 30.0, "vulnerability": 0.0}, {"status": "reliable", "p_success": 1.0}, {})
 	return actuator.attempt(type, window, "1|1", 1, true, true, false)
 
@@ -74,7 +74,7 @@ func _run() -> void:
 	var trial := Observer.new()
 	trial.configure(SaLog.new("warning"), 0.25, false, {"active_trial": true, "profile": "aggressive", "action_limit": 9})
 	_check(trial.regulation_mode() == "active", "the explicit option arms the trial")
-	_check(trial._regulation.profile == "balanced" and trial._regulation.action_limit == 12 and trial._regulation.action_types == Actuator.Policy.TRIAL_TYPES, "and the trial sets its own limits")
+	_check(trial._regulation.profile == "balanced" and trial._regulation.action_limit == Actuator.Policy.TRIAL_MAX_ACTIONS and trial._regulation.action_types == Actuator.Policy.TRIAL_TYPES, "and the trial sets its own limits")
 	trial.free()
 
 	var settings := FakeSettings.new()
