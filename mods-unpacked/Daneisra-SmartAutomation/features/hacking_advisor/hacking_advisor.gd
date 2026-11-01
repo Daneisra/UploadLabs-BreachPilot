@@ -119,7 +119,10 @@ func _advice_text() -> String:
 	var refuted := _model.contradictions(_current)
 	if not refuted.is_empty():
 		for found: Dictionary in refuted:
-			lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks])
+			if found.duration:
+				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %.1f s prévues, %.1f s réelles sur %d attaques." % [found.label, found.level, found.expected_used, found.real_used, found.attacks])
+			else:
+				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks])
 		lines.append("Aucun conseil chiffré tant que ce n'est pas résolu.")
 		return "\n".join(lines)
 	var best := HackingAdvice.best_row(_rows, _current, _objective)
@@ -278,10 +281,7 @@ func _with_change(value: float, reference: float, is_reference: bool) -> String:
 
 
 func _number(value: float) -> String:
-	var whole := roundi(value)
-	if whole < 1000:
-		return str(whole)
-	return "%d %03d" % [whole / 1000, whole % 1000]
+	return HackingUpgrades.grouped(value)
 
 
 func _log_rows() -> void:

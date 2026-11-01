@@ -135,12 +135,14 @@ func _chain() -> Dictionary:
 func _test_hit_log() -> void:
 	var log := HitLog.new()
 	log.add("corps", "a", {"event": "success", "level": 8, "complete": true, "used": 5.0, "damage_rate": 100.0, "vulnerability": 0.25, "hits": PackedFloat32Array([125.0, 250.0])})
-	log.add("corps", "a", {"event": "failure_power", "level": 8, "complete": true, "damage_rate": 100.0, "vulnerability": 0.0})
+	log.add("corps", "a", {"event": "failure_power", "level": 8, "complete": true, "damage_rate": 100.0, "vulnerability": 0.25})
 	log.add("corps", "a", {"event": "success", "level": 8, "complete": false, "used": 9.0, "damage_rate": 100.0, "hits": PackedFloat32Array([999.0])})
 	var kept := log.multipliers("a")
 	_check.call(kept.size() == 2 and is_equal_approx(kept[0], 1.0) and is_equal_approx(kept[1], 2.0), "hits are kept relative to the announcement, without vulnerability")
-	var stats := log.attack_stats("corps", "a", 8)
+	var stats := log.attack_stats("corps", "a", 8, HitLog.power_key(100.0, 0.0))
 	_check.call(stats.attacks == 2 and stats.successes == 1 and is_equal_approx(stats.used, 5.0), "only complete attacks count")
+	_check.call(log.attack_stats("corps", "a", 8, HitLog.power_key(130.0, 0.0)).attacks == 0, "attacks at another power do not compare")
+	_check.call(is_equal_approx(log.last_vulnerability("corps"), 0.25) and log.last_vulnerability("other") == 0.0, "the last attack's vulnerability is kept")
 	_check.call(log.multipliers("b").is_empty(), "another chain starts a new measure")
 	_check.call(log.multipliers("a").size() == 2, "the old chain's measures stay")
 	for index: int in HitLog.MAX_CHAINS + 2:
@@ -260,6 +262,15 @@ func _test_graph_any_chain() -> void:
 	var unmeasured := HackingModel.new(no_log)
 	_check.call(unmeasured.evaluate(unmeasured.current_scenario()).insufficient.has(HackingModel.REASON_HITS), "without hits on this chain, no figure")
 	_free_desktop(renamed)
+
+	var vulnerable := _strange_desktop()
+	var fed: FakeBreach = vulnerable.windows.get_child(6)
+	fed.vulnerability.input_id = "V"
+	fed.vulnerability.count = 0.0
+	log.add("zz_alpha", "whatever", {"event": "success", "level": 1, "complete": true, "damage_rate": 1.0, "vulnerability": 0.24})
+	var kept_value := HackingChain.read(vulnerable, {"zz_alpha": 1.0}, log, null, null)
+	_check.call(is_equal_approx(kept_value.targets.zz_alpha.vulnerability, 0.24), "vulnerability falling to nothing between two attacks is not believed")
+	_free_desktop(vulnerable)
 
 	var missing := Slot.new()
 	desktop.windows.get_child(0).containers = [missing, null, 12]
@@ -505,7 +516,23 @@ func _test_advice() -> void:
 	var objectives := HackingAdvice.objectives(chain)
 	_check.call(objectives.size() == 4 and objectives[1].label == "Données" and objectives[3].key == "balanced", "the objectives come from the chain's targets")
 	_check.call(HackingAdvice.best_row(rows, current, "xp") == corps_only, "the XP objective picks the most XP")
-	_check.call(is_equal_approx(HackingAdvice.score(corps_only, "balanced"), 0.0), "balanced gives nothing to a chain bringing nothing of one thing")
+	_check.call(is_equal_approx(HackingAdvice.score(corps_only, "balanced", current), 0.0), "balanced gives nothing to a chain bringing nothing of one thing")
+	_check.call(is_equal_approx(HackingAdvice.score(current, "balanced", current), 1.0), "the current chain is balanced's reference")
+	var lopsided := current.duplicate(true)
+	lopsided.current = false
+	lopsided.xp_rate = current.xp_rate * 2.0
+	lopsided.targets.corps.reward_rate = current.targets.corps.reward_rate * 2.0
+	lopsided.targets.gov.reward_rate = current.targets.gov.reward_rate * 0.5
+	var even := current.duplicate(true)
+	even.current = false
+	even.xp_rate = current.xp_rate * 1.2
+	even.targets.corps.reward_rate = current.targets.corps.reward_rate * 1.2
+	even.targets.gov.reward_rate = current.targets.gov.reward_rate * 1.2
+	var choices: Array[Dictionary] = [current, lopsided, even]
+	_check.call(HackingAdvice.best_row(choices, current, "balanced") == even, "balanced prefers a gain on everything to doubling at another's expense")
+	var only_lopsided: Array[Dictionary] = [current, lopsided]
+	_check.call(HackingAdvice.best_row(only_lopsided, current, "balanced") == current, "balanced never halves something, whatever it gains")
+	_check.call(HackingUpgrades.grouped(26113829114.0) == "26 113 829 114" and HackingUpgrades.grouped(405.0) == "405" and HackingUpgrades.grouped(1000.0) == "1 000", "large numbers read properly")
 	var slightly := current.duplicate(true)
 	slightly.current = false
 	slightly.xp_rate = current.xp_rate * 1.005

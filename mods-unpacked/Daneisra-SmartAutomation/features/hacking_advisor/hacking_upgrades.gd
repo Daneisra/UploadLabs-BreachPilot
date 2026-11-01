@@ -45,9 +45,23 @@ static func read(root: Node) -> Array[Dictionary]:
 	return list
 
 
-static func cost_text(cost: float, resource: String) -> String:
-	var names: Array = COST_NAMES.get(resource, [resource, resource])
-	return "%d %s" % [roundi(cost), names[0] if roundi(cost) <= 1 else names[1]]
+## A currency the mod has no word for is named by the game.
+static func cost_text(cost: float, resource: String, data: Variant = null) -> String:
+	var fallback := resource
+	if is_instance_valid(data) and data.get("currencies") is Dictionary and data.currencies.get(resource) is Dictionary:
+		fallback = data.tr(str(data.currencies[resource].get("name", resource)))
+	var names: Array = COST_NAMES.get(resource, [fallback, fallback])
+	return "%s %s" % [grouped(cost), names[0] if roundi(cost) <= 1 else names[1]]
+
+
+## 26113829114 reads 26 113 829 114.
+static func grouped(value: float) -> String:
+	var digits := str(roundi(value))
+	var text := ""
+	while digits.length() > 3:
+		text = " " + digits.right(3) + text
+		digits = digits.left(digits.length() - 3)
+	return digits + text
 
 
 ## A copy of the chain with this purchase made.
@@ -99,7 +113,7 @@ static func _item(key: String, entry: Dictionary, level: Variant, data: Node, gl
 	var changes := _changes(entry, attributes)
 	return {
 		"name": data.tr(str(entry.get("name", key))), "cost": cost, "resource": resource, "held": held, "affordable": held >= cost,
-		"cost_text": cost_text(cost, resource), "changes": changes, "followed": _is_followed(entry, changes),
+		"cost_text": cost_text(cost, resource, data), "changes": changes, "followed": _is_followed(entry, changes),
 	}
 
 

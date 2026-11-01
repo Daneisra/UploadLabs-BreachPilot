@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.3 – en cours : conseiller générique
+## 0.4.0-dev.4 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -17,6 +17,7 @@
 - Sans prévision possible, quelle qu'en soit la raison, le mod passe par des essais de niveau réels en profil équilibré ou agressif, au lieu de ne plus monter.
 - « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
 - Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
+- L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
 
 ### Corrigé
 

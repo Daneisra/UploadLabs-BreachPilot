@@ -18,36 +18,40 @@ static func objectives(chain: Dictionary) -> Array[Dictionary]:
 	return list
 
 
-## Balanced is a geometric mean: it rewards the same relative gain on each thing, and a chain
-## bringing nothing of one of them scores nothing.
-static func score(row: Dictionary, objective: String) -> float:
+## Balanced is the worst change against the current chain: a compromise improves everything, and doubling
+## the XP does not make up for halving something else. What the current chain does not bring does not count.
+static func score(row: Dictionary, objective: String, current: Dictionary) -> float:
 	if objective == XP:
 		return row.xp_rate
 	if objective != BALANCED:
 		return row.targets[objective].reward_rate
-	var product: float = row.xp_rate
+	var worst := _ratio(row.xp_rate, current.xp_rate)
 	for key: String in row.targets:
-		product *= row.targets[key].reward_rate
-	return pow(product, 1.0 / (1.0 + row.targets.size()))
+		worst = minf(worst, _ratio(row.targets[key].reward_rate, current.targets[key].reward_rate))
+	return worst
+
+
+static func _ratio(value: float, reference: float) -> float:
+	return value / reference if reference > 0.0 else 1.0
 
 
 ## The current connections stay unless another one is really better. Not fully understood: out of the ranking.
 static func best_row(rows: Array[Dictionary], current: Dictionary, objective: String) -> Dictionary:
 	var best := current
-	var limit := score(current, objective) * (1.0 + MIN_GAIN)
+	var limit := score(current, objective, current) * (1.0 + MIN_GAIN)
 	for row: Dictionary in rows:
 		if not row.insufficient.is_empty():
 			continue
-		var value := score(row, objective)
-		if value > limit and value > score(best, objective):
+		var value := score(row, objective, current)
+		if value > limit and value > score(best, objective, current):
 			best = row
 	return best
 
 
 ## Relative gain for the objective, or 1 when starting from nothing.
 static func gain(row: Dictionary, current: Dictionary, objective: String) -> float:
-	var before := score(current, objective)
-	var after := score(row, objective)
+	var before := score(current, objective, current)
+	var after := score(row, objective, current)
 	if before <= 0.0:
 		return 1.0 if after > 0.0 else 0.0
 	return after / before - 1.0

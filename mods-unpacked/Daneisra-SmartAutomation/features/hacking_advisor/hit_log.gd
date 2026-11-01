@@ -10,6 +10,7 @@ const MAX_HITS := 400
 var _hits := {}
 var _attacks := {}
 var _order: Array[String] = []
+var _vulnerability := {}
 
 
 ## event is a complete attack from the classifier.
@@ -17,7 +18,9 @@ func add(type: String, chain_key: String, event: Dictionary) -> void:
 	if not event.get("complete", false):
 		return
 	_touch(chain_key)
-	var stats: Dictionary = _attacks[chain_key].get_or_add("%s|%d" % [type, event.level], {"attacks": 0, "successes": 0, "used": 0.0})
+	_vulnerability[type] = event.get("vulnerability", 0.0)
+	var power := power_key(event.get("damage_rate", 0.0), event.get("infection_rate", 0.0))
+	var stats: Dictionary = _attacks[chain_key].get_or_add("%s|%d|%s" % [type, event.level, power], {"attacks": 0, "successes": 0, "used": 0.0})
 	stats.attacks += 1
 	if event.event == "success":
 		stats.successes += 1
@@ -38,9 +41,19 @@ func multipliers(chain_key: String) -> PackedFloat32Array:
 	return _hits.get(chain_key, PackedFloat32Array())
 
 
-## attacks, successes and total time used, at this level with this chain.
-func attack_stats(type: String, chain_key: String, level: int) -> Dictionary:
-	return _attacks.get(chain_key, {}).get("%s|%d" % [type, level], {"attacks": 0, "successes": 0, "used": 0.0})
+## Unlike hits, attack results only compare at the same power.
+static func power_key(damage: float, infection: float) -> String:
+	return "%.2f|%.2f" % [damage, infection]
+
+
+## attacks, successes and total time used, at this level with this chain and power.
+func attack_stats(type: String, chain_key: String, level: int, power: String) -> Dictionary:
+	return _attacks.get(chain_key, {}).get("%s|%d|%s" % [type, level, power], {"attacks": 0, "successes": 0, "used": 0.0})
+
+
+## What the last attack had. The slot itself falls back to nothing for an instant between two attacks.
+func last_vulnerability(type: String) -> float:
+	return _vulnerability.get(type, 0.0)
 
 
 func _touch(chain_key: String) -> void:

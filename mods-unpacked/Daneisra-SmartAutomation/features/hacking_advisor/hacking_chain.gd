@@ -4,6 +4,7 @@ extends RefCounted
 ## for the model to report as insufficient.
 
 const HackingGraph := preload("hacking_graph.gd")
+const HitLog := preload("hit_log.gd")
 
 ## Levels looked at beyond the highest unlocked one: enough to see what a scenario would open.
 const LEVELS_AHEAD := 4
@@ -69,6 +70,12 @@ static func _read_target(chain: Dictionary, graph: Dictionary, key: String, type
 	var vulnerability_slot: Variant = window.get("vulnerability")
 	var key_for_hits := HackingGraph.chain_key(graph, window, attributes)
 	var level_now := _level_field(window, "level")
+	var announced_payload := _number(payload_slot, "production")
+	var announced_infection := _number(infection_slot, "production")
+	var vulnerability := _number(vulnerability_slot, "count")
+	if hit_log != null and is_instance_valid(vulnerability_slot) and str(vulnerability_slot.get("input_id")) != "":
+		vulnerability = maxf(vulnerability, hit_log.last_vulnerability(type))
+	var power := HitLog.power_key(announced_payload, announced_infection)
 	chain.targets[key] = {
 		"type": type,
 		"label": _label(data, "windows", type, type),
@@ -77,12 +84,12 @@ static func _read_target(chain: Dictionary, graph: Dictionary, key: String, type
 		"max_level": max_level,
 		"levels": levels,
 		"interval": float(intervals.get(type, 0.0)),
-		"vulnerability": _number(vulnerability_slot, "count"),
-		"announced_payload": _number(payload_slot, "production"),
-		"announced_infection": _number(infection_slot, "production"),
+		"vulnerability": vulnerability,
+		"announced_payload": announced_payload,
+		"announced_infection": announced_infection,
 		"variation": int(_number(payload_slot, "variation")) | int(_number(infection_slot, "variation")),
 		"chain_key": key_for_hits,
-		"real": hit_log.attack_stats(type, key_for_hits, level_now) if hit_log != null else {"attacks": 0, "successes": 0, "used": 0.0},
+		"real": hit_log.attack_stats(type, key_for_hits, level_now, power) if hit_log != null else {"attacks": 0, "successes": 0, "used": 0.0},
 	}
 	chain.current.payload[key] = _note_stream(chain, graph, key, payload_slot, "payload", data)
 	chain.current.infection[key] = _note_stream(chain, graph, key, infection_slot, "infection", data)

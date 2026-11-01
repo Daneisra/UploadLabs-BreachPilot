@@ -91,7 +91,7 @@ func contradictions(row: Dictionary) -> Array[Dictionary]:
 		var real_used: float = real.used / real.successes if real.successes > 0 else -1.0
 		var used_off: bool = real_used >= 0.0 and outcome.used >= 0.0 and absf(real_used - outcome.used) > USED_TOLERANCE
 		if absf(real_chance - outcome.chance) > CHANCE_TOLERANCE or used_off:
-			found.append({"key": key, "label": target.label, "level": target.level, "expected": outcome.chance, "real": real_chance, "attacks": real.attacks})
+			found.append({"key": key, "label": target.label, "level": target.level, "expected": outcome.chance, "real": real_chance, "attacks": real.attacks, "expected_used": outcome.used, "real_used": real_used, "duration": used_off})
 	return found
 
 

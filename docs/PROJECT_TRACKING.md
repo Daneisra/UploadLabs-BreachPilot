@@ -56,6 +56,15 @@ Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la ca
 
 **Architecture générique, décidée par Jérémy le 2026-11-01 après avis de Codex et ChatGPT (issue #1) :** hybride. Le mod lit à l'exécution le graphe et les tables du jeu, et compte sur les coups mesurés ; seul un petit nombre de règles mesurées restent écrites (partage égal de la puissance, délai de l'infection, prochain tir, effets lus par attribut). « Marcher pour tout le monde » veut dire : aucun nœud ni branchement ne fait échouer le mod, et « données insuffisantes » plutôt qu'un chiffre faux. Limites : les coups sont tirés sans leur ordre, donc une séquence régulière (1 coup sur 3) devient une proportion, et la puissance est supposée proportionnelle pour un scénario jamais joué.
 
+**Essai de la `0.4.0-dev.3`, 2026-11-01, chaîne complète, 18 min :** aucune erreur, aucun arrêt. Bouton `Conseil` en place, tableau tenant à l'écran sur les captures. Montées et retours en arrière corrects avec l'injection.
+
+| Chaîne | Annoncé | Réel |
+|---|---|---|
+| Spécialiste d'infection acheté | Niveaux 9 et 9, 10 240 XP/min | Niveaux 9 et 9, 9 102 XP/min (-11 %, 135 s, avec des essais au niveau 10), 40 réussites sur 40 |
+| Avec l'optimisation de Payload critique en plus | Niveaux 9 et 9, environ 11 900 XP/min | Niveaux 9 et 9, 10 824 XP/min (-9 %, 579 s), 204 réussites sur 204 |
+
+Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au niveau 9. **Défaut trouvé :** la vulnérabilité lue sur le nœud retombe à 0 un instant entre deux attaques : ouvert à ce moment, le panneau annonçait 86 % au lieu de 100 % et se disait contredit. Corrigé en retenant la valeur de la dernière attaque.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
