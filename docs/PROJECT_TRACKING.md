@@ -50,6 +50,8 @@ Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte 
 
 Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la cause de la hausse est déduite du gain de 20 %. Les deux estimations sont en dessous du réel : le temps entre deux attaques (0,7 s) et la chance juste au-dessus d'un seuil semblent un peu pessimistes.
 
+**Temps entre deux attaques, mesuré le 2026-11-01 :** l'attaque suivante part au prochain tir du lanceur. Sur 8 longues suites, l'écart moyen avec le réel est de 0,15 s, contre 0,36 s pour un délai fixe de 0,7 s. Exemples : 3,81 s pour 3,81 s (Gouvernement niveau 4), 6,04 s pour 6,00 s (Entreprises niveau 9). Moins bon à 38,13 d'infection : 5,76 s pour 5,37 s.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

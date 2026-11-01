@@ -4,8 +4,6 @@ extends RefCounted
 ## at the limit a level often only works thanks to them, and XP doubles with each level.
 
 const NORMAL_TICK := 0.05
-## Time from the end of an attack to the start of the next: measured 0.65 and 0.77 s on the longest runs.
-const ATTACK_GAP := 0.7
 const SAMPLES := 150
 const EARLY_SAMPLES := 30
 ## From this chance on, the regulation holds a level long enough for it to count. Two failures in a row lower it.
@@ -15,7 +13,7 @@ const FAILED_IN_ROW_STOP := 2
 const SEED := 20261101
 ## How late the infection starts, in intervals. The lag is fitted on the logs: it gives 50 % for the 48 and 47 %
 ## measured over 40 attacks at the limit, and 4.59 s for the 4.59 s measured over 225 attacks. The logs show
-## an extra 0.35 in about one attack in seven.
+## a later start, 0.35, in about one attack in seven.
 const INFECTION_LAG := 0.25
 const LATE_INFECTION := 0.35
 const LATE_INFECTION_CHANCE := 0.15
@@ -89,7 +87,7 @@ func _best_level(type: String, hit: float, stack: float) -> Dictionary:
 	if _results.has(key):
 		return _results[key]
 	var target: Dictionary = _chain.targets[type]
-	var best := {"level": -1, "chance": 0.0, "used": -1.0, "reward_rate": 0.0, "xp_rate": 0.0, "hit": hit, "stack": stack, "invalid": false}
+	var best := {"level": -1, "chance": 0.0, "used": -1.0, "cycle": 0.0, "reward_rate": 0.0, "xp_rate": 0.0, "hit": hit, "stack": stack, "invalid": false}
 	if target.vulnerability > 0.0 or target.breach_variation != 0 or target.infection_variation != 0:
 		# Stealth, growing infection and vulnerability have never been measured: no figure rather than a wrong one.
 		best.invalid = true
@@ -102,13 +100,12 @@ func _best_level(type: String, hit: float, stack: float) -> Dictionary:
 			var outcome := attack_outcome(values, hit, stack)
 			if outcome.chance >= MIN_HOLD:
 				failed_in_row = 0
-				var time: float = values.time * _chain.time_factor
-				var cycle: float = outcome.chance * outcome.used + (1.0 - outcome.chance) * time + ATTACK_GAP
 				best.level = level
 				best.chance = outcome.chance
 				best.used = outcome.used
-				best.reward_rate = outcome.chance * values.reward / cycle * 60.0
-				best.xp_rate = outcome.chance * values.xp / cycle * 60.0
+				best.cycle = outcome.cycle
+				best.reward_rate = outcome.chance * values.reward / outcome.cycle * 60.0
+				best.xp_rate = outcome.chance * values.xp / outcome.cycle * 60.0
 			else:
 				failed_in_row += 1
 				if level > target.max_level or failed_in_row >= FAILED_IN_ROW_STOP:
@@ -117,14 +114,16 @@ func _best_level(type: String, hit: float, stack: float) -> Dictionary:
 	return best
 
 
-## chance of success and average duration of the attacks that succeed. The same seed gives two
-## scenarios the same luck, so that a small gap between them is not just noise.
+## chance of success, average duration of the attacks that succeed, and average time from one attack
+## to the next. The same seed gives two scenarios the same luck, so that a small gap between them is
+## not just noise.
 func attack_outcome(values: Dictionary, hit: float, stack: float) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	var time: float = values.time * _chain.time_factor
 	var successes := 0
 	var total_used := 0.0
+	var total_cycle := 0.0
 	var samples := 0
 	while samples < SAMPLES:
 		samples += 1
@@ -132,16 +131,23 @@ func attack_outcome(values: Dictionary, hit: float, stack: float) -> Dictionary:
 		if used >= 0.0:
 			successes += 1
 			total_used += used
+		total_cycle += _next_shot(used if used >= 0.0 else time)
 		if samples == EARLY_SAMPLES and successes == 0:
 			break
-	return {"chance": float(successes) / samples, "used": total_used / successes if successes > 0 else -1.0}
+	return {"chance": float(successes) / samples, "used": total_used / successes if successes > 0 else -1.0, "cycle": total_cycle / samples}
+
+
+## The next attack starts on the launcher's next shot: over 8 long runs this is 0.15 s off on average,
+## and it fits the gaps measured between attacks (3.95 s leaves 1 tick, 4.00 s leaves 20).
+func _next_shot(time: float) -> float:
+	return (floorf(time / _chain.interval + 1e-9) + 1.0) * _chain.interval
 
 
 ## One attack, tick by tick, as BreachForecast.attack_time, with whole random hits and critical hits.
 func _attack(rng: RandomNumberGenerator, firewall: float, breach: float, max_time: float, hit: float, stack_gain: float) -> float:
 	var interval: float = _chain.interval
 	var next_volley := 0.0
-	var next_pulse: float = (INFECTION_LAG + (LATE_INFECTION if rng.randf() < LATE_INFECTION_CHANCE else 0.0)) * interval
+	var next_pulse: float = (LATE_INFECTION if rng.randf() < LATE_INFECTION_CHANCE else INFECTION_LAG) * interval
 	var stack := 0.0
 	var time := 0.0
 	while time < max_time:

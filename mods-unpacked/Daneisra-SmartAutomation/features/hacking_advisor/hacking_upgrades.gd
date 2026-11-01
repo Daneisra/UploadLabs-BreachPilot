@@ -13,7 +13,11 @@ const UPGRADES := {
 	"optimization_critical_payload": "Payload critique (optimisation)",
 }
 const PERKS := {"hack_specialization": "Spécialisation de hack"}
-const COST_NAMES := {"hack_points": "point(s) de piratage", "optimization": "point(s) d'optimisation"}
+const COST_NAMES := {
+	"hack_points": ["point de piratage", "points de piratage"],
+	"optimization": ["point d'optimisation", "points d'optimisation"],
+	"token": ["jeton", "jetons"],
+}
 
 
 ## factors are the ratios of new to old values, by attribute name. Those already at their limit,
@@ -32,20 +36,27 @@ static func read(root: Node) -> Array[Dictionary]:
 			var attribute: String = entry.get("attribute_cost", "")
 			var held: float = _value(attributes, attribute)
 			list.append({
-				"name": UPGRADES[key], "cost": cost, "affordable": held >= cost,
-				"cost_text": "%d %s" % [roundi(cost), COST_NAMES.get(attribute, attribute)],
-				"changes": _changes(entry, attributes),
+				"name": UPGRADES[key], "cost": cost, "resource": attribute, "held": held, "affordable": held >= cost,
+				"cost_text": cost_text(cost, attribute), "changes": _changes(entry, attributes),
 			})
 	for key: String in PERKS:
 		var entry: Variant = data.perks.get(key)
 		if entry is Dictionary and _available(entry, globals.perks.get(key, 0), globals):
 			var cost: float = entry.cost * pow(10.0, entry.cost_e) * pow(entry.cost_inc, globals.perks.get(key, 0))
+			# A perk's currency is read like the game's others. Without it, a perk is shown but never advised.
+			var currency: String = entry.get("currency", "token")
+			var held: Variant = globals.currencies.get(currency)
+			var known: bool = held is float or held is int
 			list.append({
-				# Tokens are account-wide and stay unread: a perk is shown, never advised.
-				"name": PERKS[key], "cost": cost, "affordable": false,
-				"cost_text": "%d jetons" % roundi(cost), "changes": _changes(entry, attributes),
+				"name": PERKS[key], "cost": cost, "resource": currency, "held": float(held) if known else -1.0,
+				"affordable": known and float(held) >= cost, "cost_text": cost_text(cost, currency), "changes": _changes(entry, attributes),
 			})
 	return list
+
+
+static func cost_text(cost: float, resource: String) -> String:
+	var names: Array = COST_NAMES.get(resource, [resource, resource])
+	return "%d %s" % [roundi(cost), names[0] if roundi(cost) <= 1 else names[1]]
 
 
 ## A copy of the chain with this purchase made.

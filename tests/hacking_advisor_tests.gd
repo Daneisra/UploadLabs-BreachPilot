@@ -6,6 +6,7 @@ const ADVISOR := "res://mods-unpacked/Daneisra-SmartAutomation/features/hacking_
 const HackingModel := preload(ADVISOR + "hacking_model.gd")
 const HackingChain := preload(ADVISOR + "hacking_chain.gd")
 const HackingUpgrades := preload(ADVISOR + "hacking_upgrades.gd")
+const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 
 var _check: Callable
 
@@ -65,6 +66,8 @@ func run(check: Callable) -> void:
 	_test_levels()
 	_test_upgrades()
 	_test_upgrade_table()
+	_test_cycle_and_rates()
+	_test_advice()
 	_test_problems()
 	_test_reader()
 
@@ -209,6 +212,7 @@ class FakeAttribute extends RefCounted:
 
 
 class FakeTable extends Node:
+	var currencies := {}
 	var upgrades := {}
 	var perks := {}
 	var unlocks := {}
@@ -227,13 +231,14 @@ func _test_upgrade_table() -> void:
 		"hack_breach_speed": {"cost": 1.0, "limit": 2.0, "attribute_cost": "hack_points", "requirement": [], "attributes": {}},
 		"hack_infection_damage": {"cost": 1.0, "limit": 0.0, "attribute_cost": "hack_points", "requirement": ["research.locked"], "attributes": {}},
 	}
-	data.perks = {"hack_specialization": {"cost": 5.0, "cost_e": 2.0, "cost_inc": 1.0, "limit": 4.0, "requirement": [], "attributes": {"hack_specialization_multiplier": [0.25, 0.0, 0.0]}}}
+	data.perks = {"hack_specialization": {"cost": 5.0, "cost_e": 2.0, "cost_inc": 1.0, "limit": 4.0, "currency": "token", "requirement": [], "attributes": {"hack_specialization_multiplier": [0.25, 0.0, 0.0]}}}
 	root.add_child(data)
 	var globals := FakeTable.new()
 	globals.name = "Globals"
 	globals.upgrades = {"hack_breach_damage": 1, "hack_breach_speed": 2, "hack_sneak_attack": 1}
 	globals.perks = {"hack_specialization": 1}
 	globals.unlocks = {"research.locked": false, "research.critical_payload": true}
+	globals.currencies = {"token": 400.0}
 	root.add_child(globals)
 	var attributes := FakeTable.new()
 	attributes.name = "Attributes"
@@ -258,7 +263,76 @@ func _test_upgrade_table() -> void:
 	_check.call(absf(by_name["Attaque furtive"].changes.breach_time_multiplier.ratio - 1.4 / 1.2) < 0.001, "the sneak attack adds a second to 6, as the game says")
 	_check.call(not by_name["Attaque furtive"].affordable and by_name["Dégâts Payload"].affordable, "the points held decide what is affordable")
 	_check.call(absf(by_name["Spécialisation de hack"].cost - 500.0) < 0.001 and absf(by_name["Spécialisation de hack"].changes.hack_specialization_multiplier.ratio - 1.2) < 0.001, "the perk costs 500 tokens for 20 %, as the game says")
+	_check.call(not by_name["Spécialisation de hack"].affordable and by_name["Spécialisation de hack"].held == 400.0, "400 tokens do not pay for 500")
+	_check.call(by_name["Dégâts Payload"].cost_text == "1 point de piratage" and by_name["Multiplicateur de critique"].cost_text == "2 points de piratage", "the cost reads properly")
+	globals.currencies = {}
+	var unknown: Dictionary = {}
+	for item: Dictionary in HackingUpgrades.read(root):
+		if item.name == "Spécialisation de hack":
+			unknown = item
+	_check.call(unknown.held == -1.0 and not unknown.affordable, "an unknown balance is never advised")
 	root.free()
+
+
+func _test_cycle_and_rates() -> void:
+	var both := {"payload": ["breach_corps", "breach_government"], "infection": ["breach_corps", "breach_government"]}
+	var model := HackingModel.new(_chain())
+	_check.call(is_equal_approx(model._next_shot(3.95), 4.0) and is_equal_approx(model._next_shot(4.0), 5.0), "the next attack waits for the next shot, as measured")
+	# Measured after a purchase: 5128 XP per minute over 10 min, then 5694 over 24 min with 20 % more power.
+	var infection := _chain()
+	infection.infection_ratio = 0.55
+	var after_purchase := HackingModel.new(infection).evaluate(both)
+	_check.call(after_purchase.targets.breach_corps.level == 8 and after_purchase.targets.breach_government.level == 8, "the purchase opens level 8 on both, as measured")
+	_check.call(absf(after_purchase.xp_rate - 5128.0) / 5128.0 < 0.15, "the XP rate stays near the 5128 measured after the purchase")
+	var more_power := _chain()
+	more_power.infection_ratio = 0.55
+	more_power.power *= 1.2
+	var stronger := HackingModel.new(more_power).evaluate(both)
+	_check.call(absf(stronger.xp_rate - 5694.0) / 5694.0 < 0.15, "the XP rate stays near the 5694 measured with more power")
+
+
+func _row(payload: Array, infection: Array, corps: Array, government: Array, xp: float) -> Dictionary:
+	return {
+		"scenario": {"payload": payload, "infection": infection}, "xp_rate": xp,
+		"targets": {
+			"breach_corps": {"level": corps[0], "chance": corps[1], "cycle": corps[2], "reward_rate": corps[3]},
+			"breach_government": {"level": government[0], "chance": government[1], "cycle": government[2], "reward_rate": government[3]},
+		},
+	}
+
+
+func _test_advice() -> void:
+	var chain := _chain()
+	var all := ["breach_corps", "breach_government"]
+	var current := _row(all, all, [7, 1.0, 5.0, 776.0], [7, 1.0, 5.0, 774.0], 2900.0)
+	var corps_only := _row(["breach_corps"], ["breach_corps"], [9, 1.0, 6.0, 1650.0], [-1, 0.0, 0.0, 0.0], 5490.0)
+	var split := _row(all, ["breach_corps"], [9, 0.9, 6.0, 1400.0], [4, 1.0, 4.0, 290.0], 4900.0)
+	var rows: Array[Dictionary] = [current, corps_only, split]
+
+	var objectives := HackingAdvice.objectives(chain)
+	_check.call(objectives.size() == 4 and objectives[0].key == "xp" and objectives[3].key == "balanced", "the objectives follow the chain's targets")
+	_check.call(HackingAdvice.best_row(rows, current, "xp") == corps_only, "the XP objective picks the most XP")
+	_check.call(HackingAdvice.best_row(rows, current, "breach_government") == current, "no row beats the current one on intelligence: keep it")
+	_check.call(is_equal_approx(HackingAdvice.score(corps_only, "balanced"), 0.0), "balanced gives nothing to a chain bringing nothing of one thing")
+	var slightly := _row(all, ["breach_corps"], [7, 1.0, 5.0, 776.0], [7, 1.0, 5.0, 774.0], 2910.0)
+	var noise: Array[Dictionary] = [current, slightly]
+	_check.call(HackingAdvice.best_row(noise, current, "xp") == current, "a tiny gain is not worth rewiring")
+
+	var text := HackingAdvice.connection_text(chain, current, corps_only)
+	_check.call(text.contains("Payload : débrancher de Gouvernement") and text.contains("Infection : débrancher de Gouvernement"), "the advice says what to unplug")
+	var no_infection := _row(all, [], [7, 1.0, 5.0, 700.0], [7, 1.0, 5.0, 700.0], 2800.0)
+	_check.call(HackingAdvice.connection_text(chain, current, no_infection).contains("Interface"), "taking the infection off also frees its power")
+	var why := HackingAdvice.why_text(chain, current, corps_only)
+	_check.call(why.contains("Entreprises passe du niveau 7 au niveau 9") and why.contains("Gouvernement ne reçoit plus"), "the advice says why")
+	var faster := _row(all, all, [7, 1.0, 4.0, 900.0], [7, 1.0, 5.0, 774.0], 3100.0)
+	_check.call(HackingAdvice.why_text(chain, current, faster) == "Entreprises attaque plus vite.", "without a new level, faster attacks explain the gain")
+
+	var effects := HackingAdvice.effects(chain, current, corps_only)
+	_check.call(effects.gains.contains("XP +89 %") and effects.gains.contains("Données +113 %"), "the advice gives the gains")
+	_check.call(effects.drawbacks.contains("Renseignements -100 %"), "the advice gives the drawback")
+	_check.call(HackingAdvice.effects(chain, current, split).drawbacks.contains("Entreprises moins sûr (90 % de réussite)"), "a level at risk counts as a drawback")
+	_check.call(HackingAdvice.effects(chain, current, faster).drawbacks == "aucun", "no drawback is said plainly")
+	_check.call(absf(HackingAdvice.gain(corps_only, current, "xp") - 0.893) < 0.01, "the gain is relative to the current chain")
 
 
 func _test_problems() -> void:
