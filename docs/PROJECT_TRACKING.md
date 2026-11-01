@@ -10,8 +10,8 @@
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
-| 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
-| 5. Stabilisation | Non commencée |
+| Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
+| Smart Hacking Advisor (lecture seule) | En étude |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -22,12 +22,12 @@
 | Version 0.1.0 | Observation seule, aucune modification de la menace |
 | Intégration | Signaux et propriétés, sans extension de script ni hook |
 | Option native `auto_level_breach` | Journalisée en 0.1.0 ; la régulation refusera de s'activer tant qu'elle est active |
-| Data Lab | Observateur d'abord ; répartiteur seulement après preuve de sauvegarde, rechargement et retrait propres |
+| Périmètre (décision de Jérémy, 2026-11-01) | Ce mod est consacré au hacking. Les Data Labs et les autres idées relèveront éventuellement d'un mod indépendant |
 | Analyse du jeu | Plus de décodage de scripts ; inspection à l'exécution uniquement |
 
 ## Décisions pour la régulation (0.2.0)
 
-Validées par Jérémy après revue. **Les changements automatiques de niveau ne sont pas implémentés à ce stade** : seule la simulation à blanc existe.
+Validées par Jérémy après revue, avant le développement de l'actionneur. Les profils et les seuils ont ensuite évolué : le [changelog](../CHANGELOG.md) fait foi pour le comportement de la `0.2.0`.
 
 | Sujet | Décision |
 |---|---|

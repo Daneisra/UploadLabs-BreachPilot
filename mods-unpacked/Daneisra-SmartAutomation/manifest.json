@@ -2,7 +2,7 @@
 	"name": "SmartAutomation",
 	"namespace": "Daneisra",
 	"version_number": "0.2.0",
-	"description": "Modular QoL automation. Keeps Breach threat levels at the highest level your power can handle, with pause and resume on the nodes. Off by default.",
+	"description": "Hacking automation. Keeps Breach threat levels at the highest level your power can handle, with pause and resume on the nodes. Off by default.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-SmartAutomation",
 	"dependencies": [],
 	"extra": {

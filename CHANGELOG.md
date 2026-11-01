@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-rc.1 – en cours : régulation normale
+## 0.2.0 – 2026-11-01 : régulation normale
 
 Le mode `active` est une option normale, désactivée par défaut. Les archives d'essai, les marqueurs et les limites d'actions sont retirés.
 
