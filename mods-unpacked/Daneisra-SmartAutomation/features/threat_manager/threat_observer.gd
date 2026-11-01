@@ -952,7 +952,8 @@ func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> b
 		if profile.get("hit_spread", false) and seen.get("lowest", -1.0) > 0.0 and profile.interval > 0.0:
 			hopeful.damage_rate = (seen.lowest + (seen.highest - seen.lowest) * 0.25) / profile.interval
 		var result := BreachForecast.forecast(hopeful, target, 0.0)
-		answer = result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
+		# With vulnerability there is no forecast: a real trial decides, and the way back exists.
+		answer = profile.vulnerability > 0.0 or result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
 	_level_scans[key] = answer
 	return answer
 

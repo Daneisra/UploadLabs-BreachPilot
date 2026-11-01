@@ -96,7 +96,7 @@ func _advice_text() -> String:
 	var lines := PackedStringArray()
 	var problems := _model.chain_problems()
 	if not problems.is_empty():
-		lines.append("Attention : votre chaîne ne suit pas les règles mesurées (%s). Chiffres à prendre avec prudence." % ", ".join(problems))
+		lines.append("Attention : les dégâts annoncés ne suivent pas les règles mesurées sur cette chaîne. Chiffres à prendre avec prudence.")
 	var best := HackingAdvice.best_row(_rows, _current, _objective)
 	if best == _current:
 		lines.append("Branchement : gardez le vôtre, il est déjà le meilleur pour cet objectif.")
@@ -112,7 +112,7 @@ func _advice_text() -> String:
 		lines.append("Achat : rien de ce que vous pouvez payer n'aide cet objectif pour l'instant.")
 	for resource: String in by_resource:
 		var item: Dictionary = by_resource[resource]
-		var effects := HackingAdvice.effects(_chain, _current, item.row)
+		var effects := HackingAdvice.effects(_chain, _current, item.row, HackingUpgrades.downsides(item.upgrade.changes))
 		lines.append("Achat : %s (%s, vous en avez %s)." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held)])
 		lines.append("   Pourquoi : %s Gain : %s. Inconvénient : %s." % [HackingAdvice.why_text(_chain, _current, item.row), effects.gains, effects.drawbacks])
 	return "\n".join(lines)
@@ -122,6 +122,9 @@ func _advice_text() -> String:
 func _connections_table() -> Dictionary:
 	var types: Array = _chain.targets.keys()
 	var header := ["", "Payload vers", "Infection vers"]
+	var injection_shown: bool = _chain.injection_fed
+	if injection_shown:
+		header.append("Injection")
 	for type: String in types:
 		header.append(_chain.targets[type].label)
 	header.append("XP/min")
@@ -147,6 +150,8 @@ func _connections_table() -> Dictionary:
 		var row: Dictionary = entry.row
 		var is_current: bool = row == _current
 		var cells := [" + ".join(entry.titles), _names(row.scenario.payload), _names(row.scenario.infection)]
+		if injection_shown:
+			cells.append("gardée" if row.scenario.injection else "retirée")
 		for type: String in types:
 			cells.append(_level_text(row.targets[type]))
 		cells.append(_with_change(row.xp_rate, _current.xp_rate, is_current))

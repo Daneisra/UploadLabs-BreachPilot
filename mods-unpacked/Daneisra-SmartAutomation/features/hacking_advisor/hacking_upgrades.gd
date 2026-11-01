@@ -12,6 +12,18 @@ const UPGRADES := {
 	"hack_sneak_attack": "Attaque furtive",
 	"optimization_critical_payload": "Payload critique (optimisation)",
 }
+## What a purchase may change that the comparison can follow, and how to name a loss on it.
+const HANDLED := {
+	"breach_damage_multiplier": "Dégâts Payload",
+	"infection_damage_multiplier": "Dégâts d'infection",
+	"breach_speed_multiplier": "Vitesse d'intrusion",
+	"breach_time_multiplier": "Temps d'attaque",
+	"breach_critical_chance": "Chance de critique",
+	"breach_critical_multiplier": "Multiplicateur de critique",
+	"charged_attacks_requirement": "",
+	"hack_specialization_multiplier": "Puissance de hack",
+}
+const HACKING_CATEGORIES: Array[String] = ["hacking", "optimizations"]
 const PERKS := {"hack_specialization": "Spécialisation de hack"}
 const COST_NAMES := {
 	"hack_points": ["point de piratage", "points de piratage"],
@@ -29,14 +41,14 @@ static func read(root: Node) -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
 	if not is_instance_valid(data) or not is_instance_valid(globals) or not is_instance_valid(attributes):
 		return list
-	for key: String in UPGRADES:
-		var entry: Variant = data.upgrades.get(key)
-		if entry is Dictionary and _available(entry, globals.upgrades.get(key, 0), globals):
+	for key: String in data.upgrades:
+		var entry: Variant = data.upgrades[key]
+		if entry is Dictionary and _follows(key, entry) and _available(entry, globals.upgrades.get(key, 0), globals):
 			var cost: float = entry.cost
 			var attribute: String = entry.get("attribute_cost", "")
 			var held: float = _value(attributes, attribute)
 			list.append({
-				"name": UPGRADES[key], "cost": cost, "resource": attribute, "held": held, "affordable": held >= cost,
+				"name": UPGRADES.get(key, data.tr(entry.get("name", key))), "cost": cost, "resource": attribute, "held": held, "affordable": held >= cost,
 				"cost_text": cost_text(cost, attribute), "changes": _changes(entry, attributes),
 			})
 	for key: String in PERKS:
@@ -69,7 +81,29 @@ static func apply(chain: Dictionary, changes: Dictionary) -> Dictionary:
 	changed.power *= changes.get("hack_specialization_multiplier", {"ratio": 1.0}).ratio
 	changed.crit_chance += changes.get("breach_critical_chance", {"added": 0.0}).added
 	changed.crit_multiplier *= changes.get("breach_critical_multiplier", {"ratio": 1.0}).ratio
+	if chain.get("charge_every", 0) > 0 and changes.has("charged_attacks_requirement"):
+		changed.charge_every = maxi(chain.charge_every + roundi(changes.charged_attacks_requirement.added), 1)
 	return changed
+
+
+## What the game says a purchase costs, even when the end result is a gain: -40 % payload stays a drawback.
+static func downsides(changes: Dictionary) -> PackedStringArray:
+	var list := PackedStringArray()
+	for name: String in changes:
+		var label: String = HANDLED.get(name, "")
+		if label != "" and changes[name].ratio < 1.0:
+			list.append("%s %+d %%" % [label, roundi((changes[name].ratio - 1.0) * 100.0)])
+	return list
+
+
+## The listed ones, and any other hacking purchase whose whole effect the comparison can follow.
+static func _follows(key: String, entry: Dictionary) -> bool:
+	if UPGRADES.has(key):
+		return true
+	var effects: Variant = entry.get("attributes")
+	if not HACKING_CATEGORIES.has(entry.get("category", "")) or not effects is Dictionary or effects.is_empty():
+		return false
+	return effects.keys().all(func(name: String) -> bool: return HANDLED.has(name))
 
 
 static func _available(entry: Dictionary, level: Variant, globals: Node) -> bool:

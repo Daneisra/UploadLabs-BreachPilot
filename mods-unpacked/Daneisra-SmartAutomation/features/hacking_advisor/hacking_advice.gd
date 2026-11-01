@@ -60,6 +60,8 @@ static func connection_text(chain: Dictionary, current: Dictionary, best: Dictio
 	var parts := PackedStringArray()
 	parts.append_array(_set_changes(chain, "Payload", current.scenario.payload, best.scenario.payload))
 	parts.append_array(_set_changes(chain, "Infection", current.scenario.infection, best.scenario.infection))
+	if current.scenario.get("injection", false) and not best.scenario.get("injection", false):
+		parts.append("Débranchez Exécuter l'injection de l'Interface et des cibles, pour rendre sa puissance aux autres")
 	if best.scenario.infection.is_empty() and not current.scenario.infection.is_empty():
 		parts.append("Débranchez aussi le Produit d'infection de l'Interface, pour rendre sa puissance au Lanceur")
 	elif current.scenario.infection.is_empty() and not best.scenario.infection.is_empty():
@@ -84,9 +86,9 @@ static func why_text(chain: Dictionary, current: Dictionary, row: Dictionary) ->
 
 
 ## gains and drawbacks, for everything a chain brings and not only the objective.
-static func effects(chain: Dictionary, current: Dictionary, row: Dictionary) -> Dictionary:
+static func effects(chain: Dictionary, current: Dictionary, row: Dictionary, own_drawbacks: PackedStringArray = PackedStringArray()) -> Dictionary:
 	var gains := PackedStringArray()
-	var drawbacks := PackedStringArray()
+	var drawbacks := own_drawbacks.duplicate()
 	_add_effect(gains, drawbacks, "XP", row.xp_rate, current.xp_rate)
 	for type: String in row.targets:
 		_add_effect(gains, drawbacks, reward_name(chain, type), row.targets[type].reward_rate, current.targets[type].reward_rate)

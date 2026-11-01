@@ -1,15 +1,22 @@
 # Changelog
 
-## 0.4.0-dev.1 – en cours : conseiller par objectif
+## 0.4.0-dev.2 – en cours : conseiller par objectif
 
 ### Ajouté
 
 - Choix de l'objectif dans le panneau : XP, données, renseignements ou équilibré. Le compromis équilibré écarte un branchement qui ne rapporte plus rien d'une des trois.
 - Recommandations en clair pour le branchement et pour les achats : quoi changer, pourquoi, le gain et l'inconvénient.
 - Achats classés selon vos ressources : ce que vous pouvez payer d'abord, par ressource, avec ce qu'il manque pour le reste.
+- Le conseiller tient compte de `Charged Attack` et d'`Exécuter l'injection`, qu'il peut proposer de retirer.
+
+### Modifié
+
+- Avec de la vulnérabilité, le mod n'a pas de prévision : il passe par des essais de niveau réels, en profil équilibré ou agressif, au lieu de ne plus monter.
 
 ### Corrigé
 
+- La vulnérabilité était lue dans le mauvais champ par le conseiller.
+- Un inconvénient annoncé par le jeu, comme les -40 % de dégâts Payload de Spécialiste d'infection, n'était pas affiché.
 - Temps entre deux attaques : l'attaque suivante part au prochain tir du lanceur, au lieu d'un délai fixe de 0,7 s qui sous-estimait les gains.
 
 ## 0.3.0 – 2026-11-01 : Smart Hacking Advisor

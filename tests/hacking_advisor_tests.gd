@@ -7,6 +7,7 @@ const HackingModel := preload(ADVISOR + "hacking_model.gd")
 const HackingChain := preload(ADVISOR + "hacking_chain.gd")
 const HackingUpgrades := preload(ADVISOR + "hacking_upgrades.gd")
 const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
+const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
 
 var _check: Callable
 
@@ -68,6 +69,8 @@ func run(check: Callable) -> void:
 	_test_upgrade_table()
 	_test_cycle_and_rates()
 	_test_advice()
+	_test_new_nodes()
+	_test_trial_with_vulnerability()
 	_test_problems()
 	_test_reader()
 
@@ -171,7 +174,7 @@ func _test_levels() -> void:
 	_check.call(skipping.targets.breach_government.level > 3, "an unlocked level can be reached past one that fails")
 
 	var unmeasured := _chain()
-	unmeasured.targets.breach_government.vulnerability = 1.0
+	unmeasured.targets.breach_government.breach_variation = 1
 	var invalid := HackingModel.new(unmeasured).evaluate({"payload": ["breach_government"], "infection": []})
 	_check.call(invalid.targets.breach_government.invalid and invalid.targets.breach_government.level == -1, "what was never measured is never estimated")
 
@@ -333,6 +336,71 @@ func _test_advice() -> void:
 	_check.call(HackingAdvice.effects(chain, current, split).drawbacks.contains("Entreprises moins sûr (90 % de réussite)"), "a level at risk counts as a drawback")
 	_check.call(HackingAdvice.effects(chain, current, faster).drawbacks == "aucun", "no drawback is said plainly")
 	_check.call(absf(HackingAdvice.gain(corps_only, current, "xp") - 0.893) < 0.01, "the gain is relative to the current chain")
+
+
+func _test_new_nodes() -> void:
+	var chain := _chain()
+	var corps: Dictionary = chain.targets.breach_corps
+	var plain := HackingModel.new(chain).attack_outcome(corps.levels[8], 76.26, 38.13)
+	var weak := _chain()
+	weak.crit_chance = 0.0
+	var without := HackingModel.new(weak).attack_outcome(corps.levels[8], 40.0, 20.0)
+	var charged := weak.duplicate()
+	charged.charge_every = 3
+	var with_charge := HackingModel.new(charged).attack_outcome(corps.levels[8], 40.0, 20.0)
+	_check.call(with_charge.chance >= without.chance and with_charge.used <= without.used or without.used < 0.0, "charged shots do not slow an attack")
+	var vulnerable := HackingModel.new(weak).attack_outcome(corps.levels[8], 40.0, 20.0, 0.5)
+	_check.call(vulnerable.chance >= without.chance, "vulnerability helps an attack")
+	_check.call(plain.chance > 0.9, "the level measured at this power holds")
+
+	# Measured with the injection fed, 3 consumers: level 8 on both, 76 attacks out of 76, about 4.95 s.
+	var fed := _chain()
+	fed.power = 323.55
+	fed.infection_ratio = 0.55
+	fed.charge_every = 3
+	fed.injection_fed = true
+	fed.crit_factor = 2.2
+	fed.targets.breach_corps.vulnerability = 0.234
+	fed.targets.breach_government.vulnerability = 0.234
+	fed.targets.breach_corps.announced_payload = 130.5
+	fed.targets.breach_government.announced_payload = 130.5
+	fed.targets.breach_corps.announced_infection = 29.66
+	fed.targets.breach_government.announced_infection = 29.66
+	var model := HackingModel.new(fed)
+	_check.call(model.chain_problems().is_empty(), "a chain with these nodes follows the rules")
+	_check.call(model.scenarios().size() == 24, "the injection doubles the scenarios: kept or taken off")
+	var kept := model.evaluate(model.current_scenario())
+	_check.call(kept.current, "the current connections include the injection")
+	_check.call(kept.targets.breach_government.level >= 8 and absf(kept.targets.breach_government.used - 4.95) < 0.6, "the measured attacks are within reach, near the 4.95 s measured")
+	_check.call(absf(model.power_share(["breach_corps"], true) - 107.85) < 0.01 and absf(model.power_share(["breach_corps"], false) - 161.78) < 0.01, "taking the injection off gives its share back")
+	var off := {"scenario": {"payload": fed.current.payload, "infection": fed.current.infection, "injection": false}}
+	_check.call(HackingAdvice.connection_text(fed, kept, off).contains("Exécuter l'injection"), "the advice names the injection")
+
+	var requirement := HackingUpgrades.apply(fed, {"charged_attacks_requirement": {"ratio": 0.67, "added": -1.0}})
+	_check.call(requirement.charge_every == 2, "the charged attack purchase lowers the charges needed")
+	var specialist := {"breach_damage_multiplier": {"ratio": 0.6, "added": -0.44}, "infection_damage_multiplier": {"ratio": 2.0, "added": 1.0}}
+	_check.call(HackingUpgrades.downsides(specialist) == PackedStringArray(["Dégâts Payload -40 %"]), "the game's own drawback is named")
+	var effects := HackingAdvice.effects(fed, kept, kept, HackingUpgrades.downsides(specialist))
+	_check.call(effects.drawbacks == "Dégâts Payload -40 %", "the drawback shows even when the result is a gain")
+	var scanned := {"category": "optimizations", "attributes": {"charged_attacks_requirement": [-1.0, 0.0, 0.0]}}
+	_check.call(HackingUpgrades._follows("anything", scanned), "a new hacking purchase the comparison can follow is listed")
+	var foreign := {"category": "optimizations", "attributes": {"breach_skills": [1.0, 0.0, 0.0]}}
+	_check.call(not HackingUpgrades._follows("anything", foreign), "a purchase the comparison cannot follow stays out")
+
+
+func _test_trial_with_vulnerability() -> void:
+	var observer := Observer.new()
+	var window := FakeBreach.new()
+	var tracker := {"type": "breach_corps", "window": window, "getters": {}}
+	var profile := {"damage_rate": 30.0, "infection_rate": 0.0, "vulnerability": 0.234, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0, "signature": "v"}
+	_check.call(observer._may_work(tracker, profile, {"level": 7, "max_level": 8}), "with vulnerability a real trial is allowed")
+	_check.call(not observer._may_work(tracker, profile, {"level": 8, "max_level": 8}), "a trial never goes above the highest level")
+	profile.vulnerability = 0.0
+	profile.signature = "no"
+	profile.damage_rate = 1.0
+	_check.call(not observer._may_work(tracker, profile, {"level": 7, "max_level": 8}), "without vulnerability the forecast still decides")
+	window.free()
+	observer.free()
 
 
 func _test_problems() -> void:

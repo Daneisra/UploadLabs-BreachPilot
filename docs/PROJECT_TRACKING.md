@@ -52,6 +52,8 @@ Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la ca
 
 **Temps entre deux attaques, mesuré le 2026-11-01 :** l'attaque suivante part au prochain tir du lanceur. Sur 8 longues suites, l'écart moyen avec le réel est de 0,15 s, contre 0,36 s pour un délai fixe de 0,7 s. Exemples : 3,81 s pour 3,81 s (Gouvernement niveau 4), 6,04 s pour 6,00 s (Entreprises niveau 9). Moins bon à 38,13 d'infection : 5,76 s pour 5,37 s.
 
+**Nouveaux nœuds, mesurés le 2026-11-01 sur peu d'attaques :** `Charged Attack` double 1 coup sur 3 (76 à 152, 383 en critique), le jeu annonce +33 %. `Exécuter l'injection` prend sa part de puissance et multiplie les coups (59,3 à 72,8 avec 0,234). Sa vulnérabilité croît peu avec la puissance (0,226 à 92,4, 0,234 à 107,8) : la règle n'est pas établie, le conseiller la garde constante, et ne compare que garder ou retirer l'injection.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
