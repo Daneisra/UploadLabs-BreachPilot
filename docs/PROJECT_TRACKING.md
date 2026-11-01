@@ -9,7 +9,7 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | Trois essais validés en jeu sur Gouvernement, avec la pause sur le nœud. Quatrième essai autorisé le 2026-11-01 : Gouvernement et Entreprises, profil équilibré, 12 actions au plus, voie rapide. **Tag, fusion et régulation permanente non autorisés** |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | 4. Auto Data Lab Supply (version ultérieure) | Non commencée |
 | 5. Stabilisation | Non commencée |
 
@@ -318,6 +318,10 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 **Session finale, première tentative, 2026-11-01, build `trial.5` : arrêtée à juste titre après 4 min.** Jérémy a ajouté un nœud `Payload critique` à 02:35. Dégâts annoncés : 87,39, coups réels : 52 à 53, et 132 environ une fois sur dix. Le mod a jugé le niveau 8 certain d'après la valeur annoncée (5,0 s au plus), l'a appliqué, puis la vérification a mesuré 5,25 s : `verification_failed:duration_out_of_range`, régulation arrêtée sur les deux types, aucune autre action. Le modèle a ensuite été corrigé. Le branchement de l'infection sur les deux nœuds a aussi été observé : infection divisée par 2, 4 échecs au niveau 8, sans baisse puisque la régulation était déjà arrêtée et la prévision incertaine.
 
 **Session finale, deuxième tentative, 2026-11-01, build `trial.6`, 1 h 05 :** avec `Payload critique`, 0 action, aucun blocage, 1 026 + 677 attaques réussies. Rechargement avec pause validé : pause conservée, aucune action immédiate, reprise sans changement. **Défaut trouvé par Jérémy :** infection débranchée, 31 échecs au niveau 8 sans baisse. Le mod décidait bien de baisser dès le 2e échec, mais l'actionneur refusait (`target_forecast_not_reliable`, 27 fois), car le niveau 7 échouait aussi sans infection. Décision de Jérémy : 2 échecs d'affilée doivent suffire. Corrigé.
+
+**Test de baisse, 2026-11-01, build `trial.7`, 11 min :** réussi, 7 actions, 0 anomalie. Infection débranchée à 16:41:12 : Entreprises 8→7→6→5→4 en 88 s. Rebranchée à 16:45:14 : 4→5→6→7 en 51 s. Niveaux finaux 7/9 et 4/5. **Remarque de Jérémy :** fonctionnel, mais trop lent partout.
+
+**Limites connues de `v0.2.0-beta.1` :** une prévision certaine démentie n'est couverte qu'en simulation. Le mod compte sur le coup le plus faible observé : avec `Payload critique`, il peut rester sous un niveau qui réussit en pratique (7 au lieu de 8). Une anomalie arrête la régulation des deux types jusqu'au redémarrage. Plafonds et pauses : session uniquement. Vitesse × 5 : régulation suspendue. Toutes les mesures viennent d'une seule partie.
 
 **Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
 

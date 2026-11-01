@@ -2,7 +2,7 @@
 
 Mod de confort modulaire pour [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/), basé sur le Godot Mod Loader intégré au jeu.
 
-> **Version actuelle : 0.1.0, observation uniquement.** Cette version **ne régule rien** : elle observe les attaques d'Infiltrer Entreprises et écrit des journaux. Elle ne change jamais le niveau de menace ni aucune autre valeur du jeu. L'Auto Threat Manager n'existe pas encore.
+> **Version actuelle : 0.2.0-beta.1.** L'archive standard observe et simule sans changer aucun niveau. Les changements automatiques n'existent que dans des archives d'essai construites à la demande. La régulation normale arrive avec la 0.2.0.
 
 ## Objectif
 
@@ -13,7 +13,7 @@ Automatiser des tâches répétitives en respectant les mécaniques normales du 
 | Observateur des infiltrations (lecture seule) | 0.1.0 | **Validé en jeu** |
 | Mesures pour la régulation (lecture seule) | 0.2.0-alpha.1 | Validé en jeu |
 | Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | Validé en jeu |
-| Mesure de la fenêtre entre deux attaques (lecture seule) | Préparation de 0.2.0-beta.1 | En cours de mesure |
+| Actionneur, pause sur le nœud, essais réels | 0.2.0-beta.1 | Validé en jeu |
 | Auto Threat Manager (régulation de la menace) | 0.2.0 | Non commencé |
 | Auto Data Lab Supply : observateur, puis répartiteur | Ultérieure | Non commencé |
 

@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.0-beta.1-dev.10 – en cours : actionneur, essais actifs et pause sur le nœud
+## 0.2.0-beta.1 – 2026-11-01 : actionneur, essais actifs et pause sur le nœud
 
-**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Montée, baisse et 4 actions successives validées sur Gouvernement. Ce n'est pas encore la `0.2.0-beta.1`.
+**Le code du dépôt ne peut changer aucun niveau.** Seule une archive construite pour l'essai autorisé le peut, avec son option activée. Validé en jeu sur Gouvernement et Entreprises, avec infection et `Payload critique`. Régulation permanente non disponible : le mode `active` arrive avec la `0.2.0`.
 
 ### Modifié
 
