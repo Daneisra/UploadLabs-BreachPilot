@@ -69,6 +69,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Niveau 10 élite, à vérifier :** 2 306 de pare-feu et 9 224 d'infiltration sur Entreprises. Le panneau l'annonce à 99 %, puis le jeu annonce un gain très supérieur au niveau 11 (`get_experience_reward`). Aucune réussite réelle n'a encore confirmé ni la faisabilité ni cette récompense : si elle se confirme, monter au-delà d'un niveau élite pourrait faire perdre de l'XP.
 
+**Actualisation du panneau, 2026-11-01 :** une première version recalculait tout dès qu'un solde bougeait, et la recherche monte en continu : 93 recalculs en 3 min 30, saccades et conseils changeants, signalés par Jérémy. Le panneau ne se recalcule plus que sur un geste du joueur. Rouvert plus tard, il repart des coups mesurés entre-temps : ses chiffres peuvent bouger de quelques pour cent, et un niveau juste au seuil peut changer. Les chiffres sont affichés à 3 chiffres significatifs.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

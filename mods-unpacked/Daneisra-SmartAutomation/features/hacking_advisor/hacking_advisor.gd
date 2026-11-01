@@ -84,18 +84,19 @@ func _look_at_chain() -> void:
 	_computing = true
 
 
-## What the figures depend on: connections, power, levels, and whether enough has been measured.
+## Only what the player changes: the connections, the power, a purchase becoming possible, and a measure
+## becoming sufficient. What moves by itself, like hits piling up or research growing, must not recalculate.
 func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
 	if chain.error != "":
 		return chain.error
 	var parts := PackedStringArray([str(chain.current)])
 	for key: String in chain.targets:
 		var target: Dictionary = chain.targets[key]
-		parts.append("%s:%d:%d:%.2f:%.2f:%.2f" % [key, target.level, target.max_level, target.interval, target.vulnerability, target.real.attacks / HackingModel.MIN_ATTACKS_TO_CHECK])
+		parts.append("%s:%d:%s" % [key, target.max_level, target.chain_key])
 	for stream: Dictionary in chain.streams.values():
-		parts.append("%s:%.2f:%d" % [stream.id, stream.production, stream.multipliers.size() / HackingModel.MIN_HITS])
+		parts.append("%s:%.1f:%s" % [stream.id, stream.production, stream.multipliers.size() >= HackingModel.MIN_HITS])
 	for upgrade: Dictionary in upgrades:
-		parts.append("%s:%.2f:%.2f" % [upgrade.name, upgrade.cost, upgrade.held])
+		parts.append("%s:%.0f:%s" % [upgrade.name, upgrade.cost, upgrade.affordable])
 	return "|".join(parts)
 
 
@@ -246,7 +247,7 @@ func _purchases_table() -> Dictionary:
 		rows.append([
 			item.upgrade.name, item.upgrade.cost_text, _held_text(item.upgrade),
 			", ".join(levels) if followed else "–",
-			_number(item.row.xp_rate) if followed else "–",
+			_estimate(item.row.xp_rate) if followed else "–",
 			"%+d %%" % roundi(HackingAdvice.gain(item.row, _current, _objective) * 100.0) if followed else CHANCE_NOT_FOLLOWED,
 		])
 		kinds.append("" if item.upgrade.affordable and followed else "muted")
@@ -316,8 +317,16 @@ func _held_text(upgrade: Dictionary) -> String:
 
 func _with_change(value: float, reference: float, is_reference: bool) -> String:
 	if is_reference or reference <= 0.0:
+		return _estimate(value)
+	return "%s (%s)" % [_estimate(value), HackingAdvice.percent(value, reference)]
+
+
+## Three significant digits: these are estimates, and the digits after those are only noise.
+func _estimate(value: float) -> String:
+	if value < 1000.0:
 		return _number(value)
-	return "%s (%s)" % [_number(value), HackingAdvice.percent(value, reference)]
+	var scale: float = pow(10.0, floorf(log(value) / log(10.0)) - 2.0)
+	return _number(roundf(value / scale) * scale)
 
 
 func _number(value: float) -> String:

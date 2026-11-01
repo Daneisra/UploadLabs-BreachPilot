@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.5 – en cours : conseiller générique
+## 0.4.0-dev.6 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -8,7 +8,7 @@
 - Recommandations en clair pour le branchement et pour les achats : quoi changer, pourquoi, le gain et l'inconvénient.
 - Achats classés selon vos ressources : ce que vous pouvez payer d'abord, par ressource, avec ce qu'il manque pour le reste.
 - Bouton `Conseil` sur les nœuds d'infiltration, en plus de `Ctrl+Alt+F8`.
-- Le panneau ouvert se met à jour de lui-même quand la chaîne change, en une seconde.
+- Le panneau ouvert se recalcule de lui-même quand le joueur change la chaîne ou peut payer un nouvel achat, et seulement alors.
 - Lecture générique de la chaîne : n'importe quels nœuds et branchements, sans liste de noms. Un nœud inconnu ne bloque plus rien, et ses effets sont pris en compte par les coups réellement mesurés sur la chaîne.
 - Les noms viennent du jeu, et tout achat lié au hacking apparaît seul. Un achat dont l'effet ne peut pas être suivi est listé sans chiffre.
 

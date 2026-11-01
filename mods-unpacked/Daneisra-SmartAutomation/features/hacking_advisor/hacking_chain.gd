@@ -93,7 +93,8 @@ static func _read_target(chain: Dictionary, graph: Dictionary, key: String, type
 	}
 	chain.current.payload[key] = _note_stream(chain, graph, key, payload_slot, "payload", data)
 	chain.current.infection[key] = _note_stream(chain, graph, key, infection_slot, "infection", data)
-	if _note_stream(chain, graph, key, vulnerability_slot, "vulnerability", data) != "":
+	# A cable with nothing behind it brings nothing: there is no vulnerability to keep or to take off.
+	if _note_stream(chain, graph, key, vulnerability_slot, "vulnerability", data) != "" and vulnerability > 0.0:
 		chain.current.vulnerability = true
 	if chain.current.payload[key] != "" and hit_log != null:
 		var stream: Dictionary = chain.streams[chain.current.payload[key]]

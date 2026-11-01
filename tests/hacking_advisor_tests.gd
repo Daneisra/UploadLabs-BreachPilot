@@ -10,6 +10,7 @@ const HackingGraph := preload(ADVISOR + "hacking_graph.gd")
 const HackingUpgrades := preload(ADVISOR + "hacking_upgrades.gd")
 const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 const HitLog := preload(ADVISOR + "hit_log.gd")
+const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
 const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
 
 var _check: Callable
@@ -88,6 +89,7 @@ func run(check: Callable) -> void:
 	_test_critical_changes()
 	_test_advice()
 	_test_trial_without_forecast()
+	_test_refresh_state()
 
 
 ## 10 % of hits at 2.5 times the others, as measured, with the announcement of the critical node.
@@ -564,6 +566,37 @@ func _test_advice() -> void:
 	_check.call(HackingAdvice.effects(chain, current, current).drawbacks == "aucun", "no drawback is said plainly")
 	var own := HackingAdvice.effects(chain, current, current, PackedStringArray(["Dégâts Payload -40 %"]))
 	_check.call(own.drawbacks == "Dégâts Payload -40 %", "the game's own drawback shows even when the result is a gain")
+
+
+## A recalculation stutters: only a gesture of the player may start one.
+func _test_refresh_state() -> void:
+	var advisor := HackingAdvisor.new()
+	var upgrades: Array[Dictionary] = [{"name": "Recherche", "cost": 100.0, "held": 50.0, "affordable": false}]
+	var chain := _chain()
+	var state: String = advisor._state_of(chain, upgrades)
+
+	var same := _chain()
+	same.targets.corps.level = 8
+	same.targets.corps.interval = 0.95
+	same.targets.gov.vulnerability = 0.24
+	same.targets.gov.real = {"attacks": 500, "successes": 500, "used": 2000.0}
+	same.streams.P.multipliers.append(0.7)
+	var grown: Array[Dictionary] = [{"name": "Recherche", "cost": 100.0, "held": 51.0, "affordable": false}]
+	_check.call(advisor._state_of(same, grown) == state, "what moves by itself does not recalculate")
+
+	var rewired := _chain()
+	rewired.current.infection.gov = ""
+	_check.call(advisor._state_of(rewired, upgrades) != state, "a new connection recalculates")
+	var stronger := _chain()
+	stronger.streams.P.production = 300.0
+	_check.call(advisor._state_of(stronger, upgrades) != state, "new power recalculates")
+	var payable: Array[Dictionary] = [{"name": "Recherche", "cost": 100.0, "held": 100.0, "affordable": true}]
+	_check.call(advisor._state_of(chain, payable) != state, "a purchase becoming possible recalculates")
+	var measuring := _chain()
+	measuring.streams.P.multipliers = PackedFloat32Array([0.6])
+	_check.call(advisor._state_of(measuring, upgrades) != state, "a measure becoming sufficient recalculates")
+	_check.call(advisor._state_of({"error": "no_target"}, upgrades) == "no_target", "an error is a state too")
+	advisor.free()
 
 
 func _test_trial_without_forecast() -> void:

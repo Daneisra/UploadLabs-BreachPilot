@@ -968,14 +968,16 @@ func _level_scan(tracker: Dictionary, profile: Dictionary, margin: float, top: i
 func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> bool:
 	var seen: Dictionary = _observed_hits.get(tracker.type, {})
 	var hits := _hit_log.multipliers(tracker.get("chain_key", ""))
-	var key := "may|%s|%s|%s|%s|%s|%s|%d" % [tracker.type, profile.signature, event.level, profile.interval, seen.get("lowest", -1.0), seen.get("highest", 0.0), hits.size() / HackingModel.MIN_HITS]
+	# Once enough hits are known, the answer holds for this power: an attack must not pay for a new calculation.
+	var measured: bool = hits.size() >= HackingModel.MIN_HITS
+	var key := "may|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, event.level, profile.interval, "measured" if measured else "%s|%s" % [seen.get("lowest", -1.0), seen.get("highest", 0.0)]]
 	if _level_scans.has(key):
 		return _level_scans[key]
 	if _level_scans.size() >= FORECAST_CACHE_SIZE:
 		_level_scans.clear()
 	var answer := false
 	var target := _native_values(tracker, event.level + 1)
-	if not target.is_empty() and event.level + 1 <= event.max_level and hits.size() >= HackingModel.MIN_HITS and profile.interval > 0.0 and profile.breach_variation == 0 and profile.infection_variation == 0:
+	if not target.is_empty() and event.level + 1 <= event.max_level and measured and profile.interval > 0.0 and profile.breach_variation == 0 and profile.infection_variation == 0:
 		var model := HackingModel.new({"time_factor": 1.0})
 		var outcome := model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, hits, profile.interval)
 		answer = outcome.chance >= TRIAL_CHANCE

@@ -4,7 +4,7 @@ extends RefCounted
 ## never seen before counts as soon as it has acted. What cannot be told stays insufficient, never a figure.
 
 const NORMAL_TICK := 0.05
-const SAMPLES := 150
+const SAMPLES := 100
 const EARLY_SAMPLES := 30
 ## From this chance on, the regulation holds a level long enough for it to count. Two failures in a row lower it.
 const MIN_HOLD := 0.8
