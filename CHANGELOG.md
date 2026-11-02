@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.9 – en cours : conseiller générique
+## 0.4.0-dev.10 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -22,6 +22,7 @@
 - L'infection est mesurée à chaque attaque, quel que soit le nœud qui la produit : sa croissance par seconde, ce que chaque tir lui ajoute, et si ce gain suit les coups réels. Spread Infection et Infecter Payload sont ainsi pris en compte sans être nommés dans le code.
 - Un effet inconnu du jeu ne bloque plus le conseil : il reste sans chiffre jusqu'à ce que des attaques l'aient montré, puis il est compté, et le contrôle contre les attaques réelles s'applique.
 - Les nombres qui dépassent les entiers s'affichent sous la forme `4.60e18` au lieu d'un coût négatif.
+- Le journal relève, à chaque attaque réussie, ce que la cible produit selon le jeu, pour vérifier la récompense des niveaux élites.
 - Un achat qui change ce qu'une cible exige, comme plus de temps d'attaque, relance la régulation autant qu'un changement de puissance.
 - Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.

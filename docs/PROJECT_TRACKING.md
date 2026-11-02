@@ -79,6 +79,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Infection mesurée, `0.4.0-dev.9`, 2026-11-02 :** Spread Infection pose le bit `INFECTED` que le conseiller refusait de chiffrer. Le journal montre deux mécaniques : l'infection croît d'environ 10 % par seconde, et Infecter Payload lui ajoute à chaque coup réel, critiques compris, la part annoncée : 20 % à 37 946 (8 922 pour 44 390), 10 % à 91 071 (10 706 pour 106 536). Le classeur mesure désormais la croissance et les gains tick par tick, sans connaître le nœud. Rejeu de 46 situations réelles avec ces deux valeurs : réussite et durée proches du réel sur 19 des 20 cellules d'au moins 5 attaques ; l'écart restant est une durée tirée d'une seule attaque réussie. Sur moins de 5 attaques, Entreprises 24 à 91 071 reste prévu à 73 % pour 1 réussite sur 3. À vérifier en jeu. Toujours non vérifiés : `INFECTED` sur d'autres chaînes, une croissance achetée, la récompense élite.
 
+**Vérifié en jeu sur la `0.4.0-dev.9`, 2026-11-02 :** l'infection mesurée seule donne une croissance de 0,0998 par seconde et un gain qui suit les coups (facteur 1,00) ; le panneau chiffre de nouveau, sans erreur ni contradiction. Il montre aussi l'effet de la récompense élite non vérifiée : un achat de puissance y vaut -72 %, parce qu'Entreprises passerait de l'élite 25 à 26. La `dev.10` relève ce que les cibles produisent selon le jeu, pour trancher.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

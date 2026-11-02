@@ -59,6 +59,9 @@ static func cost_text(cost: float, resource: String, data: Variant = null) -> St
 static func grouped(value: float) -> String:
 	if absf(value) >= LARGEST_WHOLE:
 		var power := floorf(log(absf(value)) / log(10.0))
+		# 1e21 can come out of the logarithm as 20.999...: the leading figure must stay below 10.
+		if absf(value) / pow(10.0, power) >= 9.995:
+			power += 1.0
 		return "%.2fe%d" % [value / pow(10.0, power), int(power)]
 	var digits := str(roundi(value))
 	var text := ""

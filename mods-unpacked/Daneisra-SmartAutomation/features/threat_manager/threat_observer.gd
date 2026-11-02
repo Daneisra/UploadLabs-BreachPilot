@@ -36,8 +36,10 @@ const EVENT_FIELDS: Array[String] = [
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "breach_variation", "infection_variation",
 	"infection_rate", "infection_offset", "interval", "tick_speed",
 	"infection_start", "infection_end", "infection_integral", "infection_growth", "infection_pulses", "infection_gain", "dealt_total", "complete", "observed_start",
-	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "trace",
+	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "outputs", "trace",
 ]
+## The slots an attack feeds: its own damage inputs are left out.
+const ATTACK_SLOTS: Array[String] = ["breach_damage", "infection_damage", "vulnerability"]
 const TRACED_EVENTS_PER_TYPE := 12
 const FORECAST_TOLERANCE := 0.15
 const FORECAST_CACHE_SIZE := 64
@@ -390,6 +392,7 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			_probe_result(tracker, event)
 		_count_reliability(type, event.event)
 		if event.event == "success":
+			event.outputs = _outputs(tracker.window)
 			event.next_ratio = BreachPrediction.next_ratio(event.ratio, event.level)
 			event.merge(BreachPrediction.volley_model(event))
 			_add_simulation(tracker, event)
@@ -1367,6 +1370,25 @@ func _format(type: String, event: Dictionary) -> String:
 		if event.has(field):
 			parts.append("%s=%s" % [field, _format_value(event[field])])
 	return " ".join(parts)
+
+
+## What the target gives, as the game shows it on its outputs: resource, rate and stock. Read only, to check
+## what an elite level really brings against an ordinary one.
+func _outputs(window: Variant) -> String:
+	if not is_instance_valid(window) or not window.get("containers") is Array:
+		return ""
+	var skipped := []
+	for name: String in ATTACK_SLOTS:
+		skipped.append(window.get(name))
+	var parts := PackedStringArray()
+	for slot: Variant in window.containers:
+		if not is_instance_valid(slot) or skipped.has(slot):
+			continue
+		var production: Variant = slot.get("production")
+		var count: Variant = slot.get("count")
+		if (production is float or production is int) and (count is float or count is int):
+			parts.append("%s:%s:%s" % [slot.get("resource"), _format_value(float(production)), _format_value(float(count))])
+	return ",".join(parts)
 
 
 func _format_value(value: Variant) -> String:

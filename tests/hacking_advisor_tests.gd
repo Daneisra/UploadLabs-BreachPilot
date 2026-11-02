@@ -719,6 +719,17 @@ func _test_infection_measure() -> void:
 
 	_check.call(HackingUpgrades.grouped(4603854016022367232.0) == "4.60e18", "numbers beyond whole ones stay readable: %s" % HackingUpgrades.grouped(4603854016022367232.0))
 	_check.call(not HackingUpgrades.grouped(2.3e22).begins_with("-"), "and never turn negative")
+	_check.call(HackingUpgrades.grouped(1e21) == "1.00e21" and HackingUpgrades.grouped(99999999999999992000000.0) == "1.00e23", "a power of ten keeps one figure before the point: %s" % HackingUpgrades.grouped(1e21))
+	var observer := Observer.new()
+	var target := FakeBreach.new()
+	target.breach_damage = _slot("in", "breach_damage", 5.0)
+	target.containers = [target.breach_damage, _slot("xp", "hack_experience", 33.5), _slot("data", "corporation_data", 101.0)]
+	_check.call(observer._outputs(target) == "hack_experience:33.5:33.5,corporation_data:101.0:101.0", "what a target gives is read without its attack inputs: %s" % observer._outputs(target))
+	_check.call(observer._outputs(null) == "", "no target, nothing read")
+	for slot: Variant in target.containers:
+		slot.free()
+	target.free()
+	observer.free()
 	_check.call(HackingUpgrades.cost_text(1e30, "hack_points").ends_with("points de piratage"), "a huge cost is still plural")
 
 
