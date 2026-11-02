@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.6 – en cours : conseiller générique
+## 0.4.0-dev.7 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -18,6 +18,7 @@
 - Sans prévision possible, quelle qu'en soit la raison, le mod passe par des essais de niveau réels en profil équilibré ou agressif, au lieu de ne plus monter.
 - « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
 - Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
+- Attaque Ghost est prise en compte, par le signal que le jeu expose et non par son nom : les dégâts furtifs ignorent le pare-feu, flux par flux. Le panneau redonne ses chiffres, et la régulation ne tente plus un niveau sans aucune chance.
 - Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
 

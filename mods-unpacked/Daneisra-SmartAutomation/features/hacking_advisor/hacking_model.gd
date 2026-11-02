@@ -84,9 +84,9 @@ func contradictions(row: Dictionary) -> Array[Dictionary]:
 			continue
 		var scales := _scales(key, row.scenario)
 		var interval := _interval(key)
-		if (scales.hit <= 0.0 and scales.stack <= 0.0) or interval <= 0.0 or not _measured(key, row.scenario):
+		if (scales.hit <= 0.0 and scales.stack <= 0.0) or interval <= 0.0 or not _measured(key, row.scenario) or _is_unmeasured(key, row.scenario):
 			continue
-		var outcome := attack_outcome(target.levels[target.level], scales.hit * _shot_time(key), scales.stack * _shot_time(key), scales.bonus, _multipliers_for(key, row.scenario), interval)
+		var outcome := attack_outcome(target.levels[target.level], scales.hit * _shot_time(key), scales.stack * _shot_time(key), scales.bonus, _multipliers_for(key, row.scenario), interval, scales.hit_stealth, scales.stack_stealth)
 		var real_chance: float = float(real.successes) / real.attacks
 		var real_used: float = real.used / real.successes if real.successes > 0 else -1.0
 		var used_off: bool = real_used >= 0.0 and outcome.used >= 0.0 and absf(real_used - outcome.used) > USED_TOLERANCE
@@ -173,7 +173,22 @@ func _scales(key: String, scenario: Dictionary) -> Dictionary:
 		"hit": _share(scenario.payload[key], "payload", scenario) * _chain.payload_factor,
 		"stack": _share(scenario.infection[key], "infection", scenario) * _chain.infection_factor,
 		"bonus": 1.0 + (_chain.targets[key].vulnerability if scenario.vulnerability else 0.0),
+		"hit_stealth": _is_stealth(scenario.payload[key]),
+		"stack_stealth": _is_stealth(scenario.infection[key]),
 	}
+
+
+func _is_stealth(stream_id: String) -> bool:
+	return _chain.streams.has(stream_id) and (_chain.streams[stream_id].get("variation", 0) & _chain.get("stealth_mask", 0)) != 0
+
+
+## Any effect other than stealth has never been measured, on the target or on what would reach it.
+func _is_unmeasured(key: String, scenario: Dictionary) -> bool:
+	var variation: int = _chain.targets[key].variation
+	for stream_id: String in [scenario.payload[key], scenario.infection[key]]:
+		if _chain.streams.has(stream_id):
+			variation |= _chain.streams[stream_id].get("variation", 0)
+	return (variation & ~int(_chain.get("stealth_mask", 0))) != 0
 
 
 func _multipliers_for(key: String, scenario: Dictionary) -> PackedFloat32Array:
@@ -201,13 +216,13 @@ func _measured(key: String, scenario: Dictionary) -> bool:
 ## The highest level likely to hold. Above the highest unlocked level, one only opens once the one before it works.
 func _best_level(key: String, scenario: Dictionary) -> Dictionary:
 	var scales := _scales(key, scenario)
-	var memo := "%s|%s|%s|%s|%s" % [key, scales.hit, scales.stack, scales.bonus, scenario.payload[key]]
+	var memo := "%s|%s|%s|%s|%s|%s|%s|%s" % [key, scales.hit, scales.stack, scales.bonus, scenario.payload[key], scales.hit_stealth, scales.stack_stealth, scenario.infection[key]]
 	if _results.has(memo):
 		return _results[memo]
 	var target: Dictionary = _chain.targets[key]
 	var best := {"level": -1, "chance": 0.0, "used": -1.0, "cycle": 0.0, "reward_rate": 0.0, "xp_rate": 0.0, "insufficient": ""}
-	if target.variation != 0:
-		# Stealth and growing infection have never been measured: no figure rather than a wrong one.
+	if _is_unmeasured(key, scenario):
+		# Growing infection or an unknown effect: no figure rather than a wrong one.
 		best.insufficient = REASON_UNMEASURED
 	elif scales.hit > 0.0 or scales.stack > 0.0:
 		var interval := _interval(key)
@@ -216,7 +231,7 @@ func _best_level(key: String, scenario: Dictionary) -> Dictionary:
 		elif not _measured(key, scenario):
 			best.insufficient = REASON_HITS
 		else:
-			var shots := {"hit": scales.hit * _shot_time(key), "stack": scales.stack * _shot_time(key), "bonus": scales.bonus}
+			var shots := {"hit": scales.hit * _shot_time(key), "stack": scales.stack * _shot_time(key), "bonus": scales.bonus, "hit_stealth": scales.hit_stealth, "stack_stealth": scales.stack_stealth}
 			_scan_levels(best, target, shots, _multipliers_for(key, scenario), interval)
 	_results[memo] = best
 	return best
@@ -228,7 +243,7 @@ func _scan_levels(best: Dictionary, target: Dictionary, scales: Dictionary, mult
 	var failed_in_row := 0
 	for level: int in levels:
 		var values: Dictionary = target.levels[level]
-		var outcome := attack_outcome(values, scales.hit, scales.stack, scales.bonus, multipliers, interval)
+		var outcome := attack_outcome(values, scales.hit, scales.stack, scales.bonus, multipliers, interval, scales.hit_stealth, scales.stack_stealth)
 		if outcome.chance >= MIN_HOLD:
 			failed_in_row = 0
 			best.level = level
@@ -246,7 +261,7 @@ func _scan_levels(best: Dictionary, target: Dictionary, scales: Dictionary, mult
 ## chance of success, average duration of the attacks that succeed, and average time from one attack
 ## to the next. The same seed gives two scenarios the same luck, so that a small gap between them is
 ## not just noise.
-func attack_outcome(values: Dictionary, hit: float, stack: float, bonus: float, multipliers: PackedFloat32Array, interval: float) -> Dictionary:
+func attack_outcome(values: Dictionary, hit: float, stack: float, bonus: float, multipliers: PackedFloat32Array, interval: float, hit_stealth: bool = false, stack_stealth: bool = false) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	var time: float = values.time * _chain.time_factor
@@ -256,7 +271,7 @@ func attack_outcome(values: Dictionary, hit: float, stack: float, bonus: float, 
 	var samples := 0
 	while samples < SAMPLES:
 		samples += 1
-		var used := _attack(rng, values.firewall, values.breach, time, hit, stack, bonus, multipliers, interval)
+		var used := _attack(rng, values.firewall, values.breach, time, hit, stack, bonus, multipliers, interval, hit_stealth, stack_stealth)
 		if used >= 0.0:
 			successes += 1
 			total_used += used
@@ -274,7 +289,8 @@ func _next_shot(time: float, interval: float) -> float:
 
 ## One attack, tick by tick, as BreachForecast.attack_time, with hits drawn from those really seen.
 ## Measured: vulnerability multiplies the hits (59.3 became 72.8 at 0.234). Assumed: its effect on infection.
-func _attack(rng: RandomNumberGenerator, firewall: float, breach: float, max_time: float, hit: float, stack_gain: float, bonus: float, multipliers: PackedFloat32Array, interval: float) -> float:
+## Measured over 808 attacks: stealth damage goes straight to the breach bar and leaves the firewall whole.
+func _attack(rng: RandomNumberGenerator, firewall: float, breach: float, max_time: float, hit: float, stack_gain: float, bonus: float, multipliers: PackedFloat32Array, interval: float, hit_stealth: bool = false, stack_stealth: bool = false) -> float:
 	var next_volley := 0.0
 	var next_pulse: float = (LATE_INFECTION if rng.randf() < LATE_INFECTION_CHANCE else INFECTION_LAG) * interval
 	var stack := 0.0
@@ -291,6 +307,12 @@ func _attack(rng: RandomNumberGenerator, firewall: float, breach: float, max_tim
 				stack += _whole(rng, stack_gain)
 			next_pulse += interval
 		var over_time := stack * bonus * NORMAL_TICK
+		if hit_stealth:
+			breach -= volley
+			volley = 0.0
+		if stack_stealth:
+			breach -= over_time
+			over_time = 0.0
 		if firewall > 0.0:
 			firewall = maxf(firewall - volley, 0.0)
 			volley = 0.0

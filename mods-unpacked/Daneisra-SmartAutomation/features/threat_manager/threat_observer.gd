@@ -137,6 +137,11 @@ func hit_log() -> HitLog:
 	return _hit_log
 
 
+## The game's own bit for stealth damage, 0 when it does not say.
+func stealth_mask() -> int:
+	return _stealth_mask
+
+
 ## Set before start: the nodes then get a button for it.
 func set_advice_action(action: Callable) -> void:
 	_advice_action = action
@@ -977,9 +982,10 @@ func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> b
 		_level_scans.clear()
 	var answer := false
 	var target := _native_values(tracker, event.level + 1)
-	if not target.is_empty() and event.level + 1 <= event.max_level and measured and profile.interval > 0.0 and profile.breach_variation == 0 and profile.infection_variation == 0:
+	var unknown_effect: bool = ((profile.breach_variation | profile.infection_variation) & ~_stealth_mask) != 0
+	if not target.is_empty() and event.level + 1 <= event.max_level and measured and profile.interval > 0.0 and not unknown_effect:
 		var model := HackingModel.new({"time_factor": 1.0})
-		var outcome := model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, hits, profile.interval)
+		var outcome := model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, hits, profile.interval, (profile.breach_variation & _stealth_mask) != 0, (profile.infection_variation & _stealth_mask) != 0)
 		answer = outcome.chance >= TRIAL_CHANCE
 	elif not target.is_empty() and event.level + 1 <= event.max_level:
 		var hopeful := profile.duplicate()

@@ -15,7 +15,7 @@ const ERROR_TEXTS := {
 const INSUFFICIENT_TEXTS := {
 	HackingModel.REASON_HITS: "pas encore assez de coups mesurés sur cette chaîne",
 	HackingModel.REASON_INTERVAL: "pas encore d'attaque vue",
-	HackingModel.REASON_UNMEASURED: "mécanique jamais mesurée (furtivité, infection qui grandit)",
+	HackingModel.REASON_UNMEASURED: "effet jamais mesuré sur cette chaîne (infection qui grandit, ou effet inconnu)",
 }
 const CHANCE_NOT_FOLLOWED := "effet non chiffré"
 ## How often an open panel looks at the chain. A second is quick enough for a player plugging a cable.
@@ -64,7 +64,7 @@ func toggle() -> void:
 func _look_at_chain() -> void:
 	_since_check = 0.0
 	var root := get_tree().root
-	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"))
+	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"), _observer.stealth_mask())
 	var upgrades := HackingUpgrades.read(root)
 	var state := _state_of(chain, upgrades)
 	if state == _shown_state:

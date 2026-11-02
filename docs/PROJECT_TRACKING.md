@@ -73,6 +73,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Même session, journal de 23:13 à 00:01 :** 975 attaques réussies pour 12 échecs, aucune erreur ; la régulation est montée de 9 à 14 sur les deux cibles avec la puissance du joueur. Niveau 10 : 86 réussites sur 86. Niveau 11, d'abord : 11 échecs, et deux retours à 9 suivis d'une remontée. **Point ouvert :** le panneau annonce 101 000 XP/min au niveau 10 élite puis 42 500 au niveau 11, soit environ 10 150 XP par attaque contre 2 070. La régulation a donc quitté un niveau annoncé plus rentable. Le gain réel d'un niveau élite n'est toujours pas mesuré : le journal ne relève pas l'XP gagnée.
 
+**Attaque Ghost, journal du 2026-11-01 :** sur 808 attaques réussies avec Ghost sur les deux flux, les dégâts valent 101 % de la barre d'infiltration seule, et 66 % de pare-feu + infiltration ; sans furtivité, 101 % des deux barres. Le coup moyen rapporté au débit annoncé reste à 0,61 avec ou sans Ghost, de 1 071 à 2 776 de débit. Le jeu nomme le bit dans `Utils.damage_variation` (`STEALTH` = 1, `INFECTED` = 2). `INFECTED` n'a jamais été mesuré et reste sans chiffre.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

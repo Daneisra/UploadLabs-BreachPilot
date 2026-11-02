@@ -12,7 +12,8 @@ const CRITICAL_MULTIPLIER := "breach_critical_multiplier"
 
 
 ## error is empty when there is something to compare. intervals gives the attack interval seen by type.
-static func read(desktop: Variant, intervals: Dictionary, hit_log: Variant, attributes: Variant, data: Variant) -> Dictionary:
+## stealth_mask is the game's own bit for stealth damage: without it, stealth is one more unknown effect.
+static func read(desktop: Variant, intervals: Dictionary, hit_log: Variant, attributes: Variant, data: Variant, stealth_mask: int = 0) -> Dictionary:
 	if not is_instance_valid(desktop) or not is_instance_valid(desktop.get("windows")):
 		return {"error": "no_desktop"}
 	var graph := HackingGraph.snapshot(desktop)
@@ -20,7 +21,7 @@ static func read(desktop: Variant, intervals: Dictionary, hit_log: Variant, attr
 		"error": "", "targets": {}, "streams": {}, "sources": {},
 		"current": {"payload": {}, "infection": {}, "vulnerability": false},
 		"time_factor": 1.0, "interval_factor": 1.0, "power_factor": 1.0, "payload_factor": 1.0, "infection_factor": 1.0,
-		"crit_multiplier": _attribute(attributes, CRITICAL_MULTIPLIER),
+		"crit_multiplier": _attribute(attributes, CRITICAL_MULTIPLIER), "stealth_mask": stealth_mask,
 	}
 	var by_type := {}
 	for entry: Dictionary in graph.windows:
@@ -113,6 +114,7 @@ static func _note_stream(chain: Dictionary, graph: Dictionary, target_key: Strin
 	if not chain.streams.has(id):
 		chain.streams[id] = _new_stream(graph.containers[id], kind, data)
 	chain.streams[id].targets.append(target_key)
+	chain.streams[id].variation |= int(_number(slot, "variation"))
 	return id
 
 
@@ -131,7 +133,7 @@ static func _new_stream(slot: Dictionary, kind: String, data: Variant) -> Dictio
 	return {
 		"id": slot.id, "kind": kind, "resource": slot.resource, "label": _label(data, "windows", slot.window_type, slot.window_type),
 		"production": slot.production, "outputs": slot.outputs_id.size(), "targets": [],
-		"multipliers": PackedFloat32Array(), "source": "", "window_type": slot.window_type,
+		"multipliers": PackedFloat32Array(), "source": "", "window_type": slot.window_type, "variation": slot.variation,
 	}
 
 

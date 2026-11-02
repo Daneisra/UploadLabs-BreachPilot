@@ -105,6 +105,7 @@ static func _read_slot(container: Variant, window: Node) -> Dictionary:
 	var outputs: Variant = container.get("outputs_id")
 	var production: Variant = container.get("production")
 	var count: Variant = container.get("count")
+	var variation: Variant = container.get("variation")
 	return {
 		"id": str(id),
 		"window": window,
@@ -114,4 +115,5 @@ static func _read_slot(container: Variant, window: Node) -> Dictionary:
 		"outputs_id": outputs if outputs is Array else [],
 		"production": float(production) if production is float or production is int else 0.0,
 		"count": float(count) if count is float or count is int else 0.0,
+		"variation": int(variation) if variation is float or variation is int else 0,
 	}

@@ -90,6 +90,7 @@ func run(check: Callable) -> void:
 	_test_advice()
 	_test_trial_without_forecast()
 	_test_refresh_state()
+	_test_stealth()
 
 
 ## 10 % of hits at 2.5 times the others, as measured, with the announcement of the critical node.
@@ -403,10 +404,14 @@ func _test_abstention() -> void:
 	no_attack.targets.gov.interval = 0.0
 	_check.call(HackingModel.new(no_attack).evaluate(no_attack.current).insufficient.has(HackingModel.REASON_INTERVAL), "no attack seen gives no figure")
 
-	var stealth := _chain()
-	stealth.targets.gov.variation = 1
-	var hidden := HackingModel.new(stealth).evaluate(stealth.current)
+	var growing := _chain()
+	growing.stealth_mask = 1
+	growing.targets.gov.variation = 2
+	var hidden := HackingModel.new(growing).evaluate(growing.current)
 	_check.call(hidden.insufficient.has(HackingModel.REASON_UNMEASURED) and hidden.targets.gov.level == -1, "what was never measured is never estimated")
+	var unnamed := _chain()
+	unnamed.targets.gov.variation = 1
+	_check.call(HackingModel.new(unnamed).evaluate(unnamed.current).insufficient.has(HackingModel.REASON_UNMEASURED), "a game that does not name stealth leaves it unknown")
 
 	var current := HackingModel.new(_chain()).evaluate(_chain().current)
 	var better := HackingModel.new(_chain()).evaluate(_chain().current)
@@ -597,6 +602,74 @@ func _test_refresh_state() -> void:
 	_check.call(advisor._state_of(measuring, upgrades) != state, "a measure becoming sufficient recalculates")
 	_check.call(advisor._state_of({"error": "no_target"}, upgrades) == "no_target", "an error is a state too")
 	advisor.free()
+
+
+## Figures from the log of 2026-11-01, with Ghost on both streams at 2775.97 and 1669.05 per second.
+func _ghost_hits() -> PackedFloat32Array:
+	var hits := PackedFloat32Array()
+	for index: int in 300:
+		var hit := 0.33
+		if index % 3 == 0:
+			hit *= 2.0
+		if index % 5 == 0:
+			hit *= 2.68
+		hits.append(hit)
+	return hits
+
+
+func _test_stealth() -> void:
+	var model := HackingModel.new({"time_factor": 1.0})
+	var hits := _ghost_hits()
+	var cells: Array = [
+		["Corps 17", {"firewall": 7882.0, "breach": 31528.0, "time": 6.0}, true, 4.92],
+		["Government 18", {"firewall": 29557.5, "breach": 29557.5, "time": 6.0}, true, 4.85],
+		["Corps 18", {"firewall": 11823.0, "breach": 47292.0, "time": 6.0}, false, -1.0],
+		["Government 19", {"firewall": 44336.5, "breach": 44336.5, "time": 6.0}, false, -1.0],
+	]
+	for cell: Array in cells:
+		var outcome := model.attack_outcome(cell[1], 2775.97 * 0.8583, 1669.05 * 0.8583, 1.0, hits, 0.8583, true, true)
+		_check.call(outcome.chance >= HackingModel.MIN_HOLD if cell[2] else outcome.chance < HackingModel.MIN_HOLD, "%s with Ghost as measured: %.2f" % [cell[0], outcome.chance])
+		if cell[2]:
+			_check.call(absf(outcome.used - cell[3]) < 0.5, "%s with Ghost lasts as measured: %.2f" % [cell[0], outcome.used])
+	var wall := {"firewall": 29557.5, "breach": 29557.5, "time": 6.0}
+	_check.call(model.attack_outcome(wall, 2775.97 * 0.8583, 1669.05 * 0.8583, 1.0, hits, 0.8583).chance < 0.1, "the same attack without stealth stops at the firewall")
+
+	var chain := _chain()
+	chain.stealth_mask = 1
+	chain.streams.P.variation = 1
+	chain.streams.I.variation = 1
+	var row := HackingModel.new(chain).evaluate(chain.current)
+	var plain_row := HackingModel.new(_chain()).evaluate(_chain().current)
+	_check.call(row.insufficient.is_empty() and row.targets.gov.level >= plain_row.targets.gov.level, "stealth gives figures, at least as high as without it")
+	var scales := HackingModel.new(chain)._scales("gov", chain.current)
+	_check.call(scales.hit_stealth and scales.stack_stealth, "each stream carries its own stealth")
+	chain.streams.I.variation = 3
+	_check.call(HackingModel.new(chain).evaluate(chain.current).insufficient.has(HackingModel.REASON_UNMEASURED), "stealth with an unknown effect stays unknown")
+
+	var desktop := _strange_desktop()
+	var read := HackingChain.read(desktop, {}, null, null, null, 1)
+	for slot: Variant in desktop.windows.get_children():
+		if slot.get("breach_damage") != null:
+			slot.breach_damage.variation = 1
+	var ghost := HackingChain.read(desktop, {}, null, null, null, 1)
+	_check.call(read.stealth_mask == 1 and read.streams.R.variation == 0 and ghost.streams.R.variation == 1, "stealth is read from what the game exposes, on any node")
+	_free_desktop(desktop)
+
+	var observer := Observer.new()
+	observer._stealth_mask = 1
+	var log_event := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "interval": 1.0, "hits": PackedFloat32Array()}
+	for index: int in HackingModel.MIN_HITS:
+		log_event.hits.append(100.0)
+	observer.hit_log().add("any", "chain", log_event)
+	var tracker := {"type": "any", "window": TrialWindow.new(), "getters": {}, "chain_key": "chain"}
+	var profile := {"damage_rate": 30.0, "announced_rate": 1.0, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 1, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0, "signature": "g1"}
+	_check.call(not observer._may_work(tracker, profile, {"level": 7, "max_level": 8}), "with stealth too, the hits measured spare a hopeless try")
+	var strong := profile.duplicate()
+	strong.announced_rate = 100.0
+	strong.signature = "g2"
+	_check.call(observer._may_work(tracker, strong, {"level": 7, "max_level": 8}), "with stealth, a level within reach is tried")
+	tracker.window.free()
+	observer.free()
 
 
 func _test_trial_without_forecast() -> void:
