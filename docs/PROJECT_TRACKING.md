@@ -75,6 +75,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Attaque Ghost, journal du 2026-11-01 :** sur 808 attaques réussies avec Ghost sur les deux flux, les dégâts valent 101 % de la barre d'infiltration seule, et 66 % de pare-feu + infiltration ; sans furtivité, 101 % des deux barres. Le coup moyen rapporté au débit annoncé reste à 0,61 avec ou sans Ghost, de 1 071 à 2 776 de débit. Le jeu nomme le bit dans `Utils.damage_variation` (`STEALTH` = 1, `INFECTED` = 2). `INFECTED` n'a jamais été mesuré et reste sans chiffre.
 
+**Vérifié en jeu sur la `0.4.0-dev.7`, 2026-11-02 :** le panneau annonce Entreprises 18 et Gouvernement 19 à 100 % dès 01:20, et le journal le confirme ensuite : 42/42 et 43/43. La régulation n'y est montée qu'à 01:27, au changement de puissance, alors que le temps d'attaque était passé à 7 s à 01:20 : une réponse en cache et un blocage de niveau ne dépendaient que de la puissance. Corrigé en `dev.8`, à vérifier.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

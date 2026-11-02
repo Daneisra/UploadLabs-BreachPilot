@@ -44,6 +44,8 @@ const FORECAST_CACHE_SIZE := 64
 const SAVE_CANDIDATE := "(?i)save|slot|profile|file"
 const SAVE_NODES_LOGGED := 12
 ## Read-only getters called with one level argument; each is checked before use.
+## A plain level, to read what targets demand whatever level they hold.
+const REFERENCE_LEVEL := 1
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
 ## Only reported as present or absent: this version must never call them.
 const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level", "get_reward", "get_experience_reward"]
@@ -625,6 +627,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		return
 
 	var profile := PowerProfile.from_event(event, _last_intervals.get(type, 0.0))
+	profile.signature = _with_target_rules(tracker, profile.signature)
 	if profile.interval > 0.0 and event.complete:
 		_last_intervals[type] = profile.interval
 	_apply_observed_hits(type, event, profile)
@@ -1293,6 +1296,15 @@ func _usable_getters(signatures: Dictionary) -> Dictionary:
 
 
 ## Exact values of a level according to the game. Returns {} unless every getter is usable.
+## A purchase can change what a target demands while the power stays the same: more time to attack, say.
+## That is a new situation too. The reference level never moves, so that climbing changes nothing here.
+func _with_target_rules(tracker: Dictionary, signature: String) -> String:
+	var rules := _native_values(tracker, REFERENCE_LEVEL)
+	if rules.is_empty():
+		return signature
+	return "%s|%.3f|%.3f|%.3f" % [signature, rules.firewall, rules.breach, rules.time]
+
+
 func _native_values(tracker: Dictionary, level: int) -> Dictionary:
 	if tracker.getters.values().has(false):
 		return {}

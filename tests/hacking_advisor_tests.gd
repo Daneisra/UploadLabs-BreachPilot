@@ -49,6 +49,13 @@ class FakeBreach extends FakeNode:
 	func get_experience_reward(level: int) -> float: return pow(2.0, level)
 
 
+class TimedWindow extends FakeBreach:
+	var time := 6.0
+	func get_max_firewall(_level: int) -> float: return 300.0
+	func get_max_breach(_level: int) -> float: return 500.0
+	func get_max_time(_level: int) -> float: return time
+
+
 class TrialWindow extends FakeBreach:
 	func get_max_firewall(_level: int) -> float: return 300.0
 	func get_max_breach(_level: int) -> float: return 300.0
@@ -91,6 +98,7 @@ func run(check: Callable) -> void:
 	_test_trial_without_forecast()
 	_test_refresh_state()
 	_test_stealth()
+	_test_target_rules()
 
 
 ## 10 % of hits at 2.5 times the others, as measured, with the announcement of the critical node.
@@ -615,6 +623,31 @@ func _ghost_hits() -> PackedFloat32Array:
 			hit *= 2.68
 		hits.append(hit)
 	return hits
+
+
+## Bought at the same power, more attack time must reopen the levels it brings within reach.
+func _test_target_rules() -> void:
+	var observer := Observer.new()
+	var window := TimedWindow.new()
+	var tracker := {"type": "any", "window": window, "getters": {}, "chain_key": "chain"}
+	var hits := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "interval": 1.0, "hits": PackedFloat32Array()}
+	for index: int in HackingModel.MIN_HITS:
+		hits.hits.append(100.0)
+	observer.hit_log().add("any", "chain", hits)
+	var profile := {"damage_rate": 100.0, "announced_rate": 100.0, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0}
+	var attack := {"level": 7, "max_level": 8}
+	profile.signature = observer._with_target_rules(tracker, "power")
+	var before: String = profile.signature
+	_check.call(not observer._may_work(tracker, profile, attack), "six seconds are too short for this level")
+	_check.call(observer._with_target_rules(tracker, "power") == before, "the same target keeps the same situation")
+	window.time = 8.0
+	profile.signature = observer._with_target_rules(tracker, "power")
+	_check.call(profile.signature != before, "more attack time is a new situation")
+	_check.call(observer._may_work(tracker, profile, attack), "and the level it brings within reach is tried at once")
+	var blind := {"type": "any", "window": window, "getters": {"get_max_time": false}}
+	_check.call(observer._with_target_rules(blind, "power") == "power", "without the game's values, power alone tells")
+	window.free()
+	observer.free()
 
 
 func _test_stealth() -> void:

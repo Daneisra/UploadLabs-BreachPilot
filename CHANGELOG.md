@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.7 – en cours : conseiller générique
+## 0.4.0-dev.8 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -19,6 +19,7 @@
 - « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
 - Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
 - Attaque Ghost est prise en compte, par le signal que le jeu expose et non par son nom : les dégâts furtifs ignorent le pare-feu, flux par flux. Le panneau redonne ses chiffres, et la régulation ne tente plus un niveau sans aucune chance.
+- Un achat qui change ce qu'une cible exige, comme plus de temps d'attaque, relance la régulation autant qu'un changement de puissance.
 - Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
 
