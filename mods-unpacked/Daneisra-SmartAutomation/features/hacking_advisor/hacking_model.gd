@@ -3,6 +3,8 @@ extends RefCounted
 ## nothing here touches the game. Attacks are drawn from the hits really seen on the chain, so a node
 ## never seen before counts as soon as it has acted. What cannot be told stays insufficient, never a figure.
 
+const LevelChoice := preload("../threat_manager/level_choice.gd")
+
 const NORMAL_TICK := 0.05
 const SAMPLES := 100
 const EARLY_SAMPLES := 30
@@ -227,10 +229,11 @@ func _measured(key: String, scenario: Dictionary) -> bool:
 	return scenario.payload[key] == "" or _multipliers_for(key, scenario).size() >= MIN_HITS
 
 
-## The highest level likely to hold. Above the highest unlocked level, one only opens once the one before it works.
+## The level likely to hold that brings the most for the objective, as the regulation picks it. Above the
+## highest unlocked level, one only opens once the one before it works.
 func _best_level(key: String, scenario: Dictionary) -> Dictionary:
 	var scales := _scales(key, scenario)
-	var memo := "%s|%s|%s|%s|%s|%s|%s|%s" % [key, scales.hit, scales.stack, scales.bonus, scenario.payload[key], scales.hit_stealth, scales.stack_stealth, scenario.infection[key]]
+	var memo := "%s|%s|%s|%s|%s|%s|%s|%s|%s" % [key, scales.hit, scales.stack, scales.bonus, scenario.payload[key], scales.hit_stealth, scales.stack_stealth, scenario.infection[key], _chain.get("objective", LevelChoice.BALANCED)]
 	if _results.has(memo):
 		return _results[memo]
 	var target: Dictionary = _chain.targets[key]
@@ -246,30 +249,38 @@ func _best_level(key: String, scenario: Dictionary) -> Dictionary:
 			best.insufficient = REASON_HITS
 		else:
 			var shots := {"hit": scales.hit * _shot_time(key), "stack": scales.stack * _shot_time(key), "bonus": scales.bonus, "hit_stealth": scales.hit_stealth, "stack_stealth": scales.stack_stealth, "infection": _infection_of(scenario.infection[key])}
-			_scan_levels(best, target, shots, _multipliers_for(key, scenario), interval)
+			_scan_levels(best, key, target, shots, _multipliers_for(key, scenario), interval)
 	_results[memo] = best
 	return best
 
 
-func _scan_levels(best: Dictionary, target: Dictionary, scales: Dictionary, multipliers: PackedFloat32Array, interval: float) -> void:
+func _scan_levels(best: Dictionary, key: String, target: Dictionary, scales: Dictionary, multipliers: PackedFloat32Array, interval: float) -> void:
 	var levels: Array = target.levels.keys()
 	levels.sort()
 	var failed_in_row := 0
+	var holding := {}
+	var outcomes := {}
 	for level: int in levels:
 		var values: Dictionary = target.levels[level]
 		var outcome := attack_outcome(values, scales.hit, scales.stack, scales.bonus, multipliers, interval, scales.hit_stealth, scales.stack_stealth, scales.infection)
 		if outcome.chance >= MIN_HOLD:
 			failed_in_row = 0
-			best.level = level
-			best.chance = outcome.chance
-			best.used = outcome.used
-			best.cycle = outcome.cycle
-			best.reward_rate = outcome.chance * values.reward / outcome.cycle * 60.0
-			best.xp_rate = outcome.chance * values.xp / outcome.cycle * 60.0
+			holding[level] = {"chance": outcome.chance, "cycle": outcome.cycle, "reward": values.reward, "xp": values.xp}
+			outcomes[level] = outcome
 		else:
 			failed_in_row += 1
 			if level > target.max_level or failed_in_row >= FAILED_IN_ROW_STOP:
 				break
+	var chosen := LevelChoice.profitable(holding, _chain.get("objective", LevelChoice.BALANCED), key, MIN_HOLD)
+	if chosen < 0:
+		return
+	var brought := LevelChoice.rates(holding[chosen])
+	best.level = chosen
+	best.chance = outcomes[chosen].chance
+	best.used = outcomes[chosen].used
+	best.cycle = outcomes[chosen].cycle
+	best.reward_rate = brought.reward
+	best.xp_rate = brought.xp
 
 
 ## chance of success, average duration of the attacks that succeed, and average time from one attack

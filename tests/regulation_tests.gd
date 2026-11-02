@@ -6,6 +6,7 @@ const Forecast := preload(MOD + "breach_forecast.gd")
 const PowerProfile := preload(MOD + "power_profile.gd")
 const Regulator := preload(MOD + "threat_regulator.gd")
 const RegulationState := preload(MOD + "regulation_state.gd")
+const LevelChoice := preload(MOD + "level_choice.gd")
 
 var _check_call: Callable
 
@@ -29,6 +30,8 @@ func run(check: Callable) -> void:
 	_test_observed_hits()
 	_test_failures_in_row()
 	_test_probes()
+	_test_level_choice()
+	_test_profitable_regulation()
 	_test_game_load()
 	_test_pauses()
 
@@ -700,6 +703,102 @@ func _test_probes() -> void:
 	var unseen := _profile({"damage_rate": 87.3867})
 	PowerProfile.apply_observed_hits(unseen, -1.0, 20.0)
 	_check(unseen.hits_unseen and is_equal_approx(unseen.damage_rate, 87.3867), "without an uncut hit, the announced figure stands")
+
+
+## Entreprises as measured on 2026-11-02: the elite 30 pays 61.4 M data and 85.9 G XP in about 17 s,
+## the 31 9.2 M and 17.4 G in about 8 s. Units are millions and billions.
+func _measured_levels() -> Dictionary:
+	return {
+		29: {"chance": 1.0, "cycle": 6.1, "reward": 4.09, "xp": 4.35},
+		30: {"chance": 1.0, "cycle": 17.0, "reward": 61.4, "xp": 85.9},
+		31: {"chance": 1.0, "cycle": 8.3, "reward": 9.2, "xp": 17.4},
+		32: {"chance": 1.0, "cycle": 7.6, "reward": 13.8, "xp": 34.4},
+		33: {"chance": 0.5, "cycle": 9.4, "reward": 20.7, "xp": 68.8},
+	}
+
+
+func _test_level_choice() -> void:
+	var levels := _measured_levels()
+	_check(LevelChoice.profitable(levels, "corps", "corps", 0.99) == 30, "the elite that pays three times more is chosen for its data")
+	_check(LevelChoice.profitable(levels, LevelChoice.XP, "corps", 0.99) == 30, "and for the XP")
+	_check(LevelChoice.profitable(levels, LevelChoice.BALANCED, "corps", 0.99) == 30, "and balanced, since it wins on both")
+	_check(LevelChoice.profitable(levels, "gov", "corps", 0.99) == 30, "another target's objective keeps the balance")
+	levels[30].xp = 50.0
+	_check(LevelChoice.profitable(levels, "corps", "corps", 0.99) == 30, "an elite poorer in XP still wins on data")
+	_check(LevelChoice.profitable(levels, LevelChoice.XP, "corps", 0.99) == 32, "but not on XP")
+	_check(LevelChoice.profitable(levels, LevelChoice.BALANCED, "corps", 0.99) == 32, "nor balanced, which needs both")
+	var close := _measured_levels()
+	close[30].reward = 13.8 * 17.0 / 7.6 * 1.03
+	_check(LevelChoice.profitable(close, "corps", "corps", 0.99) == 32, "3 % more is noise: the highest level stays")
+	_check(LevelChoice.profitable({33: {"chance": 0.5, "cycle": 9.0, "reward": 1.0, "xp": 1.0}}, "corps", "corps", 0.99) == -1, "nothing holding, nothing chosen")
+	_check(LevelChoice.profitable({}, "corps", "corps", 0.99) == -1, "nor without levels")
+	_check(LevelChoice.profitable({4: {"chance": 1.0, "cycle": 0.0, "reward": 1.0, "xp": 1.0}}, "corps", "corps", 0.99) == 4, "an attack without a measured time does not break the choice")
+	_check(LevelChoice.to_unlock(_measured_levels(), 30, 33, 0.3) == 33, "the highest level unlocked is worth a try when it may hold")
+	_check(LevelChoice.to_unlock(_measured_levels(), 30, 33, 0.99) == -1, "not for a profile that never tries")
+	_check(LevelChoice.to_unlock(_measured_levels(), 33, 33, 0.3) == -1, "nor once there")
+	_check(LevelChoice.to_unlock(_measured_levels(), 30, 34, 0.3) == -1, "nor for a level never measured")
+
+
+func _test_profitable_regulation() -> void:
+	var reg := Regulator.new("balanced")
+	var high := {"event": "success", "complete": true, "level": 32, "max_level": 33, "signature": "s", "profitable_level": 30, "unlock_level": -1}
+	_check(reg.on_attack(high, {}, {}).reason == "stabilizing", "a choice waits for the stabilization")
+	reg.advance(10.0)
+	var down := reg.on_attack(high, {}, {})
+	_check(down.decision == "lower" and down.assumed_level == 30 and down.by_choice, "then it goes down to the level that pays more: %s" % str(down))
+	reg.on_level_changed(30)
+	_check(reg.can_reach(32), "the level left for a better one stays open")
+	var elite := {"event": "success", "complete": true, "level": 30, "max_level": 33, "signature": "s", "profitable_level": 30, "unlock_level": 33}
+	reg.advance(10.0)
+	_check(reg.on_attack(elite, {}, {}).reason == "gathering_successes", "a try waits for two successes")
+	reg.advance(10.0)
+	var unlock := reg.on_attack(elite, {}, {})
+	_check(unlock.decision == "raise" and unlock.probe and unlock.assumed_level == 33 and unlock.aim == "unlock", "then it goes up once to open the next level: %s" % str(unlock))
+	reg.on_level_changed(33)
+	reg.advance(10.0)
+	var opened := reg.on_attack({"event": "success", "complete": true, "level": 33, "max_level": 34, "signature": "s", "profitable_level": 30, "unlock_level": -1}, {}, {})
+	_check(opened.decision == "lower" and opened.assumed_level == 30, "won once, it comes back to what pays")
+	reg.on_level_changed(30)
+	reg.advance(10.0)
+	var stay := {"event": "success", "complete": true, "level": 30, "max_level": 34, "signature": "s", "profitable_level": 30, "unlock_level": -1}
+	_check(reg.on_attack(stay, {}, {}).reason == "most_profitable", "and stays there")
+	var measuring := stay.duplicate()
+	measuring.profitable_level = -1
+	reg.advance(10.0)
+	_check(reg.on_attack(measuring, {}, {}).reason == "levels_being_measured", "while the levels are measured, nothing moves")
+
+	# A try that fails twice goes back to the profitable level, and that level waits before a new try.
+	var trying := Regulator.new("balanced")
+	trying.on_level_changed(33)
+	trying.advance(10.0)
+	trying.on_attack({"event": "failure_power", "complete": true, "level": 33, "max_level": 33, "signature": "s", "target_down": 30}, {}, {})
+	trying.advance(10.0)
+	trying.on_attack({"event": "failure_power", "complete": true, "level": 33, "max_level": 33, "signature": "s", "target_down": 30}, {}, {})
+	trying.advance(10.0)
+	var back := trying.on_attack({"event": "failure_power", "complete": true, "level": 33, "max_level": 33, "signature": "s", "target_down": 30}, {}, {})
+	_check(back.decision == "lower" and back.assumed_level == 30, "a failed try goes straight back to the profitable level: %s" % str(back))
+	_check(not trying.can_reach(33), "and the failed level waits")
+
+	# Opening level after level, then coming back, must not freeze the regulator.
+	var climbing := Regulator.new("balanced")
+	var frozen := false
+	var moves := 0
+	for top: int in range(31, 43):
+		climbing.on_level_changed(30)
+		for i: int in 3:
+			climbing.advance(5.0)
+			var at_elite := climbing.on_attack({"event": "success", "complete": true, "level": 30, "max_level": top, "signature": "s", "profitable_level": 30, "unlock_level": top}, {}, {})
+			frozen = frozen or at_elite.reason.begins_with("frozen") or at_elite.reason == "budget_exhausted"
+			moves += 1 if at_elite.decision == "raise" else 0
+		climbing.on_level_changed(top)
+		climbing.advance(5.0)
+		var won := climbing.on_attack({"event": "success", "complete": true, "level": top, "max_level": top + 1, "signature": "s", "profitable_level": 30, "unlock_level": -1}, {}, {})
+		frozen = frozen or won.reason.begins_with("frozen") or won.reason == "budget_exhausted"
+		moves += 1 if won.decision == "lower" else 0
+	_check(not frozen and moves == 24, "opening twelve levels in a row does not freeze it: %d moves" % moves)
+
+	var careful := Regulator.new("conservative")
+	_check(not careful.allows_trials() and Regulator.new("balanced").allows_trials(), "only profiles that try may try to open a level")
 
 
 func _test_game_load() -> void:

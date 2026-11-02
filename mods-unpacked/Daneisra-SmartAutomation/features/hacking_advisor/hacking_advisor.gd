@@ -7,6 +7,7 @@ const HackingModel := preload("hacking_model.gd")
 const HackingUpgrades := preload("hacking_upgrades.gd")
 const HackingAdvice := preload("hacking_advice.gd")
 const AdvisorPanel := preload("advisor_panel.gd")
+const LevelChoice := preload("../threat_manager/level_choice.gd")
 
 const ERROR_TEXTS := {
 	"no_desktop": "Aucune partie en cours.",
@@ -65,6 +66,7 @@ func _look_at_chain() -> void:
 	_since_check = 0.0
 	var root := get_tree().root
 	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"), _observer.stealth_mask())
+	chain.objective = _objective
 	var upgrades := HackingUpgrades.read(root)
 	var state := _state_of(chain, upgrades)
 	if state == _shown_state:
@@ -84,12 +86,13 @@ func _look_at_chain() -> void:
 	_computing = true
 
 
-## Only what the player changes: the connections, the power, a purchase becoming possible, and a measure
-## becoming sufficient. What moves by itself, like hits piling up or research growing, must not recalculate.
+## Only what the player changes: the connections, the power, a purchase becoming possible, a measure
+## becoming sufficient, and the objective, which picks the levels. What moves by itself, like hits piling
+## up or research growing, must not recalculate.
 func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
 	if chain.error != "":
 		return chain.error
-	var parts := PackedStringArray([str(chain.current)])
+	var parts := PackedStringArray([_objective, str(chain.current)])
 	for key: String in chain.targets:
 		var target: Dictionary = chain.targets[key]
 		parts.append("%s:%d:%s" % [key, target.max_level, target.chain_key])
@@ -140,15 +143,18 @@ func _can_follow(upgrade: Dictionary) -> bool:
 	return false
 
 
+## The levels depend on the objective, here as in the regulation, which follows the same choice.
 func _on_objective_selected(key: String) -> void:
 	_objective = key
-	_render()
+	_observer.set_objective(key)
+	_look_at_chain()
 
 
 func _render() -> void:
 	var options := HackingAdvice.objectives(_chain)
 	if not options.any(func(option: Dictionary) -> bool: return option.key == _objective):
 		_objective = HackingAdvice.BALANCED
+		_observer.set_objective(_objective)
 	_panel.show_advice(options, _objective, _on_objective_selected, _advice_text(), _connections_table(), _purchases_table(), _note())
 
 
@@ -276,7 +282,7 @@ func _note() -> String:
 	var levels := PackedStringArray()
 	for key: String in _chain.targets:
 		levels.append("%s %d/%d" % [_chain.targets[key].label, _chain.targets[key].level, _chain.targets[key].max_level])
-	return "Niveaux réels : %s. Mesuré : coups réellement observés sur votre chaîne. Estimé : les mêmes coups, recalculés selon la puissance et les branchements ; une chaîne jamais jouée reste une estimation. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
+	return "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Mesuré : coups réellement observés sur votre chaîne. Estimé : les mêmes coups, recalculés selon la puissance et les branchements ; une chaîne jamais jouée reste une estimation. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
 
 
 func _insufficient_text(reasons: PackedStringArray) -> String:

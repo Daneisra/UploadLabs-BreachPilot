@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.10 – en cours : conseiller générique
+## 0.4.0-dev.11 – en cours : conseiller générique
 
 ### Ajouté
 
@@ -23,6 +23,8 @@
 - Un effet inconnu du jeu ne bloque plus le conseil : il reste sans chiffre jusqu'à ce que des attaques l'aient montré, puis il est compté, et le contrôle contre les attaques réelles s'applique.
 - Les nombres qui dépassent les entiers s'affichent sous la forme `4.60e18` au lieu d'un coût négatif.
 - Le journal relève, à chaque attaque réussie, ce que la cible produit selon le jeu, pour vérifier la récompense des niveaux élites.
+- La régulation vise le niveau qui rapporte le plus par minute pour l'objectif choisi dans le panneau, au lieu du plus haut niveau qui tient. Un niveau élite qui paie davantage est gardé. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Sans mesure suffisante ou sans les récompenses du jeu, elle vise le plus haut niveau comme avant.
+- Le panneau indique ces mêmes niveaux.
 - Un achat qui change ce qu'une cible exige, comme plus de temps d'attaque, relance la régulation autant qu'un changement de puissance.
 - Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.

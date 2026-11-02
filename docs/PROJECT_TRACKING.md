@@ -83,6 +83,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Récompense élite mesurée, `0.4.0-dev.10`, 2026-11-02 :** 1 493 attaques réussies, aucune erreur, aucune prévision contredite. Ce que la cible porte à chaque réussite est égal à `get_reward` du niveau : la récompense élite n'est pas qu'une annonce. Entreprises 30 (élite, 20 s) donne 61,4 M de données et 85,9 G d'XP par attaque, contre 9,2 M et 17,4 G au niveau 31. À puissance égale (1,42 M), en temps réel : 2,1 × 10⁸ données/min au niveau 30, 6,5 × 10⁷ au niveau 31, soit 3,3 fois plus ; 3,1 × 10¹¹ contre 1,2 × 10¹¹ XP/min. La régulation a pourtant quitté l'élite pour le niveau 31, et le -72 % du conseiller était juste. En contrepartie, le niveau maximal ne s'ouvre qu'en gagnant au plus haut niveau. Le passage en stock n'est pas observé à part.
 
+**Niveau le plus rentable, `0.4.0-dev.11`, décision de Jérémy du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

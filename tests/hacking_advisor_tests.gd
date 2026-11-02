@@ -12,6 +12,8 @@ const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 const HitLog := preload(ADVISOR + "hit_log.gd")
 const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
 const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
+const Regulator := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_regulator.gd")
+const SaLog := preload("res://mods-unpacked/Daneisra-SmartAutomation/core/sa_log.gd")
 const Classifier := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/breach_classifier.gd")
 
 var _check: Callable
@@ -62,6 +64,15 @@ class TrialWindow extends FakeBreach:
 	func get_max_breach(_level: int) -> float: return 300.0
 
 
+## Every fifth level is longer and pays ten times more, like the game's elite levels.
+class EliteWindow extends FakeBreach:
+	func get_max_firewall(level: int) -> float: return 50.0 * level
+	func get_max_breach(level: int) -> float: return 50.0 * level
+	func get_max_time(level: int) -> float: return 12.0 if level % 5 == 0 else 6.0
+	func get_reward(level: int) -> float: return 4.0 * pow(1.5, level) * (10.0 if level % 5 == 0 else 1.0)
+	func get_experience_reward(level: int) -> float: return pow(2.0, level) * (10.0 if level % 5 == 0 else 1.0)
+
+
 class FakeDesktop extends Node:
 	var windows := Node.new()
 
@@ -97,6 +108,8 @@ func run(check: Callable) -> void:
 	_test_critical_changes()
 	_test_advice()
 	_test_trial_without_forecast()
+	_test_profit_choice()
+	_test_profitable_level_in_panel()
 	_test_refresh_state()
 	_test_stealth()
 	_test_target_rules()
@@ -878,6 +891,65 @@ func _test_stealth() -> void:
 	_check.call(observer._may_work(tracker, strong, {"level": 7, "max_level": 8}), "with stealth, a level within reach is tried")
 	tracker.window.free()
 	observer.free()
+
+
+func _test_profit_choice() -> void:
+	var observer := Observer.new()
+	observer.configure(SaLog.new("info"), 0.25, false)
+	var strong_hits := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "interval": 1.0, "hits": PackedFloat32Array()}
+	for index: int in HackingModel.MIN_HITS:
+		strong_hits.hits.append(100.0)
+	observer.hit_log().add("any", "chain", strong_hits)
+	var window := EliteWindow.new()
+	var tracker := {"type": "any", "window": window, "getters": {}, "chain_key": "chain", "reward_getters": true}
+	var profile := {"damage_rate": 100.0, "announced_rate": 100.0, "infection_rate": 0.0, "vulnerability": 0.0, "breach_variation": 0, "infection_variation": 0, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0, "signature": "e"}
+	var regulator := Regulator.new("balanced")
+	var first := observer._profit_choice(tracker, profile, regulator, {"level": 5, "max_level": 6})
+	_check.call(first.profitable == -1, "the levels are measured over the next ticks, not during the attack")
+	for tick: int in 6:
+		observer._advance_profit_tables()
+	_check.call(observer._profit_choice(tracker, profile, regulator, {"level": 5, "max_level": 6}).profitable == -1, "one level a tick")
+	observer._advance_profit_tables()
+	var choice := observer._profit_choice(tracker, profile, regulator, {"level": 5, "max_level": 6})
+	_check.call(choice.profitable == 5 and choice.unlock == 6, "the elite level pays more, and the highest level is worth a try: %s" % str(choice))
+	observer.set_objective(HackingAdvice.XP)
+	_check.call(observer._profit_choice(tracker, profile, regulator, {"level": 5, "max_level": 6}).profitable == 5, "the panel's objective is followed")
+	var opened := observer._profit_choice(tracker, profile, regulator, {"level": 6, "max_level": 7})
+	_check.call(opened.profitable == -1, "a level newly opened is measured before choosing again")
+	observer._advance_profit_tables()
+	var after := observer._profit_choice(tracker, profile, regulator, {"level": 6, "max_level": 7})
+	_check.call(after.profitable == 5 and after.unlock == -1, "a level out of reach is not tried: %s" % str(after))
+	var unpaid := tracker.duplicate()
+	unpaid.reward_getters = false
+	_check.call(observer._profit_choice(unpaid, profile, regulator, {"level": 5, "max_level": 6}).is_empty(), "without the game's rewards, the highest level stays the aim")
+	var unmeasured := tracker.duplicate()
+	unmeasured.chain_key = "never"
+	_check.call(observer._profit_choice(unmeasured, profile, regulator, {"level": 5, "max_level": 6}).is_empty(), "nor without hits measured")
+	var unknown := profile.duplicate()
+	unknown.breach_variation = 4
+	unknown.signature = "u"
+	_check.call(observer._profit_choice(tracker, unknown, regulator, {"level": 5, "max_level": 6}).is_empty(), "nor with an effect never seen")
+	observer.free()
+	window.free()
+
+
+## The panel shows the levels the regulation would choose.
+func _test_profitable_level_in_panel() -> void:
+	var plain := HackingModel.new(_chain())
+	var usual: int = plain.evaluate(plain.current_scenario()).targets.gov.level
+	var chain := _chain()
+	var lower: int = usual - 2
+	chain.targets.gov.levels[lower].reward *= 20.0
+	chain.targets.gov.levels[lower].xp *= 20.0
+	var model := HackingModel.new(chain)
+	var row := model.evaluate(model.current_scenario())
+	_check.call(usual > 0 and row.targets.gov.level == lower, "a level that pays far more is shown instead of the highest: %d then %d" % [usual, row.targets.gov.level])
+	_check.call(row.targets.corps.level == plain.evaluate(plain.current_scenario()).targets.corps.level, "the other target keeps its level")
+	var xp_chain := _chain()
+	xp_chain.targets.gov.levels[lower].reward *= 20.0
+	xp_chain.objective = HackingAdvice.XP
+	var xp_model := HackingModel.new(xp_chain)
+	_check.call(xp_model.evaluate(xp_model.current_scenario()).targets.gov.level == usual, "for XP, only the XP counts")
 
 
 func _test_trial_without_forecast() -> void:

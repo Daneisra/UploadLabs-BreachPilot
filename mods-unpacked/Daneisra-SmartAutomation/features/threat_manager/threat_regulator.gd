@@ -243,6 +243,8 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 	if _timer < _frozen_until:
 		return _decision("hold", "frozen", attack)
 	if not is_failure:
+		if attack.has("profitable_level"):
+			return _try_profitable(attack)
 		return _try_raise(attack, next)
 	var decision := _try_lower(attack, current)
 	if _just_contradicted:
@@ -301,6 +303,11 @@ func required_success() -> float:
 	return _profile.p
 
 
+## Whether the profile lets a level that may fail be tried.
+func allows_trials() -> bool:
+	return _fast_raises and _profile.probes
+
+
 ## attack can name best_level and best_forecast: the highest level known to work, to go straight to it.
 func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	var target: int = attack.level + 1
@@ -341,6 +348,38 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 	return _act("raise", attack, {"p": next.p_success, "expected_used": next.used_nominal, "certain": certain, "verify_attacks": VERIFY_CERTAIN if certain else VERIFY_CAREFUL, "target": target})
 
 
+## attack names profitable_level, the level that brings the most, and may name unlock_level, the highest
+## level unlocked, worth one win to open the next. A lower to the profitable level is a choice, not a
+## failure: the level left stays open.
+func _try_profitable(attack: Dictionary) -> Dictionary:
+	var unlock: int = attack.get("unlock_level", -1)
+	var target: int = unlock if unlock > attack.level else attack.profitable_level
+	if target < 0:
+		return _decision("hold", "levels_being_measured", attack)
+	if target == attack.level:
+		return _decision("hold", "most_profitable", attack)
+	if target < attack.level:
+		if _timer - _last_lower < LOWER_DELAY:
+			return _decision("hold", "lower_delay", attack)
+		return _act("lower", attack, {"by_choice": true, "aim": "profit", "verify_attacks": VERIFY_CERTAIN, "target": target})
+	if _raises_suspended:
+		if _consecutive < WINDOW:
+			return _decision("hold", "raises_suspended", attack)
+		_raises_suspended = false
+	if _consecutive < PROBE_AFTER:
+		return _decision("hold", "gathering_successes", attack, {"successes": _consecutive})
+	if target > attack.max_level:
+		return _decision("hold", "at_game_maximum", attack)
+	if not can_reach(target):
+		return _decision("hold", "level_blocked", attack)
+	if target == unlock:
+		_probed_level = target
+		return _act("raise", attack, {"certain": false, "probe": true, "aim": "unlock", "verify_attacks": VERIFY_CERTAIN, "target": target})
+	if _timer - _last_raise < _profile.raise_delay:
+		return _decision("hold", "raise_delay", attack)
+	return _act("raise", attack, {"certain": false, "aim": "profit", "verify_attacks": VERIFY_CAREFUL, "target": target})
+
+
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:
 	if _action_busy:
 		return _decision("hold", "previous_action_unverified", attack)
@@ -378,7 +417,8 @@ func _act(direction: String, attack: Dictionary, details: Dictionary) -> Diction
 		_last_raise = _timer
 	else:
 		_last_lower = _timer
-		_block(attack.level)
+		if not details.get("by_choice", false):
+			_block(attack.level)
 	var assumed: int = details.get("target", attack.level + (1 if direction == "raise" else -1))
 	var extra := details.duplicate()
 	extra.assumed_level = assumed
