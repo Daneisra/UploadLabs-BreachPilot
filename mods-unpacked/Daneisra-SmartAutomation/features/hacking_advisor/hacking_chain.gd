@@ -88,7 +88,6 @@ static func _read_target(chain: Dictionary, graph: Dictionary, key: String, type
 		"vulnerability": vulnerability,
 		"announced_payload": announced_payload,
 		"announced_infection": announced_infection,
-		"variation": int(_number(payload_slot, "variation")) | int(_number(infection_slot, "variation")),
 		"chain_key": key_for_hits,
 		"real": hit_log.attack_stats(type, key_for_hits, level_now, power) if hit_log != null else {"attacks": 0, "successes": 0, "used": 0.0},
 	}
@@ -101,6 +100,12 @@ static func _read_target(chain: Dictionary, graph: Dictionary, key: String, type
 		var stream: Dictionary = chain.streams[chain.current.payload[key]]
 		if stream.multipliers.is_empty():
 			stream.multipliers = hit_log.multipliers(key_for_hits)
+		stream.effects_seen |= hit_log.effects_seen(key_for_hits)
+	if chain.current.infection[key] != "" and hit_log != null:
+		var stream: Dictionary = chain.streams[chain.current.infection[key]]
+		var infection_key := HackingGraph.chain_key(graph, window, attributes, HackingGraph.INFECTION_SLOT)
+		stream.infection = hit_log.infection(infection_key)
+		stream.effects_seen |= hit_log.effects_seen(infection_key)
 
 
 ## The output feeding this slot, seen as a stream that scenarios can send elsewhere.
@@ -133,7 +138,7 @@ static func _new_stream(slot: Dictionary, kind: String, data: Variant) -> Dictio
 	return {
 		"id": slot.id, "kind": kind, "resource": slot.resource, "label": _label(data, "windows", slot.window_type, slot.window_type),
 		"production": slot.production, "outputs": slot.outputs_id.size(), "targets": [],
-		"multipliers": PackedFloat32Array(), "source": "", "window_type": slot.window_type, "variation": slot.variation,
+		"multipliers": PackedFloat32Array(), "source": "", "window_type": slot.window_type, "variation": slot.variation, "effects_seen": 0,
 	}
 
 

@@ -23,6 +23,7 @@ const HACKING_ATTRIBUTE := "(?i)^(breach|hack|infection|charged|government|corps
 const HACKING_CATEGORY := "hacking"
 ## A hit this close to a critical one counts as critical, as hits are whole numbers.
 const CRITICAL_TOLERANCE := 0.93
+const LARGEST_WHOLE := 1e15
 
 
 ## Those at their limit or not unlocked are left out. followed tells whether a figure can be given.
@@ -51,11 +52,14 @@ static func cost_text(cost: float, resource: String, data: Variant = null) -> St
 	if is_instance_valid(data) and data.get("currencies") is Dictionary and data.currencies.get(resource) is Dictionary:
 		fallback = data.tr(str(data.currencies[resource].get("name", resource)))
 	var names: Array = COST_NAMES.get(resource, [fallback, fallback])
-	return "%s %s" % [grouped(cost), names[0] if roundi(cost) <= 1 else names[1]]
+	return "%s %s" % [grouped(cost), names[0] if cost <= 1.0 else names[1]]
 
 
-## 26113829114 reads 26 113 829 114.
+## 26113829114 reads 26 113 829 114. Costs can outgrow whole numbers: 4603854016022367232 reads 4.60e18.
 static func grouped(value: float) -> String:
+	if absf(value) >= LARGEST_WHOLE:
+		var power := floorf(log(absf(value)) / log(10.0))
+		return "%.2fe%d" % [value / pow(10.0, power), int(power)]
 	var digits := str(roundi(value))
 	var text := ""
 	while digits.length() > 3:

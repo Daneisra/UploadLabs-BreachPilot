@@ -77,6 +77,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Vérifié en jeu sur la `0.4.0-dev.7`, 2026-11-02 :** le panneau annonce Entreprises 18 et Gouvernement 19 à 100 % dès 01:20, et le journal le confirme ensuite : 42/42 et 43/43. La régulation n'y est montée qu'à 01:27, au changement de puissance, alors que le temps d'attaque était passé à 7 s à 01:20 : une réponse en cache et un blocage de niveau ne dépendaient que de la puissance. Corrigé en `dev.8`, à vérifier.
 
+**Infection mesurée, `0.4.0-dev.9`, 2026-11-02 :** Spread Infection pose le bit `INFECTED` que le conseiller refusait de chiffrer. Le journal montre deux mécaniques : l'infection croît d'environ 10 % par seconde, et Infecter Payload lui ajoute 20 % de chaque coup réel, critiques compris (1 312 pour 6 527, 8 922 pour 44 390). Le classeur mesure désormais la croissance et les gains tick par tick, sans connaître le nœud. Rejeu de 46 situations réelles avec ces deux valeurs : réussite et durée proches du réel sur les 20 cellules d'au moins 5 attaques, hors une durée tirée d'une seule attaque réussie et le palier à 91 071, où Infecter ne vaut plus 10 % de l'annoncé et que seule la mesure en jeu peut trancher. À vérifier en jeu. Toujours non vérifiés : `INFECTED` sur d'autres chaînes, une croissance achetée, la récompense élite.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.

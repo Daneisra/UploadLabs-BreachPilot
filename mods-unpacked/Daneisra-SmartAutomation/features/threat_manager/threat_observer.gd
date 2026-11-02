@@ -35,7 +35,7 @@ const EVENT_FIELDS: Array[String] = [
 	"sim_dist", "sim_p", "sim_next_volleys", "sim_next_dist", "sim_next_p", "sim_trusted", "sim_reasons", "next_source", "formula_ok", "native_matches",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "breach_variation", "infection_variation",
 	"infection_rate", "infection_offset", "interval", "tick_speed",
-	"infection_start", "infection_end", "infection_integral", "dealt_total", "complete", "observed_start",
+	"infection_start", "infection_end", "infection_integral", "infection_growth", "infection_pulses", "infection_gain", "dealt_total", "complete", "observed_start",
 	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "trace",
 ]
 const TRACED_EVENTS_PER_TYPE := 12
@@ -411,7 +411,8 @@ func _note_hits(tracker: Dictionary, event: Dictionary) -> void:
 		return
 	var graph := HackingGraph.snapshot(_globals.desktop)
 	tracker.chain_key = HackingGraph.chain_key(graph, tracker.window, _attributes)
-	_hit_log.add(tracker.type, tracker.chain_key, event)
+	tracker.infection_key = HackingGraph.chain_key(graph, tracker.window, _attributes, HackingGraph.INFECTION_SLOT)
+	_hit_log.add(tracker.type, tracker.chain_key, event, tracker.infection_key)
 
 
 func _start_probe() -> void:
@@ -977,7 +978,8 @@ func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> b
 	var seen: Dictionary = _observed_hits.get(tracker.type, {})
 	var hits := _hit_log.multipliers(tracker.get("chain_key", ""))
 	# Once enough hits are known, the answer holds for this power: an attack must not pay for a new calculation.
-	var measured: bool = hits.size() >= HackingModel.MIN_HITS
+	var infection := _hit_log.infection(tracker.get("infection_key", ""))
+	var measured: bool = hits.size() >= HackingModel.MIN_HITS and (profile.infection_rate <= 0.0 or infection.pulses >= HackingModel.MIN_PULSES)
 	var key := "may|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, event.level, profile.interval, "measured" if measured else "%s|%s" % [seen.get("lowest", -1.0), seen.get("highest", 0.0)]]
 	if _level_scans.has(key):
 		return _level_scans[key]
@@ -985,10 +987,11 @@ func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> b
 		_level_scans.clear()
 	var answer := false
 	var target := _native_values(tracker, event.level + 1)
-	var unknown_effect: bool = ((profile.breach_variation | profile.infection_variation) & ~_stealth_mask) != 0
+	# What infection does is in its measure. An unknown effect on the payload, or a game that does not name stealth, leaves a real trial to decide.
+	var unknown_effect: bool = (profile.breach_variation & ~_stealth_mask) != 0 or (_stealth_mask == 0 and profile.infection_variation != 0)
 	if not target.is_empty() and event.level + 1 <= event.max_level and measured and profile.interval > 0.0 and not unknown_effect:
 		var model := HackingModel.new({"time_factor": 1.0})
-		var outcome := model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, hits, profile.interval, (profile.breach_variation & _stealth_mask) != 0, (profile.infection_variation & _stealth_mask) != 0)
+		var outcome := model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, hits, profile.interval, (profile.breach_variation & _stealth_mask) != 0, (profile.infection_variation & _stealth_mask) != 0, infection)
 		answer = outcome.chance >= TRIAL_CHANCE
 	elif not target.is_empty() and event.level + 1 <= event.max_level:
 		var hopeful := profile.duplicate()

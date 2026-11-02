@@ -15,7 +15,7 @@ const ERROR_TEXTS := {
 const INSUFFICIENT_TEXTS := {
 	HackingModel.REASON_HITS: "pas encore assez de coups mesurés sur cette chaîne",
 	HackingModel.REASON_INTERVAL: "pas encore d'attaque vue",
-	HackingModel.REASON_UNMEASURED: "effet jamais mesuré sur cette chaîne (infection qui grandit, ou effet inconnu)",
+	HackingModel.REASON_UNMEASURED: "effet nouveau sur cette chaîne, aucune attaque ne l'a encore montré",
 }
 const CHANCE_NOT_FOLLOWED := "effet non chiffré"
 ## How often an open panel looks at the chain. A second is quick enough for a player plugging a cable.
@@ -94,7 +94,7 @@ func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
 		var target: Dictionary = chain.targets[key]
 		parts.append("%s:%d:%s" % [key, target.max_level, target.chain_key])
 	for stream: Dictionary in chain.streams.values():
-		parts.append("%s:%.1f:%s" % [stream.id, stream.production, stream.multipliers.size() >= HackingModel.MIN_HITS])
+		parts.append("%s:%.1f:%s:%s:%d" % [stream.id, stream.production, stream.multipliers.size() >= HackingModel.MIN_HITS, stream.get("infection", {}).get("pulses", 0) >= HackingModel.MIN_PULSES, stream.get("effects_seen", 0)])
 	for upgrade: Dictionary in upgrades:
 		parts.append("%s:%.0f:%s" % [upgrade.name, upgrade.cost, upgrade.affordable])
 	return "|".join(parts)
@@ -337,6 +337,8 @@ func _log_rows() -> void:
 	var hits := PackedStringArray()
 	for stream: Dictionary in _chain.streams.values():
 		hits.append("%s:%s:%d" % [stream.kind, stream.window_type, stream.multipliers.size()])
+		if stream.has("infection"):
+			hits.append("pulses=%d/growth=%.4f/level=%.3f/follow=%.3f" % [stream.infection.pulses, stream.infection.growth, stream.infection.level, stream.infection.follow])
 	_log.info("advisor_compare result=ok streams=%s scenarios=%d purchases=%d refuted=%d" % [",".join(hits), _rows.size(), _upgrade_rows.size(), _model.contradictions(_model.evaluate(_model.current_scenario())).size()])
 	for row: Dictionary in _rows:
 		_log.info("advisor_row current=%s insufficient=%s %s" % [row.current, ",".join(row.insufficient), _row_text(row)])

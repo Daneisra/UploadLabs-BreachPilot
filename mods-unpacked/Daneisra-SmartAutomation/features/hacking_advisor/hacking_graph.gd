@@ -5,6 +5,8 @@ extends RefCounted
 ## What makes a window an attack target. The level getters are checked as well before use.
 const TARGET_PROPERTIES: Array[String] = ["breach_damage", "infection_damage", "vulnerability", "max_firewall", "max_breach", "data"]
 const POWER_RESOURCE := "hack_power"
+const PAYLOAD_SLOT := "breach_damage"
+const INFECTION_SLOT := "infection_damage"
 ## Names of the attributes a chain's measures depend on, as they change the hits without moving the links.
 const HIT_ATTRIBUTE := "(?i)critical|charged"
 ## A chain longer than this is not a real one.
@@ -70,14 +72,16 @@ static func upstream(graph: Dictionary, output_id: String) -> Dictionary:
 	return {"path": path, "feed": feeds[0] if feeds.size() == 1 else {}}
 
 
-## What identifies the measures of a target's hits: the chain feeding it, and what changes hits.
-static func chain_key(graph: Dictionary, window: Node, attributes: Variant) -> String:
-	var slot: Variant = window.get("breach_damage")
+## What identifies the measures of a target's hits, or of its infection: the chain feeding it, and what changes hits.
+static func chain_key(graph: Dictionary, window: Node, attributes: Variant, slot_name: String = PAYLOAD_SLOT) -> String:
+	var slot: Variant = window.get(slot_name)
 	if not is_instance_valid(slot):
 		return "none"
 	var input: String = str(slot.get("input_id"))
 	var parts: PackedStringArray = upstream(graph, input).path
 	parts.sort()
+	if slot_name != PAYLOAD_SLOT:
+		parts.append(slot_name)
 	var table: Variant = attributes.get("attributes") if is_instance_valid(attributes) else null
 	if table is Dictionary:
 		var regex := RegEx.create_from_string(HIT_ATTRIBUTE)

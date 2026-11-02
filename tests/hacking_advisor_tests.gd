@@ -12,6 +12,7 @@ const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 const HitLog := preload(ADVISOR + "hit_log.gd")
 const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
 const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
+const Classifier := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/breach_classifier.gd")
 
 var _check: Callable
 
@@ -99,6 +100,8 @@ func run(check: Callable) -> void:
 	_test_refresh_state()
 	_test_stealth()
 	_test_target_rules()
+	_test_infection_measure()
+	_test_infection_model()
 
 
 ## 10 % of hits at 2.5 times the others, as measured, with the announcement of the critical node.
@@ -245,6 +248,12 @@ func _test_graph_any_chain() -> void:
 	for index: int in 40:
 		hits.append(50.0)
 	log.add("zz_alpha", key, {"event": "success", "level": 1, "complete": true, "used": 2.0, "damage_rate": 50.0, "interval": 1.0, "hits": hits})
+	var no_infection := HackingChain.read(desktop, {"zz_alpha": 1.0}, log, null, null)
+	_check.call(HackingModel.new(no_infection).evaluate(no_infection.current).insufficient.has(HackingModel.REASON_HITS), "infection on the chain gives no figure until it is measured")
+	var gains := PackedFloat32Array()
+	for index: int in HackingModel.MIN_PULSES:
+		gains.append(20.0)
+	log.add("zz_alpha", key, {"event": "success", "level": 1, "complete": true, "used": 2.0, "damage_rate": 50.0, "infection_rate": 20.0, "interval": 1.0, "hits": PackedFloat32Array(), "infection_growth": 0.0, "infection_gains": gains}, HackingGraph.chain_key(graph, alpha, null, HackingGraph.INFECTION_SLOT))
 
 	var chain := HackingChain.read(desktop, {"zz_alpha": 1.0}, log, null, null)
 	_check.call(chain.error == "" and chain.targets.size() == 2, "targets are found by what they expose, whatever their names")
@@ -414,11 +423,11 @@ func _test_abstention() -> void:
 
 	var growing := _chain()
 	growing.stealth_mask = 1
-	growing.targets.gov.variation = 2
+	growing.streams.I.variation = 2
 	var hidden := HackingModel.new(growing).evaluate(growing.current)
 	_check.call(hidden.insufficient.has(HackingModel.REASON_UNMEASURED) and hidden.targets.gov.level == -1, "what was never measured is never estimated")
 	var unnamed := _chain()
-	unnamed.targets.gov.variation = 1
+	unnamed.streams.P.variation = 1
 	_check.call(HackingModel.new(unnamed).evaluate(unnamed.current).insufficient.has(HackingModel.REASON_UNMEASURED), "a game that does not name stealth leaves it unknown")
 
 	var current := HackingModel.new(_chain()).evaluate(_chain().current)
@@ -646,6 +655,161 @@ func _test_target_rules() -> void:
 	_check.call(observer._may_work(tracker, profile, attack), "and the level it brings within reach is tried at once")
 	var blind := {"type": "any", "window": window, "getters": {"get_max_time": false}}
 	_check.call(observer._with_target_rules(blind, "power") == "power", "without the game's values, power alone tells")
+	window.free()
+	observer.free()
+
+
+func _infection_sample(time: float, count: float, breached: float) -> Dictionary:
+	return {
+		"instance_id": 1, "level": 1, "max_level": 5, "time": time, "max_time": 10.0, "detected": true, "paused": false,
+		"firewall": 100.0, "max_firewall": 100.0, "breached": breached, "max_breach": 1000000.0, "damage_rate": 100.0, "breach_variation": 1,
+		"infection_count": count, "infection_rate": 20.0, "infection_variation": 3, "vulnerability": 0.0, "tick_speed": 0.05, "now_usec": 0,
+	}
+
+
+## An attack as the game plays it with a growing infection fed by the hits: nothing tells the node behind it.
+func _played_attack(growth: float, share: float, hits: Array) -> Dictionary:
+	var classifier := Classifier.new()
+	var count := 0.0
+	var breached := 0.0
+	var time := 10.0
+	var index := 0
+	var events: Array[Dictionary] = []
+	classifier.observe(_infection_sample(time, 0.0, 0.0))
+	for tick: int in 100:
+		time -= 0.05
+		count *= exp(growth * 0.05)
+		if tick % 15 == 0:
+			var hit: float = hits[index % hits.size()]
+			index += 1
+			count += hit * share
+			breached += hit
+		breached += count * 0.05
+		classifier.observe(_infection_sample(time, count, breached))
+	events = classifier.on_breached(_infection_sample(time, count, breached))
+	return events[0]
+
+
+func _test_infection_measure() -> void:
+	var event := _played_attack(log(1.1), 0.2, [100.0, 200.0, 540.0])
+	_check.call(absf(event.infection_growth - log(1.1)) < 0.002, "growth is measured tick by tick: %.4f" % event.infection_growth)
+	_check.call(event.infection_gains.size() == 7, "each shot's gain is seen: %d" % event.infection_gains.size())
+	_check.call(absf(event.infection_gains[1] - 40.0) < 0.5 and absf(event.infection_gains[2] - 108.0) < 0.5, "and what it adds, beyond the growth")
+	var still := _played_attack(0.0, 0.2, [100.0])
+	_check.call(absf(still.infection_growth) < 0.0001 and still.infection_gains.size() == 7, "an infection that does not grow is measured as such")
+	var none := Classifier.new()
+	none.observe(_infection_sample(10.0, 0.0, 0.0))
+	var dry: Dictionary = none.on_breached(_infection_sample(9.9, 0.0, 10.0))[0]
+	_check.call(not dry.has("infection_gains"), "no infection, no measure")
+
+	var log_of := HitLog.new()
+	_check.call(log_of.infection("i").pulses == 0 and log_of.infection("i").follow == 0.0, "nothing measured yet")
+	var following := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "infection_rate": 20.0, "interval": 1.0, "breach_variation": 1, "infection_variation": 3,
+		"hits": PackedFloat32Array([50.0, 100.0, 270.0]), "infection_growth": log(1.1), "infection_gains": PackedFloat32Array([10.0, 20.0, 54.0])}
+	log_of.add("t", "h", following, "i")
+	var read := log_of.infection("i")
+	_check.call(read.pulses == 3 and absf(read.growth - log(1.1)) < 0.0001, "the measure keeps gains and growth")
+	_check.call(read.follow > 0.9 and read.follow < 1.1, "gains that spread like hits follow them: %.2f" % read.follow)
+	_check.call(log_of.effects_seen("i") == 3 and log_of.effects_seen("h") == 1 and log_of.effects_seen("x") == 0, "each flow keeps the effects attacks ran with")
+	var steady := following.duplicate()
+	steady.infection_growth = 0.0
+	steady.infection_gains = PackedFloat32Array([20.0, 20.0, 20.0])
+	log_of.add("t", "h", steady, "j")
+	_check.call(log_of.infection("j").follow == 0.0 and is_equal_approx(log_of.infection("j").level, 1.0), "gains that do not spread are a fixed amount")
+
+	_check.call(HackingUpgrades.grouped(4603854016022367232.0) == "4.60e18", "numbers beyond whole ones stay readable: %s" % HackingUpgrades.grouped(4603854016022367232.0))
+	_check.call(not HackingUpgrades.grouped(2.3e22).begins_with("-"), "and never turn negative")
+	_check.call(HackingUpgrades.cost_text(1e30, "hack_points").ends_with("points de piratage"), "a huge cost is still plural")
+
+
+## The log of 2026-11-02, Infecter Payload, Spread Infection and Ghost on both flows: 37946 announced, 7589 of infection,
+## an infection growing about 10 % per second fed by 20 % of each real hit, hits of 6527, 13056 and critical ones.
+func _spread_hits() -> PackedFloat32Array:
+	var hits := PackedFloat32Array()
+	for index: int in 300:
+		var hit := 6527.0 / (37946.33 * 0.741)
+		if index % 3 == 0:
+			hit *= 2.0
+		if index % 5 == 0:
+			hit *= 3.4
+		hits.append(hit)
+	return hits
+
+
+func _test_infection_model() -> void:
+	var model := HackingModel.new({"time_factor": 1.0})
+	var hits := _spread_hits()
+	var measured := {"pulses": 100, "growth": log(1.1), "level": 0.6, "follow": 1.0}
+	var cells: Array = [
+		["Government 23, 18 of 18", {"firewall": 224454.5, "breach": 224454.5, "time": 9.0}, 0.8, 1.0, 6.86],
+		["Corps 22, 22 of 23", {"firewall": 59854.6, "breach": 239418.4, "time": 9.0}, 0.8, 1.0, 6.85],
+		["Government 24, 4 of 7", {"firewall": 336682.0, "breach": 336682.0, "time": 9.0}, 0.0, 0.79, -1.0],
+	]
+	for cell: Array in cells:
+		var outcome := model.attack_outcome(cell[1], 37946.33 * 0.741, 7589.27 * 0.741, 1.0, hits, 0.741, true, true, measured)
+		_check.call(outcome.chance >= cell[2] and outcome.chance <= cell[3], "%s as measured: %.2f" % [cell[0], outcome.chance])
+		if cell[4] > 0.0:
+			_check.call(absf(outcome.used - cell[4]) < 0.75, "%s lasts as measured: %.2f" % [cell[0], outcome.used])
+	var wall := {"firewall": 0.0, "breach": 400000.0, "time": 9.0}
+	var flat := measured.duplicate()
+	flat.growth = 0.0
+	var lesser := model.attack_outcome(wall, 0.0, 1000.0, 1.0, hits, 0.741, true, true, flat)
+	var greater := model.attack_outcome(wall, 0.0, 1000.0, 1.0, hits, 0.741, true, true, measured)
+	_check.call(greater.chance >= lesser.chance, "growth can only help")
+	var shrinking := measured.duplicate()
+	shrinking.growth = -1.0
+	_check.call(model.attack_outcome(wall, 37946.33 * 0.741, 7589.27 * 0.741, 1.0, hits, 0.741, true, true, shrinking).chance <= greater.chance, "an infection that fades, unseen so far, is followed too")
+
+	# A node nobody has ever seen, on the chain: blocked until attacks run with it, then counted.
+	var chain := _chain()
+	chain.stealth_mask = 1
+	chain.streams.I.variation = 4
+	_check.call(HackingModel.new(chain).evaluate(chain.current).insufficient.has(HackingModel.REASON_UNMEASURED), "no attack has shown this effect yet")
+	chain.streams.I.effects_seen = 4
+	chain.streams.I.infection = {"pulses": 3, "growth": log(1.1), "level": 1.0, "follow": 0.0}
+	_check.call(HackingModel.new(chain).evaluate(chain.current).insufficient.has(HackingModel.REASON_HITS), "while it is measured, still no figure")
+	chain.streams.I.infection.pulses = HackingModel.MIN_PULSES
+	var row := HackingModel.new(chain).evaluate(chain.current)
+	var plain := HackingModel.new(_chain()).evaluate(_chain().current)
+	_check.call(row.insufficient.is_empty() and row.targets.gov.level >= plain.targets.gov.level, "once measured it counts, and growth gains levels")
+
+	var follower := _chain()
+	follower.streams.I.infection = {"pulses": 100, "growth": 0.0, "level": 0.6, "follow": 1.0}
+	var before: float = HackingModel.new(follower)._scales("gov", follower.current).stack
+	follower.payload_factor = 1.5
+	_check.call(is_equal_approx(HackingModel.new(follower)._scales("gov", follower.current).stack, before * 1.5), "infection that follows the hits gains what the payload gains")
+	follower.payload_factor = 1.0
+	var off_payload: Dictionary = follower.current.duplicate(true)
+	off_payload.payload.gov = ""
+	_check.call(HackingModel.new(follower).evaluate(off_payload).insufficient.has(HackingModel.REASON_UNMEASURED), "without hits to follow, no figure")
+
+	var desktop := _strange_desktop()
+	var graph := HackingGraph.snapshot(desktop)
+	for entry: Dictionary in graph.windows:
+		if HackingGraph.is_target(entry.node):
+			_check.call(HackingGraph.chain_key(graph, entry.node, null, HackingGraph.INFECTION_SLOT) != HackingGraph.chain_key(graph, entry.node, null), "the infection has its own measure")
+			break
+	_free_desktop(desktop)
+
+	var observer := Observer.new()
+	observer._stealth_mask = 1
+	var attack := {"event": "success", "level": 1, "complete": true, "damage_rate": 100.0, "infection_rate": 20.0, "interval": 1.0, "breach_variation": 1, "infection_variation": 3, "hits": PackedFloat32Array(),
+		"infection_growth": log(1.1), "infection_gains": PackedFloat32Array()}
+	for index: int in HackingModel.MIN_HITS:
+		attack.hits.append(100.0)
+		attack.infection_gains.append(20.0)
+	var window := TrialWindow.new()
+	var tracker := {"type": "any", "window": window, "getters": {}, "chain_key": "chain", "infection_key": "bio"}
+	var profile := {"damage_rate": 1.0, "announced_rate": 1.0, "infection_rate": 0.2, "vulnerability": 0.0, "breach_variation": 1, "infection_variation": 3, "interval": 1.0, "tick_speed": 0.05, "infection_offset": -1.0, "signature": "before"}
+	_check.call(observer._may_work(tracker, profile, {"level": 7, "max_level": 8}), "without the infection's measure, a real trial decides")
+	observer.hit_log().add("any", "chain", attack, "bio")
+	profile.signature = "after"
+	_check.call(not observer._may_work(tracker, profile, {"level": 7, "max_level": 8}), "once measured, a hopeless try is spared even with growth")
+	var strong := profile.duplicate()
+	strong.announced_rate = 100.0
+	strong.infection_rate = 20.0
+	strong.signature = "strong"
+	_check.call(observer._may_work(tracker, strong, {"level": 7, "max_level": 8}), "and a level within reach is tried")
 	window.free()
 	observer.free()
 
