@@ -81,6 +81,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Vérifié en jeu sur la `0.4.0-dev.9`, 2026-11-02 :** l'infection mesurée seule donne une croissance de 0,0998 par seconde et un gain qui suit les coups (facteur 1,00) ; le panneau chiffre de nouveau, sans erreur ni contradiction. Il montre aussi l'effet de la récompense élite non vérifiée : un achat de puissance y vaut -72 %, parce qu'Entreprises passerait de l'élite 25 à 26. La `dev.10` relève ce que les cibles produisent selon le jeu, pour trancher.
 
+**Récompense élite mesurée, `0.4.0-dev.10`, 2026-11-02 :** 1 493 attaques réussies, aucune erreur, aucune prévision contredite. Ce que la cible porte à chaque réussite est égal à `get_reward` du niveau : la récompense élite n'est pas qu'une annonce. Entreprises 30 (élite, 20 s) donne 61,4 M de données et 85,9 G d'XP par attaque, contre 9,2 M et 17,4 G au niveau 31. À puissance égale (1,42 M), en temps réel : 2,1 × 10⁸ données/min au niveau 30, 6,5 × 10⁷ au niveau 31, soit 3,3 fois plus ; 3,1 × 10¹¹ contre 1,2 × 10¹¹ XP/min. La régulation a pourtant quitté l'élite pour le niveau 31, et le -72 % du conseiller était juste. En contrepartie, le niveau maximal ne s'ouvre qu'en gagnant au plus haut niveau. Le passage en stock n'est pas observé à part.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
