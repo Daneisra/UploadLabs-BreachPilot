@@ -85,6 +85,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Niveau le plus rentable, `0.4.0-dev.11`, décision de Jérémy du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
 
+**Vérifié en jeu sur la `0.4.0-dev.11`, 2026-11-03 :** 408 attaques réussies, 10 échecs, aucune erreur ; 12 changements de niveau, tous vérifiés. Entreprises et Gouvernement restent sur l'élite 40 et montent une fois pour ouvrir 41 à 44, puis reviennent. En équilibré, Gouvernement finit sur 43 et non sur l'élite 40 : celle-ci donne 2,3 fois plus de données mais 1 % d'XP en moins, et l'équilibré exige un gain sur les deux.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
