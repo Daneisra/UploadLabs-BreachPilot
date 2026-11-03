@@ -629,6 +629,23 @@ func _test_balanced_trade() -> void:
 	_check.call(HackingAdvice.best_row([current, trade, even] as Array[Dictionary], current, "balanced") == trade, "the larger average gain wins")
 	_check.call(absf(HackingAdvice.gain(even, current, "balanced") - 0.04) < 1e-6, "balanced's gain is the average change")
 	_check.call(HackingAdvice.best_row([current, trade] as Array[Dictionary], current, "gov") == current, "an objective naming a resource still keeps it")
+	var refused := _changed(current, 1.25, 1.0, 0.6)
+	_check.call(HackingAdvice.is_refused_trade(refused, current, "balanced") and not HackingAdvice.is_refused_trade(refused, current, "xp") and not HackingAdvice.is_refused_trade(trade, current, "balanced"), "a refused trade is told apart from a loss")
+	var advisor := HackingAdvisor.new()
+	advisor._chain = _chain()
+	advisor._current = current
+	advisor._objective = HackingAdvice.BALANCED
+	var cell := advisor._purchase_gain(refused)
+	_check.call(cell.begins_with("compromis : ") and cell.contains("Renseignements -40 %") and not cell.contains("-100"), "a purchase balanced refuses says what it costs, not -100 %%: %s" % cell)
+	advisor._upgrade_rows = [{"upgrade": {"name": "Dégâts Payload", "affordable": true, "resource": "points", "cost": 1.0, "cost_text": "1 point", "held": 12.0, "changes": {}}, "row": refused}]
+	advisor._rows = [current]
+	advisor._model = HackingModel.new(_chain())
+	var card := advisor._card()
+	var said := false
+	for line: Dictionary in card:
+		said = said or (line.text.contains("Dégâts Payload donnerait XP +25 %") and line.text.contains("Renseignements -40 %"))
+	_check.call(said, "and the card names the trade it refused")
+	advisor.free()
 
 
 func _test_reliability() -> void:

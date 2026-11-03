@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-dev.1 – en cours : recommandations et panneau
+## 0.5.0-dev.2 – en cours : recommandations et panneau
 
 ### Ajouté
 
@@ -11,6 +11,7 @@
 
 - Sur une chaîne trop grande pour essayer tous les branchements, le conseiller ne s'arrête plus au meilleur changement unique : il repart du meilleur trouvé et réessaie chaque changement, jusqu'à ne plus rien gagner. Plusieurs changements peuvent donc être conseillés ensemble.
 - L'objectif équilibré du panneau suit la même règle que la régulation : au plus 5 % de moins sur une ressource pour au moins 10 % de plus sur une autre. Son gain est la variation moyenne.
+- Un achat que l'équilibré refuse, parce qu'il gagne d'un côté mais perd trop de l'autre, n'est plus affiché à -100 % : le panneau dit ce qu'il coûterait, et la recommandation le nomme avec son gain, pour que vous choisissiez un autre objectif si vous le voulez.
 
 ## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
 

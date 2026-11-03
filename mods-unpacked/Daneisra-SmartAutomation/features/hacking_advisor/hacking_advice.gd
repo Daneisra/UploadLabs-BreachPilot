@@ -59,6 +59,11 @@ static func best_row(rows: Array[Dictionary], current: Dictionary, objective: St
 	return best
 
 
+## Balanced refuses a chain that loses too much of one thing for what it gains: not a loss of everything.
+static func is_refused_trade(row: Dictionary, current: Dictionary, objective: String) -> bool:
+	return objective == BALANCED and score(row, objective, current) <= 0.0 and score(current, objective, current) > 0.0
+
+
 ## Relative gain for the objective, or 1 when starting from nothing.
 static func gain(row: Dictionary, current: Dictionary, objective: String) -> float:
 	var before := score(current, objective, current)

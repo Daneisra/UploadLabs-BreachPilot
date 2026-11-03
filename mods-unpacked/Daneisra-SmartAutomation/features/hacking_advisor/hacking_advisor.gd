@@ -239,12 +239,27 @@ func _card() -> Array[Dictionary]:
 			by_resource[item.upgrade.resource] = item
 	if by_resource.is_empty():
 		lines.append({"text": "Achat : rien de ce que vous pouvez payer n'aide cet objectif de façon chiffrable pour l'instant.", "kind": "muted"})
+		var trade := _refused_trade()
+		if not trade.is_empty():
+			var effects := HackingAdvice.effects(_chain, _current, trade.row)
+			lines.append({"text": "   %s donnerait %s, mais %s : un compromis que l'équilibré refuse. Choisissez un autre objectif pour trancher." % [trade.upgrade.name, effects.gains, effects.drawbacks], "kind": "muted"})
 	for resource: String in by_resource:
 		var item: Dictionary = by_resource[resource]
 		var effects := HackingAdvice.effects(_chain, _current, item.row, HackingUpgrades.downsides(item.upgrade.changes))
 		lines.append({"text": "Achat conseillé : %s (%s, vous en avez %s), %s." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held), _gain_text(item.row)], "kind": "title"})
 		lines.append({"text": "   Gain : %s. Inconvénients : %s." % [effects.gains, effects.drawbacks], "kind": ""})
 	return lines
+
+
+## The best purchase balanced refuses for what it costs elsewhere, by XP: the player may still want it.
+func _refused_trade() -> Dictionary:
+	var found := {}
+	for item: Dictionary in _upgrade_rows:
+		if item.row.is_empty() or not item.upgrade.affordable or not HackingAdvice.is_refused_trade(item.row, _current, _objective):
+			continue
+		if found.is_empty() or item.row.xp_rate > found.row.xp_rate:
+			found = item
+	return found
 
 
 func _objective_label() -> String:
@@ -319,10 +334,17 @@ func _purchases_table() -> Dictionary:
 			item.upgrade.name, item.upgrade.cost_text, _held_text(item.upgrade),
 			", ".join(levels) if followed else "–",
 			_estimate(item.row.xp_rate) if followed else "–",
-			"%+d %%" % roundi(HackingAdvice.gain(item.row, _current, _objective) * 100.0) if followed else CHANCE_NOT_FOLLOWED,
+			_purchase_gain(item.row) if followed else CHANCE_NOT_FOLLOWED,
 		])
 		kinds.append("" if item.upgrade.affordable and followed else "muted")
 	return {"rows": rows, "kinds": kinds}
+
+
+## A trade balanced refuses is not a loss of everything: what it would lose is said instead.
+func _purchase_gain(row: Dictionary) -> String:
+	if HackingAdvice.is_refused_trade(row, _current, _objective):
+		return "compromis : %s" % HackingAdvice.effects(_chain, _current, row).drawbacks
+	return "%+d %%" % roundi(HackingAdvice.gain(row, _current, _objective) * 100.0)
 
 
 ## What can be paid and is understood first, each resource together: a point and a token cannot be compared.
