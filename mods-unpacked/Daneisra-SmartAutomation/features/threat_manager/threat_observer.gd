@@ -1037,7 +1037,7 @@ func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatR
 	for level: int in table.levels:
 		if level >= _regulation.min_level and level <= event.max_level and regulator.can_reach(level):
 			reachable[level] = table.levels[level]
-	var profitable := LevelChoice.profitable(reachable, _objective, tracker.type, regulator.required_success())
+	var profitable := LevelChoice.profitable(reachable, _objective, tracker.type, regulator.required_success(), regulator.home_level(event.level))
 	if profitable < 0:
 		return {}
 	var trial: float = TRIAL_CHANCE if regulator.allows_trials() else regulator.required_success()

@@ -69,6 +69,8 @@ var _raises_suspended := false
 var _just_contradicted := false
 var _action_busy := false
 var _probed_level := -1
+## The level a try to open the next one started from: the regulation compares with it to come back.
+var _trial_from := -1
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
@@ -303,6 +305,11 @@ func required_success() -> float:
 	return _profile.p
 
 
+## The level the regulation stands for: the one it left to open the next level while it is up there.
+func home_level(level: int) -> int:
+	return _trial_from if level == _probed_level and _trial_from >= 0 else level
+
+
 ## Whether the profile lets a level that may fail be tried.
 func allows_trials() -> bool:
 	return _fast_raises and _profile.probes
@@ -331,6 +338,7 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 		return _decision("hold", "level_blocked", attack, {"blocked_for": _blocked[target] - _timer})
 	if probing:
 		_probed_level = target
+		_trial_from = -1
 		return _act("raise", attack, {"certain": false, "probe": true, "verify_attacks": VERIFY_CERTAIN, "target": target})
 
 	var status: String = next.get("status", "invalid")
@@ -374,6 +382,7 @@ func _try_profitable(attack: Dictionary) -> Dictionary:
 		return _decision("hold", "level_blocked", attack)
 	if target == unlock:
 		_probed_level = target
+		_trial_from = attack.level
 		return _act("raise", attack, {"certain": false, "probe": true, "aim": "unlock", "verify_attacks": VERIFY_CERTAIN, "target": target})
 	if _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)

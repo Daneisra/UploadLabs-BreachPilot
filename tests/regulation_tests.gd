@@ -745,6 +745,22 @@ func _test_level_choice() -> void:
 	var both := government.duplicate(true)
 	both[40].xp = 863685108041289.0 * 1.06 * 12.35 / 60.0
 	_check(LevelChoice.profitable(both, LevelChoice.BALANCED, "gov", 0.99) == 40, "a gain on both still wins")
+	# Government on 2026-11-03: with more power, 44 brings more XP and the elite 40 more data, each beyond the trade.
+	var split := {
+		40: {"chance": 1.0, "cycle": 12.0, "reward": 100.0, "xp": 100.0},
+		44: {"chance": 1.0, "cycle": 10.0, "reward": 50.0, "xp": 105.0},
+	}
+	_check(LevelChoice.profitable(split, LevelChoice.BALANCED, "gov", 0.99, 40) == 40, "balanced keeps the elite it has when the other level only wins on one side")
+	_check(LevelChoice.profitable(split, LevelChoice.BALANCED, "gov", 0.99, 44) == 44, "and keeps 44 just as well")
+	_check(LevelChoice.profitable(split, LevelChoice.BALANCED, "gov", 0.99) == 44, "without a current level, the highest")
+	_check(LevelChoice.profitable(split, LevelChoice.XP, "gov", 0.99, 40) == 44, "the XP objective still goes for the XP")
+	_check(LevelChoice.profitable(split, "gov", "gov", 0.99, 44) == 40, "and the data objective for the data")
+	var slipping := split.duplicate(true)
+	slipping[40].chance = 0.5
+	_check(LevelChoice.profitable(slipping, LevelChoice.BALANCED, "gov", 0.99, 40) == 44, "a current level that no longer holds is not kept")
+	var better := split.duplicate(true)
+	better[44].reward = 140.0
+	_check(LevelChoice.profitable(better, LevelChoice.BALANCED, "gov", 0.99, 40) == 44, "a level winning on both is still taken")
 	var close := _measured_levels()
 	close[30].reward = 13.8 * 17.0 / 7.6 * 1.03
 	_check(LevelChoice.profitable(close, "corps", "corps", 0.99) == 32, "3 % more is noise: the highest level stays")
@@ -773,6 +789,7 @@ func _test_profitable_regulation() -> void:
 	var unlock := reg.on_attack(elite, {}, {})
 	_check(unlock.decision == "raise" and unlock.probe and unlock.assumed_level == 33 and unlock.aim == "unlock", "then it goes up once to open the next level: %s" % str(unlock))
 	reg.on_level_changed(33)
+	_check(reg.home_level(33) == 30 and reg.home_level(30) == 30, "up there to open a level, the regulation stands for the one it left")
 	reg.advance(10.0)
 	var opened := reg.on_attack({"event": "success", "complete": true, "level": 33, "max_level": 34, "signature": "s", "profitable_level": 30, "unlock_level": -1}, {}, {})
 	_check(opened.decision == "lower" and opened.assumed_level == 30, "won once, it comes back to what pays")

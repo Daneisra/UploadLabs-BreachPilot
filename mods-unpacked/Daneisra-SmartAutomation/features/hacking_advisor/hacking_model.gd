@@ -285,7 +285,7 @@ func _scan_levels(best: Dictionary, key: String, target: Dictionary, scales: Dic
 			failed_in_row += 1
 			if level > target.max_level or failed_in_row >= FAILED_IN_ROW_STOP:
 				break
-	var chosen := LevelChoice.profitable(holding, _chain.get("objective", LevelChoice.BALANCED), key, MIN_HOLD)
+	var chosen := LevelChoice.profitable(holding, _chain.get("objective", LevelChoice.BALANCED), key, MIN_HOLD, target.level)
 	if chosen < 0:
 		return
 	var brought := LevelChoice.rates(holding[chosen])
