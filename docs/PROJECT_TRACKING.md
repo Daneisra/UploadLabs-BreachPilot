@@ -12,6 +12,7 @@
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
 | Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
+| Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Jérémy le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -86,6 +87,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 **Niveau le plus rentable, `0.4.0-dev.11`, décision de Jérémy du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
 
 **Vérifié en jeu sur la `0.4.0-dev.11`, 2026-11-03 :** 408 attaques réussies, 10 échecs, aucune erreur ; 12 changements de niveau, tous vérifiés. Entreprises et Gouvernement restent sur l'élite 40 et montent une fois pour ouvrir 41 à 44, puis reviennent. En équilibré, Gouvernement finit sur 43 et non sur l'élite 40 : celle-ci donne 2,3 fois plus de données mais 1 % d'XP en moins, et l'équilibré exige un gain sur les deux.
+
+**Sortie de la `0.4.0`, 2026-11-03 :** à la demande de Jérémy, l'équilibré accepte de perdre au plus 5 % d'une ressource si l'autre gagne au moins 10 %. Rejouée sur les 31 tableaux de niveaux de la session dev.11, la règle garde les mêmes choix, sauf Gouvernement en fin de session : l'élite 40 au lieu de 43. Les objectifs XP et Données ne changent pas, ni les protections contre les allers-retours et les changements manuels. Restent à mesurer plus tard, sans bloquer la version : l'infection sur d'autres chaînes et une croissance d'infection achetée.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 

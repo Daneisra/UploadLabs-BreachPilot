@@ -7,6 +7,9 @@ const XP := "xp"
 const BALANCED := "balanced"
 ## Below this, a better level is noise from the random attacks, and not worth leaving the highest one.
 const MIN_GAIN := 0.05
+## Balanced accepts this much less of one resource, when the other brings at least MIN_TRADE more.
+const MAX_LOSS := 0.05
+const MIN_TRADE := 0.10
 
 
 ## What a level brings per minute: {"reward": ..., "xp": ...}. entry holds chance, cycle, reward and xp.
@@ -18,14 +21,20 @@ static func rates(entry: Dictionary) -> Dictionary:
 
 ## How good a level is for the objective. own_key is the objective that names this target's reward:
 ## an objective naming another target does not depend on this one, which then keeps a balance.
-## Balanced is the worse of the two changes against the reference: a level only wins on both.
+## Balanced compares with the reference: a level counts when it gains on both, or loses a little of one
+## for much more of the other. It is then worth the product of both changes, and 0.0 otherwise.
 static func score(entry: Dictionary, objective: String, own_key: String, reference: Dictionary) -> float:
 	var brought := rates(entry)
 	if objective == XP:
 		return brought.xp
 	if objective == own_key:
 		return brought.reward
-	return minf(_ratio(brought.reward, reference.reward), _ratio(brought.xp, reference.xp))
+	var reward := _ratio(brought.reward, reference.reward)
+	var xp := _ratio(brought.xp, reference.xp)
+	var low := minf(reward, xp)
+	if low >= 1.0 + MIN_GAIN or (low >= 1.0 - MAX_LOSS and maxf(reward, xp) >= 1.0 + MIN_TRADE):
+		return reward * xp
+	return 0.0
 
 
 ## levels: level -> {chance, cycle, reward, xp}, only those that can be reached. Returns the level that
@@ -40,7 +49,9 @@ static func profitable(levels: Dictionary, objective: String, own_key: String, r
 		return -1
 	var reference := rates(levels[highest])
 	var best := highest
-	var best_score := score(levels[highest], objective, own_key, reference) * (1.0 + MIN_GAIN)
+	# The reference is worth 1.0 when balanced; a level only counts there once it passes the rules above.
+	var balanced: bool = objective != XP and objective != own_key
+	var best_score := 1.0 if balanced else score(levels[highest], objective, own_key, reference) * (1.0 + MIN_GAIN)
 	for level: int in levels:
 		var entry: Dictionary = levels[level]
 		if entry.chance < required:

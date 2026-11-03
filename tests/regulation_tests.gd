@@ -727,6 +727,24 @@ func _test_level_choice() -> void:
 	_check(LevelChoice.profitable(levels, "corps", "corps", 0.99) == 30, "an elite poorer in XP still wins on data")
 	_check(LevelChoice.profitable(levels, LevelChoice.XP, "corps", 0.99) == 32, "but not on XP")
 	_check(LevelChoice.profitable(levels, LevelChoice.BALANCED, "corps", 0.99) == 32, "nor balanced, which needs both")
+	# Government at the end of the dev.11 session: the elite 40 brings 2.3 times the data for 1 % less XP.
+	var government := {
+		40: {"chance": 1.0, "cycle": 12.35, "reward": 34369561366.69 * 12.35 / 60.0, "xp": 854404373211073.0 * 12.35 / 60.0},
+		43: {"chance": 1.0, "cycle": 9.78, "reward": 14657157295.63 * 9.78 / 60.0, "xp": 863685108041289.0 * 9.78 / 60.0},
+		44: {"chance": 0.35, "cycle": 12.07, "reward": 1.0, "xp": 1.0},
+	}
+	_check(LevelChoice.profitable(government, LevelChoice.BALANCED, "gov", 0.99) == 40, "balanced gives up 1 % of XP for 130 % more data")
+	_check(LevelChoice.profitable(government, LevelChoice.XP, "gov", 0.99) == 43, "the XP objective keeps the XP")
+	_check(LevelChoice.profitable(government, "gov", "gov", 0.99) == 40, "the data objective keeps the data")
+	var costly := government.duplicate(true)
+	costly[40].xp *= 0.94 / 0.989
+	_check(LevelChoice.profitable(costly, LevelChoice.BALANCED, "gov", 0.99) == 43, "but not 6 % of XP")
+	var small := government.duplicate(true)
+	small[40].reward = 14657157295.63 * 1.08 * 12.35 / 60.0
+	_check(LevelChoice.profitable(small, LevelChoice.BALANCED, "gov", 0.99) == 43, "nor for only 8 % more data")
+	var both := government.duplicate(true)
+	both[40].xp = 863685108041289.0 * 1.06 * 12.35 / 60.0
+	_check(LevelChoice.profitable(both, LevelChoice.BALANCED, "gov", 0.99) == 40, "a gain on both still wins")
 	var close := _measured_levels()
 	close[30].reward = 13.8 * 17.0 / 7.6 * 1.03
 	_check(LevelChoice.profitable(close, "corps", "corps", 0.99) == 32, "3 % more is noise: the highest level stays")

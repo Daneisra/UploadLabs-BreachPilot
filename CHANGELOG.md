@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0-dev.11 – en cours : conseiller générique
+## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
 
 ### Ajouté
 
@@ -25,6 +25,7 @@
 - Le journal relève, à chaque attaque réussie, ce que la cible produit selon le jeu, pour vérifier la récompense des niveaux élites.
 - La régulation vise le niveau qui rapporte le plus par minute pour l'objectif choisi dans le panneau, au lieu du plus haut niveau qui tient. Un niveau élite qui paie davantage est gardé. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Sans mesure suffisante ou sans les récompenses du jeu, elle vise le plus haut niveau comme avant.
 - Le panneau indique ces mêmes niveaux.
+- En équilibré, un niveau est préféré s'il rapporte plus en données et en XP, ou s'il perd au plus 5 % de l'une pour au moins 10 % de plus de l'autre. Les objectifs XP et Données ne regardent que leur ressource.
 - Un achat qui change ce qu'une cible exige, comme plus de temps d'attaque, relance la régulation autant qu'un changement de puissance.
 - Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
 - L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
