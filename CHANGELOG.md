@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0-dev.1 – en cours : recommandations et panneau
+
+### Ajouté
+
+- Le panneau commence par la recommandation : les branchements à changer, un par étape, le gain estimé, les inconvénients et la fiabilité, avec sa raison. Les tableaux de calcul sont dans une section repliable, qui reste ouverte si vous l'ouvrez.
+- La fiabilité est élevée pour ce qui est mesuré sur votre chaîne, et baisse d'un cran quand un flux est envoyé vers une cible qu'il n'a jamais attaquée, et d'un autre quand une réussite est incertaine.
+
+### Modifié
+
+- Sur une chaîne trop grande pour essayer tous les branchements, le conseiller ne s'arrête plus au meilleur changement unique : il repart du meilleur trouvé et réessaie chaque changement, jusqu'à ne plus rien gagner. Plusieurs changements peuvent donc être conseillés ensemble.
+- L'objectif équilibré du panneau suit la même règle que la régulation : au plus 5 % de moins sur une ressource pour au moins 10 % de plus sur une autre. Son gain est la variation moyenne.
+
 ## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
 
 ### Ajouté

@@ -24,6 +24,9 @@ const MIN_HITS := 30
 ## Gains needed before trusting how the infection behaves: about as many attacks as for the hits.
 const MIN_PULSES := 20
 const MAX_SCENARIOS := 64
+## Rounds of the search through a chain too large to try whole: each one keeps the best change and tries
+## every change from there. Most chains settle in two or three.
+const MAX_SEARCH_ROUNDS := 4
 ## From this many attacks, what really happened can refute the calculation.
 const MIN_ATTACKS_TO_CHECK := 10
 const CHANCE_TOLERANCE := 0.35
@@ -44,15 +47,15 @@ func current_scenario() -> Dictionary:
 	return _chain.current
 
 
-## Every way of sending the streams to the targets. Too many of them: only one change at a time.
+## Every way of sending the streams to the targets. Too many of them: only one change at a time, from which
+## the search goes on with neighbors().
 func scenarios() -> Array[Dictionary]:
 	var keys: Array = _chain.targets.keys()
 	var payload := _stream_choices("payload")
 	var infection := _stream_choices("infection")
 	var vulnerabilities: Array = [true, false] if _chain.current.vulnerability else [false]
-	var total: float = pow(payload.size() + 1.0, keys.size()) * pow(infection.size() + 1.0, keys.size()) * vulnerabilities.size()
-	if total > MAX_SCENARIOS:
-		return _one_change_scenarios(keys, payload, infection)
+	if searches():
+		return neighbors(_chain.current)
 	var list: Array[Dictionary] = []
 	for payload_set: Dictionary in _assignments(keys, payload):
 		if payload_set.values().all(func(id: String) -> bool: return id == ""):
@@ -60,6 +63,35 @@ func scenarios() -> Array[Dictionary]:
 		for infection_set: Dictionary in _assignments(keys, infection):
 			for vulnerability: bool in vulnerabilities:
 				list.append({"payload": payload_set, "infection": infection_set, "vulnerability": vulnerability})
+	return list
+
+
+## Whether the chain is too large to try every way, so that the best one is searched change by change.
+func searches() -> bool:
+	var keys: Array = _chain.targets.keys()
+	var vulnerabilities := 2.0 if _chain.current.vulnerability else 1.0
+	return pow(_stream_choices("payload").size() + 1.0, keys.size()) * pow(_stream_choices("infection").size() + 1.0, keys.size()) * vulnerabilities > MAX_SCENARIOS
+
+
+## base, then every chain one cable away from it. A chain sending no payload anywhere is left out.
+func neighbors(base: Dictionary) -> Array[Dictionary]:
+	var keys: Array = _chain.targets.keys()
+	var list: Array[Dictionary] = [base]
+	for kind: String in ["payload", "infection"]:
+		var choices := _stream_choices(kind)
+		for key: String in keys:
+			for choice: String in [""] + choices:
+				if choice == base[kind][key]:
+					continue
+				var changed: Dictionary = base.duplicate(true)
+				changed[kind][key] = choice
+				if kind == "payload" and changed.payload.values().all(func(id: String) -> bool: return id == ""):
+					continue
+				list.append(changed)
+	if _chain.current.vulnerability:
+		var toggled: Dictionary = base.duplicate(true)
+		toggled.vulnerability = not base.vulnerability
+		list.append(toggled)
 	return list
 
 
@@ -117,24 +149,6 @@ func _assignments(keys: Array, choices: Array[String]) -> Array[Dictionary]:
 				next[key] = choice
 				grown.append(next)
 		list = grown
-	return list
-
-
-func _one_change_scenarios(keys: Array, payload: Array[String], infection: Array[String]) -> Array[Dictionary]:
-	var list: Array[Dictionary] = [_chain.current]
-	for kind: String in ["payload", "infection"]:
-		var choices: Array[String] = payload if kind == "payload" else infection
-		for key: String in keys:
-			for choice: String in [""] + choices:
-				if choice == _chain.current[kind][key]:
-					continue
-				var changed: Dictionary = _chain.current.duplicate(true)
-				changed[kind][key] = choice
-				list.append(changed)
-	if _chain.current.vulnerability:
-		var without: Dictionary = _chain.current.duplicate(true)
-		without.vulnerability = false
-		list.append(without)
 	return list
 
 

@@ -34,6 +34,10 @@ var _upgrades: Array[Dictionary] = []
 var _upgrade_rows: Array[Dictionary] = []
 var _shown_state := ""
 var _computing := false
+## The search through a chain too large to try whole: what was tried, from which chain, and how many rounds.
+var _seen := {}
+var _search_base: Dictionary
+var _rounds := 0
 var _since_check := 0.0
 ## Kept for the session: the player's choice should survive closing the panel.
 var _objective := HackingAdvice.BALANCED
@@ -80,6 +84,11 @@ func _look_at_chain() -> void:
 	_chain = chain
 	_model = HackingModel.new(_chain)
 	_pending = _model.scenarios()
+	_seen = {}
+	for scenario: Dictionary in _pending:
+		_seen[str(scenario)] = true
+	_search_base = _chain.current
+	_rounds = 0
 	_rows = []
 	_upgrades = upgrades
 	_upgrade_rows = []
@@ -116,6 +125,8 @@ func _process(delta: float) -> void:
 	if not _pending.is_empty():
 		_rows.append(_model.evaluate(_pending.pop_back()))
 		return
+	if _model.searches() and _next_round():
+		return
 	if _upgrade_rows.size() < _upgrades.size():
 		_upgrade_rows.append(_evaluate_upgrade(_upgrades[_upgrade_rows.size()]))
 		return
@@ -123,6 +134,34 @@ func _process(delta: float) -> void:
 	_current = _model.evaluate(_model.current_scenario())
 	_log_rows()
 	_render()
+
+
+## From the best chain found so far, every cable change is tried again, until nothing better turns up.
+## Several changes can then add up, as on a chain small enough to try whole.
+func _next_round() -> bool:
+	if _rounds >= HackingModel.MAX_SEARCH_ROUNDS:
+		return false
+	var current := _current_row()
+	if current.is_empty():
+		return false
+	var best := HackingAdvice.best_row(_rows, current, _objective)
+	if best.scenario == _search_base:
+		return false
+	_search_base = best.scenario
+	_rounds += 1
+	for scenario: Dictionary in _model.neighbors(best.scenario):
+		var key := str(scenario)
+		if not _seen.has(key):
+			_seen[key] = true
+			_pending.append(scenario)
+	return not _pending.is_empty()
+
+
+func _current_row() -> Dictionary:
+	for row: Dictionary in _rows:
+		if row.current:
+			return row
+	return {}
 
 
 func _evaluate_upgrade(upgrade: Dictionary) -> Dictionary:
@@ -155,30 +194,43 @@ func _render() -> void:
 	if not options.any(func(option: Dictionary) -> bool: return option.key == _objective):
 		_objective = HackingAdvice.BALANCED
 		_observer.set_objective(_objective)
-	_panel.show_advice(options, _objective, _on_objective_selected, _advice_text(), _connections_table(), _purchases_table(), _note())
+	_panel.show_advice(options, _objective, _on_objective_selected, _card(), _connections_table(), _purchases_table(), _note())
 
 
-func _advice_text() -> String:
-	var lines := PackedStringArray()
+## The recommendation first: what to do, what it brings, what it costs and how sure it is. Each line has a
+## kind for its color: "title", "good", "bad" or "" for plain text, "muted" for what explains.
+func _card() -> Array[Dictionary]:
+	var lines: Array[Dictionary] = []
 	if not _current.insufficient.is_empty():
-		lines.append("Données insuffisantes pour conseiller : %s. Le conseil reviendra de lui-même, laissez tourner quelques attaques." % _insufficient_text(_current.insufficient))
-		return "\n".join(lines)
+		lines.append({"text": "Données insuffisantes pour conseiller : %s." % _insufficient_text(_current.insufficient), "kind": "title"})
+		lines.append({"text": "Le conseil reviendra de lui-même, laissez tourner quelques attaques.", "kind": "muted"})
+		return lines
 	var refuted := _model.contradictions(_current)
 	if not refuted.is_empty():
+		lines.append({"text": "Aucun conseil chiffré : le calcul ne correspond pas à ce qui est mesuré.", "kind": "title"})
 		for found: Dictionary in refuted:
 			if found.duration:
-				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %.1f s prévues, %.1f s réelles sur %d attaques." % [found.label, found.level, found.expected_used, found.real_used, found.attacks])
+				lines.append({"text": "%s niveau %d : %.1f s prévues, %.1f s réelles sur %d attaques." % [found.label, found.level, found.expected_used, found.real_used, found.attacks], "kind": "bad"})
 			else:
-				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks])
-		lines.append("Aucun conseil chiffré tant que ce n'est pas résolu.")
-		return "\n".join(lines)
+				lines.append({"text": "%s niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks], "kind": "bad"})
+		return lines
+	var goal := _objective_label()
 	var best := HackingAdvice.best_row(_rows, _current, _objective)
 	if best == _current:
-		lines.append("Branchement : gardez le vôtre, il est déjà le meilleur pour cet objectif.")
+		var sure := HackingAdvice.reliability(_chain, _current)
+		lines.append({"text": "Gardez votre branchement : c'est déjà le meilleur pour %s." % goal, "kind": "title"})
+		lines.append({"text": "Fiabilité : %s (%s)." % [sure.text, sure.reasons], "kind": "muted"})
 	else:
 		var effects := HackingAdvice.effects(_chain, _current, best)
-		lines.append("Branchement : %s" % HackingAdvice.connection_text(_chain, _current, best))
-		lines.append("   Pourquoi : %s Gain : %s. Inconvénient : %s." % [HackingAdvice.why_text(_chain, _current, best), effects.gains, effects.drawbacks])
+		var sure := HackingAdvice.reliability(_chain, best)
+		lines.append({"text": "Meilleur branchement pour %s, %s :" % [goal, _gain_text(best)], "kind": "title"})
+		var steps := HackingAdvice.steps(_chain, _current, best)
+		for index: int in steps.size():
+			lines.append({"text": "   %d. %s." % [index + 1, steps[index]], "kind": ""})
+		lines.append({"text": "Gain estimé : %s." % effects.gains, "kind": "good"})
+		lines.append({"text": "Inconvénients : %s." % effects.drawbacks, "kind": "bad" if effects.drawbacks != "aucun" else "muted"})
+		lines.append({"text": "Fiabilité : %s (%s)." % [sure.text, sure.reasons], "kind": "" if sure.level == 2 else "bad"})
+		lines.append({"text": "Pourquoi : %s" % HackingAdvice.why_text(_chain, _current, best), "kind": "muted"})
 	var by_resource := {}
 	for item: Dictionary in _ranked_purchases():
 		if item.row.is_empty() or not item.upgrade.affordable or by_resource.has(item.upgrade.resource):
@@ -186,13 +238,26 @@ func _advice_text() -> String:
 		if HackingAdvice.gain(item.row, _current, _objective) >= HackingAdvice.MIN_GAIN:
 			by_resource[item.upgrade.resource] = item
 	if by_resource.is_empty():
-		lines.append("Achat : rien de ce que vous pouvez payer n'aide cet objectif de façon chiffrable pour l'instant.")
+		lines.append({"text": "Achat : rien de ce que vous pouvez payer n'aide cet objectif de façon chiffrable pour l'instant.", "kind": "muted"})
 	for resource: String in by_resource:
 		var item: Dictionary = by_resource[resource]
 		var effects := HackingAdvice.effects(_chain, _current, item.row, HackingUpgrades.downsides(item.upgrade.changes))
-		lines.append("Achat : %s (%s, vous en avez %s)." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held)])
-		lines.append("   Pourquoi : %s Gain : %s. Inconvénient : %s." % [HackingAdvice.why_text(_chain, _current, item.row), effects.gains, effects.drawbacks])
-	return "\n".join(lines)
+		lines.append({"text": "Achat conseillé : %s (%s, vous en avez %s), %s." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held), _gain_text(item.row)], "kind": "title"})
+		lines.append({"text": "   Gain : %s. Inconvénients : %s." % [effects.gains, effects.drawbacks], "kind": ""})
+	return lines
+
+
+func _objective_label() -> String:
+	for option: Dictionary in HackingAdvice.objectives(_chain):
+		if option.key == _objective:
+			return option.label if option.key != HackingAdvice.BALANCED else "l'équilibre"
+	return _objective
+
+
+## The gain for the objective; balanced gives the average change of what the chain brings.
+func _gain_text(row: Dictionary) -> String:
+	var value := roundi(HackingAdvice.gain(row, _current, _objective) * 100.0)
+	return "%+d %% en moyenne" % value if _objective == HackingAdvice.BALANCED else "%+d %%" % value
 
 
 ## The current connections, then the best for each objective. One row can win several titles.
@@ -234,7 +299,7 @@ func _connections_table() -> Dictionary:
 		cells.append(_with_change(row.xp_rate, _current.xp_rate, row.current))
 		for key: String in keys:
 			cells.append(_with_change(row.targets[key].reward_rate, _current.targets[key].reward_rate, row.current))
-		cells.append("mesuré" if row.current else "estimé")
+		cells.append(HackingAdvice.reliability(_chain, row).text)
 		rows.append(cells)
 		kinds.append("current" if row.current else ("best" if entry.get("selected", false) else ""))
 	return {"rows": rows, "kinds": kinds}
@@ -282,7 +347,7 @@ func _note() -> String:
 	var levels := PackedStringArray()
 	for key: String in _chain.targets:
 		levels.append("%s %d/%d" % [_chain.targets[key].label, _chain.targets[key].level, _chain.targets[key].max_level])
-	return "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Mesuré : coups réellement observés sur votre chaîne. Estimé : les mêmes coups, recalculés selon la puissance et les branchements ; une chaîne jamais jouée reste une estimation. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
+	return "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Fiabilité : élevée pour ce qui est mesuré sur votre chaîne ou les mêmes coups autrement répartis ; elle baisse d'un cran quand un flux est envoyé là où il n'a jamais attaqué, et d'un autre quand une réussite est incertaine. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
 
 
 func _insufficient_text(reasons: PackedStringArray) -> String:
