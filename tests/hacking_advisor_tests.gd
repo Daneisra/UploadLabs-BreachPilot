@@ -12,6 +12,7 @@ const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 const HitLog := preload(ADVISOR + "hit_log.gd")
 const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
 const AdvisorPanel := preload(ADVISOR + "advisor_panel.gd")
+const AdvisorTrials := preload(ADVISOR + "advisor_trials.gd")
 const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
 const Regulator := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_regulator.gd")
 const SaLog := preload("res://mods-unpacked/Daneisra-SmartAutomation/core/sa_log.gd")
@@ -116,6 +117,7 @@ func run(check: Callable) -> void:
 	_test_reliability()
 	_test_chain_search()
 	_test_recommendation_card()
+	_test_trials()
 	_test_stealth()
 	_test_target_rules()
 	_test_infection_measure()
@@ -744,6 +746,99 @@ func _test_recommendation_card() -> void:
 	_check.call(not panel._toggle.visible and panel._summary.visible, "a message hides the card")
 	panel.free()
 	advisor.free()
+
+
+class FakeGlobalsTable extends Node:
+	var unlocks := {}
+
+
+## A chain like the one of 2026-11-03: two nodes without power, a target with no damage, empty inputs.
+func _trial_desktop() -> FakeDesktop:
+	var desktop := FakeDesktop.new()
+	var nodes: Array[Node] = [
+		_node("src", [_slot("S", "hack_power", 300.0, "", ["F1", "F4"])]),
+		_node("launcher", [_slot("F1", "hack_power", 150.0, "S"), _slot("L", "payload_damage", 110.0, "", ["corps_p", "gov_p"])]),
+		_node("virus", [_slot("F2", "hack_power", 0.0), _slot("V", "infection_damage", 0.0)]),
+		_node("injector", [_slot("F3", "hack_power", 0.0), _slot("J", "vulnerability", 0.0)]),
+		_node("spare", [_slot("F4", "hack_power", 150.0, "S"), _slot("X", "payload_damage", 50.0)]),
+		_node("modifier", [_slot("M1", "vulnerability", 0.0), _slot("M2", "vulnerability", 0.0, "", ["elsewhere"])]),
+		_breach("corps", "L", ""),
+		_breach("gov", "L", ""),
+		_breach("anon", "", ""),
+		_node("collector", [_slot("C", "reward", 0.0)]),
+	]
+	for node: Node in nodes:
+		desktop.windows.add_child(node)
+	return desktop
+
+
+func _trial_windows() -> Dictionary:
+	var windows := {}
+	for type: String in ["src", "launcher", "virus", "injector", "spare", "modifier", "corps", "gov", "anon"]:
+		windows[type] = {"name": type.capitalize(), "category": "hacking", "requirement": []}
+	windows["bank"] = {"name": "Infiltrer Banque", "category": "hacking", "requirement": ["research.bank"], "description": "Récupère des Jetons si elle réussit."}
+	windows["locked"] = {"name": "Verrouillé", "category": "hacking", "requirement": ["research.locked"]}
+	windows["collector"] = {"name": "Collecteur", "category": "other", "requirement": []}
+	windows["shop"] = {"name": "Boutique", "category": "other", "requirement": []}
+	return windows
+
+
+class TrialTable extends FakeTable:
+	var windows := {}
+	var resources := {"vulnerability": {"name": "Vulnérabilité"}, "infection_damage": {"name": "Dégâts d'infection"}, "payload_damage": {"name": "Dégâts Payload"}}
+
+
+func _test_trials() -> void:
+	var desktop := _trial_desktop()
+	var data := TrialTable.new()
+	data.windows = _trial_windows()
+	var globals := FakeGlobalsTable.new()
+	globals.unlocks = {"research.bank": true, "research.locked": false}
+	var trials := AdvisorTrials.read(HackingGraph.snapshot(desktop), data, globals)
+	var keys := PackedStringArray()
+	var texts := {}
+	for trial: Dictionary in trials:
+		keys.append(trial.key)
+		texts[trial.key] = trial.text
+	_check.call(keys.has("no_power|virus") and keys.has("no_power|injector"), "nodes without power are found: %s" % ", ".join(keys))
+	_check.call(keys.has("no_damage|anon") and texts["no_damage|anon"].contains("Anon ne reçoit aucun dégât"), "and a target that never attacks")
+	_check.call(keys.has("unused|spare") and texts["unused|spare"].contains("Dégâts Payload"), "and an output plugged into nothing")
+	_check.call(keys.has("empty|vulnerability") and texts["empty|vulnerability"].contains("Vulnérabilité est vide sur Corps, Gov") and texts["empty|vulnerability"].contains("Injector") and texts["empty|vulnerability"].contains("Alimentez-le"), "an empty input another node could fill: %s" % texts.get("empty|vulnerability", ""))
+	_check.call(not texts.get("empty|vulnerability", "").contains("Modifier") and not texts.get("empty|vulnerability", "").contains("Anon"), "an idle input in the middle makes nothing, and a target without damage is told on its own")
+	_check.call(keys.has("empty|infection_damage") and texts["empty|infection_damage"].contains("Virus"), "the infection a node could bring once powered")
+	_check.call(keys.has("new|bank") and texts["new|bank"].contains("Récupère des Jetons si elle réussit") and texts["new|bank"].contains("Add Node"), "a node unlocked but not placed, with what the game says")
+	_check.call(not keys.has("new|locked") and not keys.has("new|shop") and not keys.has("new|corps"), "neither what is locked, nor what is not hacking, nor what is placed")
+	_check.call(trials[0].priority == AdvisorTrials.IDLE and trials[-1].key == "new|bank", "what can be done with the nodes already there comes first")
+	for trial: Dictionary in trials:
+		_check.call(not trial.text.contains("%"), "no figure in a suggestion: %s" % trial.text)
+	_check.call(AdvisorTrials.read({"windows": []}, null, null).is_empty(), "without the game's tables, nothing is suggested")
+
+	var advisor := HackingAdvisor.new()
+	advisor._chain = _chain()
+	advisor._model = HackingModel.new(advisor._chain)
+	advisor._objective = HackingAdvice.XP
+	for scenario: Dictionary in advisor._model.scenarios():
+		advisor._rows.append(advisor._model.evaluate(scenario))
+	advisor._current = advisor._model.evaluate(advisor._chain.current)
+	advisor._trials = trials
+	var richer := advisor._current.duplicate(true)
+	richer.xp_rate *= 1.3
+	advisor._upgrade_rows = [{"upgrade": {"name": "Dégâts Payload", "affordable": false, "resource": "points", "cost": 10.0, "cost_text": "10 points", "held": 4.0, "changes": {}}, "row": richer}]
+	var card := advisor._card()
+	var shown := 0
+	var titled := false
+	for line: Dictionary in card:
+		titled = titled or line.text == "À essayer"
+		shown += 1 if line.text.begins_with("• ") else 0
+	_check.call(titled and shown == AdvisorTrials.SHOWN, "the card keeps a short list: %d" % shown)
+	_check.call(advisor._note().contains("Autres pistes à essayer") and advisor._note().contains("Infiltrer Banque"), "the others wait in the details")
+	_check.call(advisor._saving_trial().text.contains("Il vous manque 6") and advisor._saving_trial().text.contains("+30 %"), "a purchase worth saving for: %s" % advisor._saving_trial().get("text", ""))
+	var state: String = advisor._state_of(advisor._chain, [], trials)
+	_check.call(state != advisor._state_of(advisor._chain, [], trials.slice(1)), "a node powered or placed refreshes the panel")
+	advisor.free()
+	globals.free()
+	data.free()
+	_free_desktop(desktop)
 
 
 ## A recalculation stutters: only a gesture of the player may start one.

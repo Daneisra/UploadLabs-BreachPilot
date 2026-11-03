@@ -7,6 +7,8 @@ const HackingModel := preload("hacking_model.gd")
 const HackingUpgrades := preload("hacking_upgrades.gd")
 const HackingAdvice := preload("hacking_advice.gd")
 const AdvisorPanel := preload("advisor_panel.gd")
+const AdvisorTrials := preload("advisor_trials.gd")
+const HackingGraph := preload("hacking_graph.gd")
 const LevelChoice := preload("../threat_manager/level_choice.gd")
 
 const ERROR_TEXTS := {
@@ -32,6 +34,7 @@ var _rows: Array[Dictionary] = []
 var _current: Dictionary
 var _upgrades: Array[Dictionary] = []
 var _upgrade_rows: Array[Dictionary] = []
+var _trials: Array[Dictionary] = []
 var _shown_state := ""
 var _computing := false
 ## The search through a chain too large to try whole: what was tried, from which chain, and how many rounds.
@@ -72,7 +75,8 @@ func _look_at_chain() -> void:
 	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"), _observer.stealth_mask())
 	chain.objective = _objective
 	var upgrades := HackingUpgrades.read(root)
-	var state := _state_of(chain, upgrades)
+	var trials := AdvisorTrials.read(HackingGraph.snapshot(root.get_node("Globals").desktop), root.get_node("Data"), root.get_node("Globals"))
+	var state := _state_of(chain, upgrades, trials)
 	if state == _shown_state:
 		return
 	_shown_state = state
@@ -82,6 +86,7 @@ func _look_at_chain() -> void:
 		_panel.show_message(ERROR_TEXTS.get(chain.error, chain.error))
 		return
 	_chain = chain
+	_trials = trials
 	_model = HackingModel.new(_chain)
 	_pending = _model.scenarios()
 	_seen = {}
@@ -98,10 +103,12 @@ func _look_at_chain() -> void:
 ## Only what the player changes: the connections, the power, a purchase becoming possible, a measure
 ## becoming sufficient, and the objective, which picks the levels. What moves by itself, like hits piling
 ## up or research growing, must not recalculate.
-func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
+func _state_of(chain: Dictionary, upgrades: Array[Dictionary], trials: Array[Dictionary] = []) -> String:
 	if chain.error != "":
 		return chain.error
 	var parts := PackedStringArray([_objective, str(chain.current)])
+	for trial: Dictionary in trials:
+		parts.append(trial.key)
 	for key: String in chain.targets:
 		var target: Dictionary = chain.targets[key]
 		parts.append("%s:%d:%s" % [key, target.max_level, target.chain_key])
@@ -197,9 +204,48 @@ func _render() -> void:
 	_panel.show_advice(options, _objective, _on_objective_selected, _card(), _connections_table(), _purchases_table(), _note())
 
 
-## The recommendation first: what to do, what it brings, what it costs and how sure it is. Each line has a
-## kind for its color: "title", "good", "bad" or "" for plain text, "muted" for what explains.
+## The recommendation first, then what could be tried. Each line has a kind for its color: "title",
+## "good", "bad" or "" for plain text, "muted" for what explains.
 func _card() -> Array[Dictionary]:
+	var lines := _recommendation()
+	var trials := _all_trials()
+	if not trials.is_empty():
+		lines.append({"text": "À essayer", "kind": "title"})
+		for trial: Dictionary in trials.slice(0, AdvisorTrials.SHOWN):
+			lines.append({"text": "• %s" % trial.text, "kind": ""})
+		if trials.size() > AdvisorTrials.SHOWN:
+			lines.append({"text": "%d autres pistes dans le détail des calculs." % (trials.size() - AdvisorTrials.SHOWN), "kind": "muted"})
+	return lines
+
+
+## The nodes and cables worth trying, and the best purchase to save for, most useful first.
+func _all_trials() -> Array[Dictionary]:
+	var list := _trials.duplicate()
+	var saving := _saving_trial()
+	if not saving.is_empty():
+		list.append(saving)
+	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.priority < b.priority)
+	return list
+
+
+## A purchase that cannot be paid yet but would help the objective: its figure comes from the hits measured.
+func _saving_trial() -> Dictionary:
+	if _current.is_empty() or not _current.insufficient.is_empty():
+		return {}
+	var best := {}
+	for item: Dictionary in _upgrade_rows:
+		if item.row.is_empty() or item.upgrade.affordable or item.upgrade.held < 0.0:
+			continue
+		var gain := HackingAdvice.gain(item.row, _current, _objective)
+		if gain >= HackingAdvice.MIN_GAIN and (best.is_empty() or gain > best.gain):
+			best = {"item": item, "gain": gain}
+	if best.is_empty():
+		return {}
+	var upgrade: Dictionary = best.item.upgrade
+	return {"key": "save|%s" % upgrade.name, "priority": AdvisorTrials.SAVING, "text": "%s aiderait cet objectif, %s. Il vous manque %s : à garder en vue." % [upgrade.name, _gain_text(best.item.row), _number(upgrade.cost - upgrade.held)]}
+
+
+func _recommendation() -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	if not _current.insufficient.is_empty():
 		lines.append({"text": "Données insuffisantes pour conseiller : %s." % _insufficient_text(_current.insufficient), "kind": "title"})
@@ -369,7 +415,14 @@ func _note() -> String:
 	var levels := PackedStringArray()
 	for key: String in _chain.targets:
 		levels.append("%s %d/%d" % [_chain.targets[key].label, _chain.targets[key].level, _chain.targets[key].max_level])
-	return "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Fiabilité : élevée pour ce qui est mesuré sur votre chaîne ou les mêmes coups autrement répartis ; elle baisse d'un cran quand un flux est envoyé là où il n'a jamais attaqué, et d'un autre quand une réussite est incertaine. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
+	var more := ""
+	var trials := _all_trials()
+	if trials.size() > AdvisorTrials.SHOWN:
+		var rest := PackedStringArray()
+		for trial: Dictionary in trials.slice(AdvisorTrials.SHOWN):
+			rest.append("• %s" % trial.text)
+		more = "Autres pistes à essayer :\n%s\n\n" % "\n".join(rest)
+	return more + "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Fiabilité : élevée pour ce qui est mesuré sur votre chaîne ou les mêmes coups autrement répartis ; elle baisse d'un cran quand un flux est envoyé là où il n'a jamais attaqué, et d'un autre quand une réussite est incertaine. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
 
 
 func _insufficient_text(reasons: PackedStringArray) -> String:

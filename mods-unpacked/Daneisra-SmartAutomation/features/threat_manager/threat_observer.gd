@@ -1461,6 +1461,11 @@ func _log_inventory(root: Node) -> void:
 			var is_unlocked: Variant = unlocked.has(key) if unlocked != null else "unknown"
 			hacking.append("%s:%s:%s" % [key, is_unlocked, definition.get("requirement", [])])
 	_log.info("inventory hacking_windows=%s" % ";".join(hacking))
+	# What a node's definition holds, to learn how the game counts the nodes one may place.
+	for key: String in _data.windows:
+		if _data.windows[key] is Dictionary and _data.windows[key].get("category") == "hacking":
+			_log.info("inventory window_fields=%s:%s" % [key, ",".join(_data.windows[key].keys())])
+			break
 
 
 func _format(type: String, event: Dictionary) -> String:
