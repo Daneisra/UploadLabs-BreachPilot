@@ -12,6 +12,7 @@
 | Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
 | Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
+| Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Jérémy le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -49,6 +50,45 @@ Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte 
 | Spécialisation de hack (dégâts annoncés de 104,86 à 125,84), 24 min 14 | Niveaux 8 et 8, 100 %, 5 288 XP/min | Niveaux 8 et 8, 271 réussites sur 271 et 268 sur 268, 5 694 XP/min (+8 %) |
 
 Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la cause de la hausse est déduite du gain de 20 %. Les deux estimations sont en dessous du réel : le temps entre deux attaques (0,7 s) et la chance juste au-dessus d'un seuil semblent un peu pessimistes.
+
+**Temps entre deux attaques, mesuré le 2026-11-01 :** l'attaque suivante part au prochain tir du lanceur. Sur 8 longues suites, l'écart moyen avec le réel est de 0,15 s, contre 0,36 s pour un délai fixe de 0,7 s. Exemples : 3,81 s pour 3,81 s (Gouvernement niveau 4), 6,04 s pour 6,00 s (Entreprises niveau 9). Moins bon à 38,13 d'infection : 5,76 s pour 5,37 s.
+
+**Nouveaux nœuds, mesurés le 2026-11-01 sur peu d'attaques :** `Charged Attack` double 1 coup sur 3 (76 à 152, 383 en critique), le jeu annonce +33 %. `Exécuter l'injection` prend sa part de puissance et multiplie les coups (59,3 à 72,8 avec 0,234). Sa vulnérabilité croît peu avec la puissance (0,226 à 92,4, 0,234 à 107,8) : la règle n'est pas établie, le conseiller la garde constante, et ne compare que garder ou retirer l'injection.
+
+**Architecture générique, décidée par Jérémy le 2026-11-01 après avis de Codex et ChatGPT (issue #1) :** hybride. Le mod lit à l'exécution le graphe et les tables du jeu, et compte sur les coups mesurés ; seul un petit nombre de règles mesurées restent écrites (partage égal de la puissance, délai de l'infection, prochain tir, effets lus par attribut). « Marcher pour tout le monde » veut dire : aucun nœud ni branchement ne fait échouer le mod, et « données insuffisantes » plutôt qu'un chiffre faux. Limites : les coups sont tirés sans leur ordre, donc une séquence régulière (1 coup sur 3) devient une proportion, et la puissance est supposée proportionnelle pour un scénario jamais joué.
+
+**Essai de la `0.4.0-dev.3`, 2026-11-01, chaîne complète, 18 min :** aucune erreur, aucun arrêt. Bouton `Conseil` en place, tableau tenant à l'écran sur les captures. Montées et retours en arrière corrects avec l'injection.
+
+| Chaîne | Annoncé | Réel |
+|---|---|---|
+| Spécialiste d'infection acheté | Niveaux 9 et 9, 10 240 XP/min | Niveaux 9 et 9, 9 102 XP/min (-11 %, 135 s, avec des essais au niveau 10), 40 réussites sur 40 |
+| Avec l'optimisation de Payload critique en plus | Niveaux 9 et 9, environ 11 900 XP/min | Niveaux 9 et 9, 10 824 XP/min (-9 %, 579 s), 204 réussites sur 204 |
+
+Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au niveau 9. **Défaut trouvé :** la vulnérabilité lue sur le nœud retombe à 0 un instant entre deux attaques : ouvert à ce moment, le panneau annonçait 86 % au lieu de 100 % et se disait contredit. Corrigé en retenant la valeur de la dernière attaque.
+
+**Premier rebranchement suivi d'un conseil, 2026-11-01 :** injection retirée comme conseillé. Annoncé : niveaux 9 et 9, 12 659 XP/min (+6 %). Réel : niveaux 9 et 9, environ 14 450 XP/min sur 34 s seulement (16 réussites sur 16), soit 14 % de plus qu'annoncé. Après deux achats : 14 687 XP/min sur 525 s, 251 réussites sur 251.
+
+**Niveau 10 élite, à vérifier :** 2 306 de pare-feu et 9 224 d'infiltration sur Entreprises. Le panneau l'annonce à 99 %, puis le jeu annonce un gain très supérieur au niveau 11 (`get_experience_reward`). Aucune réussite réelle n'a encore confirmé ni la faisabilité ni cette récompense : si elle se confirme, monter au-delà d'un niveau élite pourrait faire perdre de l'XP.
+
+**Actualisation du panneau, 2026-11-01 :** une première version recalculait tout dès qu'un solde bougeait, et la recherche monte en continu : 93 recalculs en 3 min 30, saccades et conseils changeants, signalés par Jérémy. Le panneau ne se recalcule plus que sur un geste du joueur. Rouvert plus tard, il repart des coups mesurés entre-temps : ses chiffres peuvent bouger de quelques pour cent, et un niveau juste au seuil peut changer. Les chiffres sont affichés à 3 chiffres significatifs. Vérifié en jeu par Jérémy le 2026-11-01 sur la `0.4.0-dev.6` : jeu fluide, panneau stable, mise à jour après branchement et achat, courte pause au recalcul non gênante.
+
+**Même session, journal de 23:13 à 00:01 :** 975 attaques réussies pour 12 échecs, aucune erreur ; la régulation est montée de 9 à 14 sur les deux cibles avec la puissance du joueur. Niveau 10 : 86 réussites sur 86. Niveau 11, d'abord : 11 échecs, et deux retours à 9 suivis d'une remontée. **Point ouvert :** le panneau annonce 101 000 XP/min au niveau 10 élite puis 42 500 au niveau 11, soit environ 10 150 XP par attaque contre 2 070. La régulation a donc quitté un niveau annoncé plus rentable. Le gain réel d'un niveau élite n'est toujours pas mesuré : le journal ne relève pas l'XP gagnée.
+
+**Attaque Ghost, journal du 2026-11-01 :** sur 808 attaques réussies avec Ghost sur les deux flux, les dégâts valent 101 % de la barre d'infiltration seule, et 66 % de pare-feu + infiltration ; sans furtivité, 101 % des deux barres. Le coup moyen rapporté au débit annoncé reste à 0,61 avec ou sans Ghost, de 1 071 à 2 776 de débit. Le jeu nomme le bit dans `Utils.damage_variation` (`STEALTH` = 1, `INFECTED` = 2). `INFECTED` n'a jamais été mesuré et reste sans chiffre.
+
+**Vérifié en jeu sur la `0.4.0-dev.7`, 2026-11-02 :** le panneau annonce Entreprises 18 et Gouvernement 19 à 100 % dès 01:20, et le journal le confirme ensuite : 42/42 et 43/43. La régulation n'y est montée qu'à 01:27, au changement de puissance, alors que le temps d'attaque était passé à 7 s à 01:20 : une réponse en cache et un blocage de niveau ne dépendaient que de la puissance. Corrigé en `dev.8` et vérifié : temps passé à 9 s à 02:45:15 à puissance égale, montées 12 s et 22 s plus tard.
+
+**Infection mesurée, `0.4.0-dev.9`, 2026-11-02 :** Spread Infection pose le bit `INFECTED` que le conseiller refusait de chiffrer. Le journal montre deux mécaniques : l'infection croît d'environ 10 % par seconde, et Infecter Payload lui ajoute à chaque coup réel, critiques compris, la part annoncée : 20 % à 37 946 (8 922 pour 44 390), 10 % à 91 071 (10 706 pour 106 536). Le classeur mesure désormais la croissance et les gains tick par tick, sans connaître le nœud. Rejeu de 46 situations réelles avec ces deux valeurs : réussite et durée proches du réel sur 19 des 20 cellules d'au moins 5 attaques ; l'écart restant est une durée tirée d'une seule attaque réussie. Sur moins de 5 attaques, Entreprises 24 à 91 071 reste prévu à 73 % pour 1 réussite sur 3. À vérifier en jeu. Toujours non vérifiés : `INFECTED` sur d'autres chaînes, une croissance achetée, la récompense élite.
+
+**Vérifié en jeu sur la `0.4.0-dev.9`, 2026-11-02 :** l'infection mesurée seule donne une croissance de 0,0998 par seconde et un gain qui suit les coups (facteur 1,00) ; le panneau chiffre de nouveau, sans erreur ni contradiction. Il montre aussi l'effet de la récompense élite non vérifiée : un achat de puissance y vaut -72 %, parce qu'Entreprises passerait de l'élite 25 à 26. La `dev.10` relève ce que les cibles produisent selon le jeu, pour trancher.
+
+**Récompense élite mesurée, `0.4.0-dev.10`, 2026-11-02 :** 1 493 attaques réussies, aucune erreur, aucune prévision contredite. Ce que la cible porte à chaque réussite est égal à `get_reward` du niveau : la récompense élite n'est pas qu'une annonce. Entreprises 30 (élite, 20 s) donne 61,4 M de données et 85,9 G d'XP par attaque, contre 9,2 M et 17,4 G au niveau 31. À puissance égale (1,42 M), en temps réel : 2,1 × 10⁸ données/min au niveau 30, 6,5 × 10⁷ au niveau 31, soit 3,3 fois plus ; 3,1 × 10¹¹ contre 1,2 × 10¹¹ XP/min. La régulation a pourtant quitté l'élite pour le niveau 31, et le -72 % du conseiller était juste. En contrepartie, le niveau maximal ne s'ouvre qu'en gagnant au plus haut niveau. Le passage en stock n'est pas observé à part.
+
+**Niveau le plus rentable, `0.4.0-dev.11`, décision de Jérémy du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
+
+**Vérifié en jeu sur la `0.4.0-dev.11`, 2026-11-03 :** 408 attaques réussies, 10 échecs, aucune erreur ; 12 changements de niveau, tous vérifiés. Entreprises et Gouvernement restent sur l'élite 40 et montent une fois pour ouvrir 41 à 44, puis reviennent. En équilibré, Gouvernement finit sur 43 et non sur l'élite 40 : celle-ci donne 2,3 fois plus de données mais 1 % d'XP en moins, et l'équilibré exige un gain sur les deux.
+
+**Sortie de la `0.4.0`, 2026-11-03 :** à la demande de Jérémy, l'équilibré accepte de perdre au plus 5 % d'une ressource si l'autre gagne au moins 10 %. Rejouée sur les 31 tableaux de niveaux de la session dev.11, la règle garde les mêmes choix, sauf Gouvernement en fin de session : l'élite 40 au lieu de 43. Les objectifs XP et Données ne changent pas, ni les protections contre les allers-retours et les changements manuels. Restent à mesurer plus tard, sans bloquer la version : l'infection sur d'autres chaînes et une croissance d'infection achetée.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 

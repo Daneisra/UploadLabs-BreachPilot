@@ -670,7 +670,7 @@ func _test_government_and_native_values() -> void:
 	observer.start()
 	_check(_count("bind result=ok type=breach_corps") == 1, "Corps is observed")
 	_check(_count("bind result=ok type=breach_government") == 1, "Government is observed")
-	_check(_count("type=breach_bank") == 0, "other Breach types stay out of scope")
+	_check(_count("bind result=ok type=breach_bank") == 1, "any other attack node is observed too, whatever its name")
 
 	corps.breach_damage.production = 30.0
 	game.Signals.tick.emit()

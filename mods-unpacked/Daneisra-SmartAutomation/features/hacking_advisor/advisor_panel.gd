@@ -1,12 +1,12 @@
 extends CanvasLayer
-## The advisor's panel. It only shows: no button here can change the game.
+## The advisor's panel. It only shows: its buttons change what is displayed, never the game.
 
 const LAYER := 90
 const TITLE_SIZE := 26
-const SUMMARY_SIZE := 21
+const SUMMARY_SIZE := 20
 const CELL_SIZE := 19
 const NOTE_SIZE := 16
-const WIDTH := 1180.0
+const WIDTH := 1240.0
 const BACKGROUND := Color(0.07, 0.09, 0.13)
 const BORDER := Color(0.3, 0.38, 0.5)
 const TEXT := Color(0.93, 0.95, 0.98)
@@ -14,6 +14,7 @@ const GOOD := Color(0.45, 0.9, 0.55)
 const CURRENT := Color(0.5, 0.78, 1.0)
 const MUTED := Color(0.62, 0.68, 0.75)
 
+var _objectives: HBoxContainer
 var _summary: Label
 var _grid: GridContainer
 var _upgrade_grid: GridContainer
@@ -45,13 +46,13 @@ func _init() -> void:
 	var title := _label("Conseil hacking", TITLE_SIZE, TEXT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	var close := Button.new()
-	close.text = "Fermer"
-	close.focus_mode = Control.FOCUS_NONE
-	close.add_theme_font_size_override("font_size", CELL_SIZE)
+	var close := _button("Fermer")
 	close.pressed.connect(func() -> void: visible = false)
 	header.add_child(close)
 
+	_objectives = HBoxContainer.new()
+	_objectives.add_theme_constant_override("separation", 8)
+	column.add_child(_objectives)
 	_summary = _label("", SUMMARY_SIZE, TEXT)
 	_wrap(_summary)
 	column.add_child(_summary)
@@ -68,30 +69,44 @@ func show_message(text: String) -> void:
 	visible = true
 	_summary.text = text
 	_note.text = ""
-	_fill(_grid, [], [])
-	_fill(_upgrade_grid, [], [])
+	_clear(_objectives)
+	_fill(_grid, {"rows": [], "kinds": []})
+	_fill(_upgrade_grid, {"rows": [], "kinds": []})
 
 
-## rows are lists of cells; kinds gives each row's color: "header", "current", "best", "muted" or "".
-func show_tables(summary: String, rows: Array, kinds: Array, upgrade_rows: Array, upgrade_kinds: Array, note: String) -> void:
+## tables hold rows, lists of cells, and kinds, each row's color: "header", "current", "best", "muted" or "".
+func show_advice(options: Array[Dictionary], selected: String, on_select: Callable, advice: String, connections: Dictionary, purchases: Dictionary, note: String) -> void:
 	visible = true
-	_summary.text = summary
+	_summary.text = advice
 	_note.text = note
-	_fill(_grid, rows, kinds)
-	_fill(_upgrade_grid, upgrade_rows, upgrade_kinds)
+	_clear(_objectives)
+	_objectives.add_child(_label("Objectif :", CELL_SIZE, MUTED))
+	for option: Dictionary in options:
+		var button := _button(option.label)
+		if option.key == selected:
+			button.add_theme_color_override("font_color", GOOD)
+			button.add_theme_color_override("font_hover_color", GOOD)
+		button.pressed.connect(on_select.bind(option.key))
+		_objectives.add_child(button)
+	_fill(_grid, connections)
+	_fill(_upgrade_grid, purchases)
 
 
-func _fill(grid: GridContainer, rows: Array, kinds: Array) -> void:
-	for child: Node in grid.get_children():
-		grid.remove_child(child)
-		child.queue_free()
-	grid.visible = rows.size() > 1
-	if rows.is_empty():
+func _fill(grid: GridContainer, table: Dictionary) -> void:
+	_clear(grid)
+	grid.visible = table.rows.size() > 1
+	if table.rows.is_empty():
 		return
-	grid.columns = rows[0].size()
-	for index: int in rows.size():
-		for cell: String in rows[index]:
-			grid.add_child(_label(cell, CELL_SIZE, _color(kinds[index])))
+	grid.columns = table.rows[0].size()
+	for index: int in table.rows.size():
+		for cell: String in table.rows[index]:
+			grid.add_child(_label(cell, CELL_SIZE, _color(table.kinds[index])))
+
+
+func _clear(node: Node) -> void:
+	for child: Node in node.get_children():
+		node.remove_child(child)
+		child.queue_free()
 
 
 func _color(kind: String) -> Color:
@@ -115,6 +130,14 @@ func _new_grid() -> GridContainer:
 func _wrap(label: Label) -> void:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = WIDTH
+
+
+func _button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", CELL_SIZE)
+	return button
 
 
 func _label(text: String, size: int, color: Color) -> Label:

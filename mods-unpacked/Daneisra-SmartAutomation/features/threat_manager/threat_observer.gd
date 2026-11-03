@@ -15,8 +15,14 @@ const GapProbe := preload("gap_probe.gd")
 const GapStats := preload("gap_stats.gd")
 const ThreatActuator := preload("threat_actuator.gd")
 const AutomationControl := preload("automation_control.gd")
+const LevelChoice := preload("level_choice.gd")
+const HitLog := preload("../hacking_advisor/hit_log.gd")
+const HackingGraph := preload("../hacking_advisor/hacking_graph.gd")
+const HackingModel := preload("../hacking_advisor/hacking_model.gd")
 
-const WATCHED_WINDOWS: Array[String] = ["breach_corps", "breach_government"]
+## From this chance, measured on the hits really seen, a level is worth a real try. Below, a try only costs attacks.
+const TRIAL_CHANCE := 0.3
+
 const RESCAN_TICKS := 100
 const DISTRIBUTION_REPORT_EVERY := 50
 const RELIABILITY_REPORT_EVERY := 200
@@ -30,18 +36,24 @@ const EVENT_FIELDS: Array[String] = [
 	"sim_dist", "sim_p", "sim_next_volleys", "sim_next_dist", "sim_next_p", "sim_trusted", "sim_reasons", "next_source", "formula_ok", "native_matches",
 	"max_time", "max_firewall", "max_breach", "damage_rate", "vulnerability", "breach_variation", "infection_variation",
 	"infection_rate", "infection_offset", "interval", "tick_speed",
-	"infection_start", "infection_end", "infection_integral", "dealt_total", "complete", "observed_start",
-	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "trace",
+	"infection_start", "infection_end", "infection_integral", "infection_growth", "infection_pulses", "infection_gain", "dealt_total", "complete", "observed_start",
+	"threshold", "progress_age", "clues", "reason", "steps", "max_step", "mean_step", "real_seconds", "outputs", "trace",
 ]
+## The slots an attack feeds: its own damage inputs are left out.
+const ATTACK_SLOTS: Array[String] = ["breach_damage", "infection_damage", "vulnerability"]
 const TRACED_EVENTS_PER_TYPE := 12
 const FORECAST_TOLERANCE := 0.15
 const FORECAST_CACHE_SIZE := 64
 const SAVE_CANDIDATE := "(?i)save|slot|profile|file"
 const SAVE_NODES_LOGGED := 12
 ## Read-only getters called with one level argument; each is checked before use.
+## A plain level, to read what targets demand whatever level they hold.
+const REFERENCE_LEVEL := 1
 const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "get_max_time", "is_elite"]
+## What a level pays, read the same way. Without them the regulation keeps aiming at the highest level.
+const REWARD_GETTERS: Array[String] = ["get_reward", "get_experience_reward"]
 ## Only reported as present or absent: this version must never call them.
-const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level", "get_reward", "get_experience_reward"]
+const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level"]
 const BLOCK_TEXTS := {
 	"emergency_stop": "arrêt d'urgence, jusqu'au redémarrage du jeu",
 	"native_option": "option native de montée automatique active",
@@ -96,6 +108,13 @@ var _observed_hits: Dictionary = {}
 var _level_scans: Dictionary = {}
 var _last_signatures: Dictionary = {}
 var _last_hold_reason: Dictionary = {}
+var _hit_log: HitLog = HitLog.new()
+var _advice_action := Callable()
+## The objective chosen in the panel: the regulation aims at the level that brings the most for it.
+var _objective := LevelChoice.BALANCED
+## Per type: each level's chance and rewards at the current power, measured one level a tick.
+var _profit_tables: Dictionary = {}
+var _last_choice: Dictionary = {}
 var _gap_probe := false
 var _gap_stats: GapStats
 var _hooks: Array[FrameHook] = []
@@ -120,10 +139,31 @@ func _new_actuator(armed: bool) -> ThreatActuator:
 	})
 
 
-## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
 ## The attack interval last seen for each type: the advisor has no other way to know it.
 func attack_intervals() -> Dictionary:
 	return _last_intervals
+
+
+## What attacks really did, by chain. It survives restarting the observer, like the player's chain.
+func hit_log() -> HitLog:
+	return _hit_log
+
+
+## The game's own bit for stealth damage, 0 when it does not say.
+func stealth_mask() -> int:
+	return _stealth_mask
+
+
+## Set before start: the nodes then get a button for it.
+func set_advice_action(action: Callable) -> void:
+	_advice_action = action
+
+
+## regulation.mode is off, dry_run or active. Anything else means off: nothing acts by accident.
+func set_objective(objective: String) -> void:
+	if objective != _objective:
+		_objective = objective
+		_log.info("objective_selected objective=%s" % objective)
 
 
 func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulation: Dictionary = {}, gap_probe: bool = false) -> void:
@@ -241,7 +281,8 @@ func _scan_desktop() -> void:
 func _bind_window(window: Variant) -> void:
 	if not is_instance_valid(window) or not window is Node or not "window" in window:
 		return
-	if not window.window in WATCHED_WINDOWS or not window.is_node_ready():
+	# A target is known by what it exposes: any attack node qualifies, whatever its name.
+	if not ApiGuard.is_breach_like(window) or not window.is_node_ready():
 		return
 	var id: int = window.get_instance_id()
 	if _trackers.has(id) or _rejected.has(id):
@@ -258,6 +299,7 @@ func _bind_window(window: Variant) -> void:
 		"classifier": BreachClassifier.new(_starvation_ratio),
 		"getters": _usable_getters(signatures),
 		"native_usable": signatures.get("level_up", -1) == 1 and signatures.get("level_down", -1) == 1,
+		"reward_getters": REWARD_GETTERS.all(func(getter: String) -> bool: return signatures.get(getter, -1) == 1),
 	}
 	_log_native_actions(window)
 	_attach_control(_trackers[id])
@@ -286,6 +328,7 @@ func _on_tick() -> void:
 		_log_new_halt()
 	if _gap_stats != null:
 		_note_probe_tick()
+	_advance_profit_tables()
 	for id: int in _trackers.keys():
 		var tracker: Dictionary = _trackers[id]
 		if not is_instance_valid(tracker.window):
@@ -365,6 +408,7 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			_probe_result(tracker, event)
 		_count_reliability(type, event.event)
 		if event.event == "success":
+			event.outputs = _outputs(tracker.window)
 			event.next_ratio = BreachPrediction.next_ratio(event.ratio, event.level)
 			event.merge(BreachPrediction.volley_model(event))
 			_add_simulation(tracker, event)
@@ -372,11 +416,22 @@ func _report(tracker: Dictionary, events: Array[Dictionary]) -> void:
 			_compare_native(tracker, event)
 		_limit_trace(type, event)
 		_log.info(_format(type, event))
+		_note_hits(tracker, event)
 		if event.event == "success":
 			_check_prediction(type, event)
 			_record_distribution(type, event)
 		if _regulation.mode != "off":
 			_regulate(tracker, event)
+
+
+## The chain is read again at each attack: a rewired node must not mix with the measures of the old chain.
+func _note_hits(tracker: Dictionary, event: Dictionary) -> void:
+	if not event.get("complete", false) or not event.event in ["success", "failure_power"] or not is_instance_valid(tracker.window):
+		return
+	var graph := HackingGraph.snapshot(_globals.desktop)
+	tracker.chain_key = HackingGraph.chain_key(graph, tracker.window, _attributes)
+	tracker.infection_key = HackingGraph.chain_key(graph, tracker.window, _attributes, HackingGraph.INFECTION_SLOT)
+	_hit_log.add(tracker.type, tracker.chain_key, event, tracker.infection_key)
 
 
 func _start_probe() -> void:
@@ -592,6 +647,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		return
 
 	var profile := PowerProfile.from_event(event, _last_intervals.get(type, 0.0))
+	profile.signature = _with_target_rules(tracker, profile.signature)
 	if profile.interval > 0.0 and event.complete:
 		_last_intervals[type] = profile.interval
 	_apply_observed_hits(type, event, profile)
@@ -613,7 +669,11 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		"event": event.event, "complete": event.complete, "level": event.level,
 		"max_level": event.max_level, "signature": profile.signature,
 	}
-	if event.complete and event.event == "success":
+	var choice := _profit_choice(tracker, profile, regulator, event) if event.complete else {}
+	if event.complete and event.event == "success" and not choice.is_empty():
+		attack.profitable_level = choice.profitable
+		attack.unlock_level = choice.unlock
+	elif event.complete and event.event == "success":
 		var best := _best_raise(tracker, profile, regulator, event)
 		if best > event.level:
 			attack.best_level = best
@@ -621,7 +681,8 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 		else:
 			attack.probe_possible = _may_work(tracker, profile, event)
 	elif event.complete and event.event == "failure_power":
-		attack.target_down = _best_lower(tracker, profile, regulator, event)
+		var profitable: int = choice.get("profitable", -1)
+		attack.target_down = profitable if profitable >= 0 and profitable < event.level else _best_lower(tracker, profile, regulator, event)
 	var decision := regulator.on_attack(attack, current, next)
 	var assumed := next
 	if decision.decision != "hold":
@@ -645,7 +706,9 @@ func _handle_action(tracker: Dictionary, event: Dictionary, decision: Dictionary
 	var type: String = tracker.type
 	if _actuator.has_pending(type):
 		var direction := _actuator.pending_direction()
-		if (direction == "raise" and event.event == "failure_power") or (direction == "lower" and event.event == "success"):
+		# A lower chosen for what a level brings does not wait for a failure, and a success does not contradict it.
+		var by_choice := _actuator.pending_by_choice()
+		if (direction == "raise" and event.event == "failure_power") or (direction == "lower" and event.event == "success" and not by_choice):
 			_cancel_action(type, "contradicted_by_attack")
 	if decision.decision != "hold":
 		var power := {"damage_rate": event.damage_rate, "infection_rate": event.infection_rate, "vulnerability": event.vulnerability}
@@ -784,7 +847,7 @@ func _attach_control(tracker: Dictionary) -> void:
 		parent.remove_child(old)
 		old.queue_free()
 	var control := AutomationControl.new()
-	control.setup(source, _on_control_pressed.bind(tracker.type))
+	control.setup(source, _on_control_pressed.bind(tracker.type), _advice_action)
 	parent.add_child(control)
 	tracker.control = control
 	control.show_state(_automation_view(tracker.type))
@@ -936,23 +999,111 @@ func _level_scan(tracker: Dictionary, profile: Dictionary, margin: float, top: i
 	return scan
 
 
+## The hits and the infection measured on the chain, and whether attacks can be drawn from them.
+## What infection does is in its measure. An unknown effect on the payload, or a game that does not name
+## stealth, leaves a real trial to decide.
+func _chain_measure(tracker: Dictionary, profile: Dictionary) -> Dictionary:
+	var hits := _hit_log.multipliers(tracker.get("chain_key", ""))
+	var infection := _hit_log.infection(tracker.get("infection_key", ""))
+	var unknown_effect: bool = (profile.breach_variation & ~_stealth_mask) != 0 or (_stealth_mask == 0 and profile.infection_variation != 0)
+	var enough: bool = hits.size() >= HackingModel.MIN_HITS and (profile.infection_rate <= 0.0 or infection.pulses >= HackingModel.MIN_PULSES)
+	return {"hits": hits, "infection": infection, "measured": enough, "usable": enough and profile.interval > 0.0 and not unknown_effect}
+
+
+func _level_outcome(profile: Dictionary, target: Dictionary, measure: Dictionary) -> Dictionary:
+	var model := HackingModel.new({"time_factor": 1.0})
+	return model.attack_outcome(target, profile.announced_rate * profile.interval, profile.infection_rate * profile.interval, 1.0 + profile.vulnerability, measure.hits, profile.interval, (profile.breach_variation & _stealth_mask) != 0, (profile.infection_variation & _stealth_mask) != 0, measure.infection)
+
+
+## The level that brings the most for the objective, and the level to win to open the next one.
+## {} when the chain is not measured or the game does not tell the rewards: the highest level is then aimed at.
+## profitable is -1 while the levels are being measured, which keeps the level where it is.
+func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatRegulator, event: Dictionary) -> Dictionary:
+	if not tracker.get("reward_getters", false) or tracker.getters.values().has(false):
+		return {}
+	var measure := _chain_measure(tracker, profile)
+	if not measure.usable:
+		return {}
+	# The measure is kept as it was when it became enough: an attack must not pay for a new table.
+	var key := "%s|%s|%s" % [tracker.type, profile.signature, profile.interval]
+	var table: Dictionary = _profit_tables.get(tracker.type, {})
+	if table.get("key", "") != key:
+		table = {"key": key, "window": tracker.window, "profile": profile, "measure": measure, "levels": {}, "next": maxi(_regulation.min_level, 0), "top": event.max_level}
+		_profit_tables[tracker.type] = table
+	table.top = maxi(table.top, event.max_level)
+	if table.next <= table.top:
+		return {"profitable": -1, "unlock": -1}
+	var reachable := {}
+	for level: int in table.levels:
+		if level >= _regulation.min_level and level <= event.max_level and regulator.can_reach(level):
+			reachable[level] = table.levels[level]
+	var profitable := LevelChoice.profitable(reachable, _objective, tracker.type, regulator.required_success())
+	if profitable < 0:
+		return {}
+	var trial: float = TRIAL_CHANCE if regulator.allows_trials() else regulator.required_success()
+	var choice := {"profitable": profitable, "unlock": LevelChoice.to_unlock(reachable, event.level, event.max_level, trial)}
+	var text := "%s|%d|%d" % [_objective, choice.profitable, choice.unlock]
+	if _last_choice.get(tracker.type, "") != text:
+		_last_choice[tracker.type] = text
+		_log.info("level_choice type=%s objective=%s level=%d profitable=%d unlock=%d" % [tracker.type, _objective, event.level, choice.profitable, choice.unlock])
+	return choice
+
+
+## One level a tick over all types: a level costs up to some milliseconds, and the game must not stutter.
+func _advance_profit_tables() -> void:
+	for type: String in _profit_tables.keys():
+		var table: Dictionary = _profit_tables[type]
+		if table.next > table.top:
+			continue
+		if not is_instance_valid(table.window):
+			_profit_tables.erase(type)
+			return
+		var level: int = table.next
+		table.next += 1
+		var target := _native_values({"window": table.window, "getters": {}}, level)
+		var reward: Variant = table.window.get_reward(level)
+		var xp: Variant = table.window.get_experience_reward(level)
+		if not target.is_empty() and (reward is float or reward is int) and (xp is float or xp is int):
+			var outcome := _level_outcome(table.profile, target, table.measure)
+			table.levels[level] = {"chance": outcome.chance, "cycle": outcome.cycle, "reward": float(reward), "xp": float(xp)}
+		if table.next > table.top:
+			_log_profit_table(type, table)
+		return
+
+
+func _log_profit_table(type: String, table: Dictionary) -> void:
+	var parts := PackedStringArray()
+	for level: int in table.levels:
+		var entry: Dictionary = table.levels[level]
+		if entry.chance > 0.0:
+			var brought := LevelChoice.rates(entry)
+			parts.append("%d:%.2f:%.2f:%s:%s" % [level, entry.chance, entry.cycle, _format_value(brought.reward), _format_value(brought.xp)])
+	_log.info("profit_levels type=%s top=%d levels=%s" % [type, table.top, ";".join(parts)])
+
+
 ## Could the next level work with some luck? Strong hits count for a quarter of the gap above the lowest.
 func _may_work(tracker: Dictionary, profile: Dictionary, event: Dictionary) -> bool:
 	var seen: Dictionary = _observed_hits.get(tracker.type, {})
-	var key := "may|%s|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, event.level, profile.interval, seen.get("lowest", -1.0), seen.get("highest", 0.0)]
+	# Once enough hits are known, the answer holds for this power: an attack must not pay for a new calculation.
+	var measure := _chain_measure(tracker, profile)
+	var key := "may|%s|%s|%s|%s|%s" % [tracker.type, profile.signature, event.level, profile.interval, "measured" if measure.measured else "%s|%s" % [seen.get("lowest", -1.0), seen.get("highest", 0.0)]]
 	if _level_scans.has(key):
 		return _level_scans[key]
 	if _level_scans.size() >= FORECAST_CACHE_SIZE:
 		_level_scans.clear()
 	var answer := false
 	var target := _native_values(tracker, event.level + 1)
-	if not target.is_empty() and event.level + 1 <= event.max_level:
+	if not target.is_empty() and event.level + 1 <= event.max_level and measure.usable:
+		answer = _level_outcome(profile, target, measure).chance >= TRIAL_CHANCE
+	elif not target.is_empty() and event.level + 1 <= event.max_level:
 		var hopeful := profile.duplicate()
 		hopeful.erase("hit_spread")
 		if profile.get("hit_spread", false) and seen.get("lowest", -1.0) > 0.0 and profile.interval > 0.0:
 			hopeful.damage_rate = (seen.lowest + (seen.highest - seen.lowest) * 0.25) / profile.interval
 		var result := BreachForecast.forecast(hopeful, target, 0.0)
-		answer = result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
+		# Without a forecast, whatever the reason, a real trial decides: the way back exists. Only having no damage at all rules it out.
+		var unknown: bool = result.status == "invalid" and not result.reasons.has("no_damage") and not result.reasons.has("low_hit")
+		answer = unknown or result.status == "uncertain" or (result.status == "reliable" and result.p_success >= 0.5)
 	_level_scans[key] = answer
 	return answer
 
@@ -1250,6 +1401,15 @@ func _usable_getters(signatures: Dictionary) -> Dictionary:
 
 
 ## Exact values of a level according to the game. Returns {} unless every getter is usable.
+## A purchase can change what a target demands while the power stays the same: more time to attack, say.
+## That is a new situation too. The reference level never moves, so that climbing changes nothing here.
+func _with_target_rules(tracker: Dictionary, signature: String) -> String:
+	var rules := _native_values(tracker, REFERENCE_LEVEL)
+	if rules.is_empty():
+		return signature
+	return "%s|%.3f|%.3f|%.3f" % [signature, rules.firewall, rules.breach, rules.time]
+
+
 func _native_values(tracker: Dictionary, level: int) -> Dictionary:
 	if tracker.getters.values().has(false):
 		return {}
@@ -1269,7 +1429,7 @@ func _matches(a: float, b: float) -> bool:
 func _log_native_methods(type: String, signatures: Dictionary) -> void:
 	var found := PackedStringArray()
 	var absent := PackedStringArray()
-	for method: String in NATIVE_GETTERS + NATIVE_REPORTED:
+	for method: String in NATIVE_GETTERS + REWARD_GETTERS + NATIVE_REPORTED:
 		if signatures.has(method):
 			found.append("%s/%d" % [method, signatures[method]])
 		else:
@@ -1309,6 +1469,25 @@ func _format(type: String, event: Dictionary) -> String:
 		if event.has(field):
 			parts.append("%s=%s" % [field, _format_value(event[field])])
 	return " ".join(parts)
+
+
+## What the target gives, as the game shows it on its outputs: resource, rate and stock. Read only, to check
+## what an elite level really brings against an ordinary one.
+func _outputs(window: Variant) -> String:
+	if not is_instance_valid(window) or not window.get("containers") is Array:
+		return ""
+	var skipped := []
+	for name: String in ATTACK_SLOTS:
+		skipped.append(window.get(name))
+	var parts := PackedStringArray()
+	for slot: Variant in window.containers:
+		if not is_instance_valid(slot) or skipped.has(slot):
+			continue
+		var production: Variant = slot.get("production")
+		var count: Variant = slot.get("count")
+		if (production is float or production is int) and (count is float or count is int):
+			parts.append("%s:%s:%s" % [slot.get("resource"), _format_value(float(production)), _format_value(float(count))])
+	return ",".join(parts)
 
 
 func _format_value(value: Variant) -> String:

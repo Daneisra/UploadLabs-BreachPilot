@@ -16,6 +16,11 @@ const CONTINUOUS_MARGIN := 1.5
 const EPSILON_DAMAGE := 1e-6
 const TRACE_POINTS := 64
 const TRACE_STEP := 0.25
+## Ticks needed to tell how the infection moves by itself.
+const MIN_GROWTH_STEPS := 10
+## What the infection must gain beyond its own growth, in points and as a share of itself, to be a shot's doing.
+const GAIN_FLOOR := 1.0
+const GAIN_NOISE := 0.002
 
 var state: State = State.UNBOUND
 
@@ -181,12 +186,15 @@ func _open_cycle(sample: Dictionary, partial: bool) -> void:
 		"min_hit": -1.0,
 		"max_hit": -1.0,
 		"low_hit": -1.0,
+		"hits": PackedFloat32Array(),
 		"last_breached": sample.breached,
 		"breach_variation": sample.breach_variation,
 		"infection_variation": sample.infection_variation,
 		"infection_start": sample.infection_count,
 		"infection_end": sample.infection_count,
 		"infection_integral": 0.0,
+		"infection_counts": PackedFloat64Array([sample.infection_count]),
+		"infection_steps": PackedFloat64Array([0.0]),
 		"last_progress": _dealt(sample),
 		"last_progress_time": sample.time,
 		"max_step": 0.0,
@@ -208,6 +216,8 @@ func _update_cycle(sample: Dictionary) -> void:
 		_cycle.step_sum += step
 		_cycle.steps += 1
 		_cycle.infection_integral += sample.infection_count * step
+		_cycle.infection_counts.append(sample.infection_count)
+		_cycle.infection_steps.append(step)
 	_cycle.breach_variation |= sample.breach_variation
 	_cycle.infection_variation |= sample.infection_variation
 	_cycle.infection_end = sample.infection_count
@@ -248,6 +258,35 @@ func _note_volley(sample: Dictionary) -> void:
 	_cycle.last_volley_time = sample.time
 
 
+## What the infection really does, whatever the node behind it: how fast it moves by itself, and what shots add.
+## Most ticks see no shot, so the low quarter of the changes is the infection left to itself.
+func _set_infection_measure(event: Dictionary) -> void:
+	var counts: PackedFloat64Array = _cycle.infection_counts
+	var steps: PackedFloat64Array = _cycle.infection_steps
+	var rates := PackedFloat64Array()
+	for index: int in range(1, counts.size()):
+		if counts[index - 1] > 0.0 and counts[index] > 0.0:
+			rates.append(log(counts[index] / counts[index - 1]) / steps[index])
+	if rates.size() < MIN_GROWTH_STEPS:
+		return
+	rates.sort()
+	var growth: float = rates[rates.size() / 4]
+	var gains := PackedFloat32Array()
+	if counts[0] > 0.0 and not _cycle.partial:
+		gains.append(counts[0])
+	var total: float = counts[0] if counts[0] > 0.0 and not _cycle.partial else 0.0
+	for index: int in range(1, counts.size()):
+		var kept: float = counts[index - 1] * exp(growth * steps[index])
+		if counts[index] - kept > GAIN_FLOOR + GAIN_NOISE * kept:
+			gains.append(counts[index] - kept)
+			total += counts[index] - kept
+	event.infection_growth = growth
+	event.infection_gains = gains
+	event.infection_pulses = gains.size()
+	if not gains.is_empty():
+		event.infection_gain = total / gains.size()
+
+
 ## Keeps time:infection:firewall:breached points, to compare infection with a model afterwards.
 func _record_trace(sample: Dictionary) -> void:
 	if sample.infection_count <= 0.0 or sample.time > _cycle.trace_next_time or _cycle.trace.size() >= TRACE_POINTS:
@@ -274,12 +313,15 @@ func _record_hit(sample: Dictionary) -> void:
 	_cycle.last_breached = sample.breached
 	if not _is_volley(sample, delta):
 		return
-	var hit := delta - _continuous_damage(sample)
+	# Infection still eating the firewall is not on the breach bar: the whole rise is the hit.
+	var on_firewall: bool = sample.firewall > 0.0 and not _previous.is_empty() and sample.firewall < _previous.firewall
+	var hit: float = delta if on_firewall else delta - _continuous_damage(sample)
 	_cycle.min_hit = hit if _cycle.min_hit < 0.0 else minf(_cycle.min_hit, hit)
 	_cycle.max_hit = maxf(_cycle.max_hit, hit)
 	# A hit that empties the bar is cut to what was left: it says nothing about the hit's real size.
 	if sample.breached < sample.max_breach - EPSILON_DAMAGE:
 		_cycle.low_hit = hit if _cycle.low_hit < 0.0 else minf(_cycle.low_hit, hit)
+		_cycle.hits.append(hit)
 
 
 func _set_hits(event: Dictionary) -> void:
@@ -288,6 +330,7 @@ func _set_hits(event: Dictionary) -> void:
 		event.max_hit = _cycle.max_hit
 	if _cycle.low_hit >= 0.0:
 		event.low_hit = _cycle.low_hit
+		event.hits = _cycle.hits
 
 
 func _base_event(event_name: String, sample: Dictionary) -> Dictionary:
@@ -307,6 +350,7 @@ func _base_event(event_name: String, sample: Dictionary) -> Dictionary:
 		event.infection_end = _cycle.infection_end
 		event.infection_integral = _cycle.infection_integral
 		event.dealt_total = _dealt(sample)
+		_set_infection_measure(event)
 	if not _cycle.trace.is_empty():
 		event.trace = ";".join(_cycle.trace)
 	return event

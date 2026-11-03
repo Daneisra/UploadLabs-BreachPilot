@@ -1,21 +1,26 @@
 extends Node
-## Ctrl+Alt+F8: compares the ways of connecting the hacking chain, and what each purchase would bring.
-## Read-only: the player decides.
+## The Conseil button on the nodes, or Ctrl+Alt+F8: advice on the hacking chain for a chosen objective.
+## Read-only: the player decides. Nothing it cannot explain may stop the rest of the mod.
 
 const HackingChain := preload("hacking_chain.gd")
 const HackingModel := preload("hacking_model.gd")
 const HackingUpgrades := preload("hacking_upgrades.gd")
+const HackingAdvice := preload("hacking_advice.gd")
 const AdvisorPanel := preload("advisor_panel.gd")
+const LevelChoice := preload("../threat_manager/level_choice.gd")
 
 const ERROR_TEXTS := {
 	"no_desktop": "Aucune partie en cours.",
-	"chain_shape": "Il faut une seule Interface de hacking, un seul Lanceur Payload, et au plus une infection, un Payload critique et un nœud par cible.",
 	"no_target": "Aucun nœud d'infiltration trouvé.",
-	"no_payload": "Aucune cible ne reçoit de Payload : rien à comparer pour l'instant.",
-	"no_attack_seen": "Le mod n'a pas encore vu d'attaque : réessayez dans quelques secondes.",
 }
-const REWARD_NAMES := {"breach_corps": "Données", "breach_government": "Renseign."}
-const SHORT_NAMES := {"breach_corps": "E", "breach_government": "G", "breach_bank": "B", "breach_anonymous": "A"}
+const INSUFFICIENT_TEXTS := {
+	HackingModel.REASON_HITS: "pas encore assez de coups mesurés sur cette chaîne",
+	HackingModel.REASON_INTERVAL: "pas encore d'attaque vue",
+	HackingModel.REASON_UNMEASURED: "effet nouveau sur cette chaîne, aucune attaque ne l'a encore montré",
+}
+const CHANCE_NOT_FOLLOWED := "effet non chiffré"
+## How often an open panel looks at the chain. A second is quick enough for a player plugging a cable.
+const REFRESH_SECONDS := 1.0
 
 var _log: Variant
 var _observer: Variant
@@ -24,8 +29,14 @@ var _chain: Dictionary
 var _model: HackingModel
 var _pending: Array[Dictionary] = []
 var _rows: Array[Dictionary] = []
+var _current: Dictionary
 var _upgrades: Array[Dictionary] = []
 var _upgrade_rows: Array[Dictionary] = []
+var _shown_state := ""
+var _computing := false
+var _since_check := 0.0
+## Kept for the session: the player's choice should survive closing the panel.
+var _objective := HackingAdvice.BALANCED
 
 
 func configure(logger: Variant, observer: Variant) -> void:
@@ -40,182 +51,311 @@ func _ready() -> void:
 
 
 func toggle() -> void:
-	set_process(false)
 	if _panel.visible:
 		_panel.visible = false
+		set_process(false)
 		return
 	_panel.show_message("Calcul en cours…")
+	_shown_state = ""
+	set_process(true)
+	_look_at_chain()
+
+
+## Starts a calculation when the chain changed. What is shown stays until the new figures are ready.
+func _look_at_chain() -> void:
+	_since_check = 0.0
 	var root := get_tree().root
-	_chain = HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), root.get_node("Attributes"))
-	if _chain.error != "":
-		_log.info("advisor_compare result=%s" % _chain.error)
-		_panel.show_message(ERROR_TEXTS.get(_chain.error, _chain.error))
+	var chain := HackingChain.read(root.get_node("Globals").desktop, _observer.attack_intervals(), _observer.hit_log(), root.get_node("Attributes"), root.get_node("Data"), _observer.stealth_mask())
+	chain.objective = _objective
+	var upgrades := HackingUpgrades.read(root)
+	var state := _state_of(chain, upgrades)
+	if state == _shown_state:
 		return
+	_shown_state = state
+	if chain.error != "":
+		_computing = false
+		_log.info("advisor_compare result=%s" % chain.error)
+		_panel.show_message(ERROR_TEXTS.get(chain.error, chain.error))
+		return
+	_chain = chain
 	_model = HackingModel.new(_chain)
 	_pending = _model.scenarios()
 	_rows = []
-	_upgrades = HackingUpgrades.read(root)
+	_upgrades = upgrades
 	_upgrade_rows = []
-	set_process(true)
+	_computing = true
+
+
+## Only what the player changes: the connections, the power, a purchase becoming possible, a measure
+## becoming sufficient, and the objective, which picks the levels. What moves by itself, like hits piling
+## up or research growing, must not recalculate.
+func _state_of(chain: Dictionary, upgrades: Array[Dictionary]) -> String:
+	if chain.error != "":
+		return chain.error
+	var parts := PackedStringArray([_objective, str(chain.current)])
+	for key: String in chain.targets:
+		var target: Dictionary = chain.targets[key]
+		parts.append("%s:%d:%s" % [key, target.max_level, target.chain_key])
+	for stream: Dictionary in chain.streams.values():
+		parts.append("%s:%.1f:%s:%s:%d" % [stream.id, stream.production, stream.multipliers.size() >= HackingModel.MIN_HITS, stream.get("infection", {}).get("pulses", 0) >= HackingModel.MIN_PULSES, stream.get("effects_seen", 0)])
+	for upgrade: Dictionary in upgrades:
+		parts.append("%s:%.0f:%s" % [upgrade.name, upgrade.cost, upgrade.affordable])
+	return "|".join(parts)
 
 
 ## One calculation per frame: the game must not stutter for a panel.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _panel.visible:
 		set_process(false)
+		return
+	if not _computing:
+		_since_check += delta
+		if _since_check >= REFRESH_SECONDS:
+			_look_at_chain()
 		return
 	if not _pending.is_empty():
 		_rows.append(_model.evaluate(_pending.pop_back()))
 		return
 	if _upgrade_rows.size() < _upgrades.size():
-		var upgrade: Dictionary = _upgrades[_upgrade_rows.size()]
-		var model := HackingModel.new(HackingUpgrades.apply(_chain, upgrade.changes))
-		_upgrade_rows.append({"upgrade": upgrade, "row": model.evaluate(_model.current_scenario())})
+		_upgrade_rows.append(_evaluate_upgrade(_upgrades[_upgrade_rows.size()]))
 		return
-	set_process(false)
-	_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.xp_rate > b.xp_rate)
-	var problems := _model.chain_problems()
-	var current := _model.evaluate(_model.current_scenario())
-	_upgrade_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _gain_per_cost(a, current) > _gain_per_cost(b, current))
-	_log_rows(current, problems)
-	_show(current, problems)
+	_computing = false
+	_current = _model.evaluate(_model.current_scenario())
+	_log_rows()
+	_render()
 
 
-func _show(current: Dictionary, problems: PackedStringArray) -> void:
-	var types: Array = _chain.targets.keys()
-	var header := ["", "Payload vers", "Infection vers"]
-	for type: String in types:
-		header.append(_chain.targets[type].label)
-	header.append("XP/min")
-	for type: String in types:
-		header.append("%s/min" % REWARD_NAMES.get(type, _chain.targets[type].label))
-	var table: Array = [header]
-	var kinds: Array = ["header"]
-	for picked: Dictionary in _picked_rows(current, types):
-		var row: Dictionary = picked.row
-		var cells := [picked.label, _names(row.scenario.payload), _names(row.scenario.infection)]
-		for type: String in types:
-			cells.append(_level_text(row.targets[type]))
-		cells.append(_with_change(row.xp_rate, current.xp_rate, picked.kind == "current"))
-		for type: String in types:
-			cells.append(_with_change(row.targets[type].reward_rate, current.targets[type].reward_rate, picked.kind == "current"))
-		table.append(cells)
-		kinds.append(picked.kind)
-
-	var upgrade_table: Array = [["Achat", "Coût", "Niveaux", "XP/min", "Gain XP"]]
-	var upgrade_kinds: Array = ["header"]
-	for item: Dictionary in _upgrade_rows:
-		var levels := PackedStringArray()
-		for type: String in types:
-			levels.append("%s %d" % [SHORT_NAMES[type], item.row.targets[type].level])
-		upgrade_table.append([item.upgrade.name, item.upgrade.cost_text, ", ".join(levels), _number(item.row.xp_rate), _percent(item.row.xp_rate, current.xp_rate)])
-		upgrade_kinds.append("" if item.upgrade.affordable else "muted")
-
-	_panel.show_tables(_summary(current, problems), table, kinds, upgrade_table, upgrade_kinds, _note())
+func _evaluate_upgrade(upgrade: Dictionary) -> Dictionary:
+	var item := {"upgrade": upgrade, "row": {}}
+	if upgrade.followed and _can_follow(upgrade):
+		item.row = HackingModel.new(HackingUpgrades.apply(_chain, upgrade.changes)).evaluate(_model.current_scenario())
+		if not item.row.insufficient.is_empty():
+			item.row = {}
+	return item
 
 
-## The player's connections, then the best for each thing a chain can bring. One row can win several titles.
-func _picked_rows(current: Dictionary, types: Array) -> Array[Dictionary]:
-	var picked: Array[Dictionary] = [{"label": "Actuel", "kind": "current", "row": current}]
-	var titles: Array = [["Meilleur XP", func(row: Dictionary) -> float: return row.xp_rate]]
-	for type: String in types:
-		var name: String = REWARD_NAMES.get(type, _chain.targets[type].label)
-		titles.append(["Meilleur %s" % name, func(row: Dictionary) -> float: return row.targets[type].reward_rate])
-	for title: Array in titles:
-		var best: Dictionary = _rows[0]
-		for row: Dictionary in _rows:
-			if title[1].call(row) > title[1].call(best):
-				best = row
-		if _model.is_current(best.scenario):
-			picked[0].label += ", " + title[0].to_lower()
-			continue
-		var found := false
-		for entry: Dictionary in picked:
-			if entry.row.scenario == best.scenario:
-				entry.label += ", " + title[0].to_lower()
-				found = true
-		if not found:
-			picked.append({"label": title[0], "kind": "best" if picked.size() == 1 else "", "row": best})
-	return picked
+func _can_follow(upgrade: Dictionary) -> bool:
+	if not upgrade.changes.has("breach_critical_chance") and not upgrade.changes.has("breach_critical_multiplier"):
+		return true
+	for stream: Dictionary in _chain.streams.values():
+		if stream.kind == "payload" and HackingUpgrades.can_follow_critical(stream.multipliers, _chain.crit_multiplier):
+			return true
+	return false
 
 
-func _summary(current: Dictionary, problems: PackedStringArray) -> String:
+## The levels depend on the objective, here as in the regulation, which follows the same choice.
+func _on_objective_selected(key: String) -> void:
+	_objective = key
+	_observer.set_objective(key)
+	_look_at_chain()
+
+
+func _render() -> void:
+	var options := HackingAdvice.objectives(_chain)
+	if not options.any(func(option: Dictionary) -> bool: return option.key == _objective):
+		_objective = HackingAdvice.BALANCED
+		_observer.set_objective(_objective)
+	_panel.show_advice(options, _objective, _on_objective_selected, _advice_text(), _connections_table(), _purchases_table(), _note())
+
+
+func _advice_text() -> String:
 	var lines := PackedStringArray()
-	if not problems.is_empty():
-		lines.append("Attention : votre chaîne ne suit pas les règles mesurées (%s). Chiffres à prendre avec prudence." % ", ".join(problems))
-	var best: Dictionary = _rows[0]
-	if _model.is_current(best.scenario):
-		lines.append("Votre branchement est déjà le meilleur pour l'XP.")
+	if not _current.insufficient.is_empty():
+		lines.append("Données insuffisantes pour conseiller : %s. Le conseil reviendra de lui-même, laissez tourner quelques attaques." % _insufficient_text(_current.insufficient))
+		return "\n".join(lines)
+	var refuted := _model.contradictions(_current)
+	if not refuted.is_empty():
+		for found: Dictionary in refuted:
+			if found.duration:
+				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %.1f s prévues, %.1f s réelles sur %d attaques." % [found.label, found.level, found.expected_used, found.real_used, found.attacks])
+			else:
+				lines.append("Le calcul ne correspond pas à ce qui est mesuré sur %s au niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks])
+		lines.append("Aucun conseil chiffré tant que ce n'est pas résolu.")
+		return "\n".join(lines)
+	var best := HackingAdvice.best_row(_rows, _current, _objective)
+	if best == _current:
+		lines.append("Branchement : gardez le vôtre, il est déjà le meilleur pour cet objectif.")
 	else:
-		lines.append("Pour plus d'XP : Payload vers %s, infection vers %s (%s XP)." % [_names(best.scenario.payload), _names(best.scenario.infection), _percent(best.xp_rate, current.xp_rate)])
-	for item: Dictionary in _upgrade_rows:
-		if item.upgrade.affordable and item.row.xp_rate > current.xp_rate:
-			lines.append("Achat le plus rentable, sur votre branchement : %s (%s, %s XP)." % [item.upgrade.name, item.upgrade.cost_text, _percent(item.row.xp_rate, current.xp_rate)])
-			break
+		var effects := HackingAdvice.effects(_chain, _current, best)
+		lines.append("Branchement : %s" % HackingAdvice.connection_text(_chain, _current, best))
+		lines.append("   Pourquoi : %s Gain : %s. Inconvénient : %s." % [HackingAdvice.why_text(_chain, _current, best), effects.gains, effects.drawbacks])
+	var by_resource := {}
+	for item: Dictionary in _ranked_purchases():
+		if item.row.is_empty() or not item.upgrade.affordable or by_resource.has(item.upgrade.resource):
+			continue
+		if HackingAdvice.gain(item.row, _current, _objective) >= HackingAdvice.MIN_GAIN:
+			by_resource[item.upgrade.resource] = item
+	if by_resource.is_empty():
+		lines.append("Achat : rien de ce que vous pouvez payer n'aide cet objectif de façon chiffrable pour l'instant.")
+	for resource: String in by_resource:
+		var item: Dictionary = by_resource[resource]
+		var effects := HackingAdvice.effects(_chain, _current, item.row, HackingUpgrades.downsides(item.upgrade.changes))
+		lines.append("Achat : %s (%s, vous en avez %s)." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held)])
+		lines.append("   Pourquoi : %s Gain : %s. Inconvénient : %s." % [HackingAdvice.why_text(_chain, _current, item.row), effects.gains, effects.drawbacks])
 	return "\n".join(lines)
+
+
+## The current connections, then the best for each objective. One row can win several titles.
+func _connections_table() -> Dictionary:
+	var keys: Array = _chain.targets.keys()
+	var header := ["", "Payload vers", "Infection vers"]
+	if _chain.current.vulnerability:
+		header.append("Vulnérabilité")
+	for key: String in keys:
+		header.append(_chain.targets[key].label)
+	header.append("XP/min")
+	for key: String in keys:
+		header.append("%s/min" % _chain.targets[key].reward_name.split(" ", false)[0])
+	header.append("Fiabilité")
+	var rows: Array = [header]
+	var kinds: Array = ["header"]
+	var picked: Array[Dictionary] = [{"titles": PackedStringArray(["Actuel"]), "row": _current}]
+	if _current.insufficient.is_empty() and _model.contradictions(_current).is_empty():
+		for option: Dictionary in HackingAdvice.objectives(_chain):
+			var best := HackingAdvice.best_row(_rows, _current, option.key)
+			var entry: Variant = null
+			for candidate: Dictionary in picked:
+				if candidate.row.scenario == best.scenario:
+					entry = candidate
+			if entry == null:
+				entry = {"titles": PackedStringArray(), "row": best}
+				picked.append(entry)
+			if option.key == _objective:
+				entry.selected = true
+			if not entry.row.current:
+				entry.titles.append(option.label)
+	for entry: Dictionary in picked:
+		var row: Dictionary = entry.row
+		var cells := [" + ".join(entry.titles), _sent_to(row.scenario.payload), _sent_to(row.scenario.infection)]
+		if _chain.current.vulnerability:
+			cells.append("gardée" if row.scenario.vulnerability else "retirée")
+		for key: String in keys:
+			cells.append(_level_text(row.targets[key]))
+		cells.append(_with_change(row.xp_rate, _current.xp_rate, row.current))
+		for key: String in keys:
+			cells.append(_with_change(row.targets[key].reward_rate, _current.targets[key].reward_rate, row.current))
+		cells.append("mesuré" if row.current else "estimé")
+		rows.append(cells)
+		kinds.append("current" if row.current else ("best" if entry.get("selected", false) else ""))
+	return {"rows": rows, "kinds": kinds}
+
+
+func _purchases_table() -> Dictionary:
+	var rows: Array = [["Achat", "Coût", "Disponible", "Niveaux", "XP/min", "Gain pour l'objectif"]]
+	var kinds: Array = ["header"]
+	var usable: bool = _current.insufficient.is_empty() and _model.contradictions(_current).is_empty()
+	for item: Dictionary in _ranked_purchases():
+		var followed: bool = usable and not item.row.is_empty()
+		var levels := PackedStringArray()
+		if followed:
+			for key: String in item.row.targets:
+				levels.append("%s %d" % [_short(key), item.row.targets[key].level])
+		rows.append([
+			item.upgrade.name, item.upgrade.cost_text, _held_text(item.upgrade),
+			", ".join(levels) if followed else "–",
+			_estimate(item.row.xp_rate) if followed else "–",
+			"%+d %%" % roundi(HackingAdvice.gain(item.row, _current, _objective) * 100.0) if followed else CHANCE_NOT_FOLLOWED,
+		])
+		kinds.append("" if item.upgrade.affordable and followed else "muted")
+	return {"rows": rows, "kinds": kinds}
+
+
+## What can be paid and is understood first, each resource together: a point and a token cannot be compared.
+func _ranked_purchases() -> Array[Dictionary]:
+	var ranked := _upgrade_rows.duplicate()
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_ready: bool = a.upgrade.affordable and not a.row.is_empty()
+		var b_ready: bool = b.upgrade.affordable and not b.row.is_empty()
+		if a_ready != b_ready:
+			return a_ready
+		if a.row.is_empty() != b.row.is_empty():
+			return b.row.is_empty()
+		if a.upgrade.resource != b.upgrade.resource:
+			return a.upgrade.resource < b.upgrade.resource
+		if a.row.is_empty():
+			return a.upgrade.name < b.upgrade.name
+		return HackingAdvice.gain(a.row, _current, _objective) / maxf(a.upgrade.cost, 1.0) > HackingAdvice.gain(b.row, _current, _objective) / maxf(b.upgrade.cost, 1.0))
+	return ranked
 
 
 func _note() -> String:
 	var levels := PackedStringArray()
-	for type: String in _chain.targets:
-		levels.append("%s %d/%d" % [_chain.targets[type].label, _chain.targets[type].level, _chain.targets[type].max_level])
-	return "Niveaux réels : %s. Estimations : attaques tirées au hasard avec les critiques du jeu. Le pourcentage est la chance de réussir une attaque. Infection vers « aucune » suppose de la débrancher aussi de l'Interface, ce qui rend sa puissance au Lanceur." % ", ".join(levels)
+	for key: String in _chain.targets:
+		levels.append("%s %d/%d" % [_chain.targets[key].label, _chain.targets[key].level, _chain.targets[key].max_level])
+	return "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Mesuré : coups réellement observés sur votre chaîne. Estimé : les mêmes coups, recalculés selon la puissance et les branchements ; une chaîne jamais jouée reste une estimation. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
 
 
-func _gain_per_cost(item: Dictionary, current: Dictionary) -> float:
-	if not item.upgrade.affordable or item.upgrade.cost <= 0.0:
-		return -1.0
-	return (item.row.xp_rate - current.xp_rate) / item.upgrade.cost
+func _insufficient_text(reasons: PackedStringArray) -> String:
+	var parts := PackedStringArray()
+	for reason: String in reasons:
+		parts.append(INSUFFICIENT_TEXTS.get(reason, reason))
+	return ", ".join(parts)
 
 
-func _names(types: Array) -> String:
-	if types.is_empty():
-		return "aucune"
+func _sent_to(assignment: Dictionary) -> String:
 	var names := PackedStringArray()
-	for type: String in types:
-		names.append(_chain.targets[type].label)
-	return " + ".join(names)
+	for key: String in assignment:
+		if assignment[key] != "":
+			names.append(_chain.targets[key].label)
+	return " + ".join(names) if not names.is_empty() else "aucune"
+
+
+func _short(key: String) -> String:
+	var words: PackedStringArray = _chain.targets[key].label.split(" ", false)
+	return words[-1].left(1) if not words.is_empty() else key
 
 
 func _level_text(target: Dictionary) -> String:
-	if target.invalid:
-		return "non mesuré"
+	if target.insufficient != "":
+		return "données insuffisantes"
 	if target.level < 0:
 		return "–"
 	return "niv. %d, %d %%" % [target.level, roundi(target.chance * 100.0)]
 
 
+func _held_text(upgrade: Dictionary) -> String:
+	if upgrade.held < 0.0:
+		return "inconnu"
+	if upgrade.affordable:
+		return _number(upgrade.held)
+	return "%s (manque %s)" % [_number(upgrade.held), _number(upgrade.cost - upgrade.held)]
+
+
 func _with_change(value: float, reference: float, is_reference: bool) -> String:
 	if is_reference or reference <= 0.0:
+		return _estimate(value)
+	return "%s (%s)" % [_estimate(value), HackingAdvice.percent(value, reference)]
+
+
+## Three significant digits: these are estimates, and the digits after those are only noise.
+func _estimate(value: float) -> String:
+	if value < 1000.0:
 		return _number(value)
-	return "%s (%s)" % [_number(value), _percent(value, reference)]
-
-
-func _percent(value: float, reference: float) -> String:
-	if reference <= 0.0:
-		return "–"
-	return "%+d %%" % roundi((value / reference - 1.0) * 100.0)
+	var scale: float = pow(10.0, floorf(log(value) / log(10.0)) - 2.0)
+	return _number(roundf(value / scale) * scale)
 
 
 func _number(value: float) -> String:
-	var whole := roundi(value)
-	if whole < 1000:
-		return str(whole)
-	return "%d %03d" % [whole / 1000, whole % 1000]
+	return HackingUpgrades.grouped(value)
 
 
-func _log_rows(current: Dictionary, problems: PackedStringArray) -> void:
-	_log.info("advisor_compare result=ok power=%s launcher_ratio=%s infection_ratio=%s crit=%s/%s others=%d interval=%s problems=%s" % [_chain.power, _chain.launcher_ratio, _chain.infection_ratio, _chain.crit_chance, _chain.crit_multiplier, _chain.other_consumers, _chain.interval, ",".join(problems)])
+func _log_rows() -> void:
+	var hits := PackedStringArray()
+	for stream: Dictionary in _chain.streams.values():
+		hits.append("%s:%s:%d" % [stream.kind, stream.window_type, stream.multipliers.size()])
+		if stream.has("infection"):
+			hits.append("pulses=%d/growth=%.4f/level=%.3f/follow=%.3f" % [stream.infection.pulses, stream.infection.growth, stream.infection.level, stream.infection.follow])
+	_log.info("advisor_compare result=ok streams=%s scenarios=%d purchases=%d refuted=%d" % [",".join(hits), _rows.size(), _upgrade_rows.size(), _model.contradictions(_model.evaluate(_model.current_scenario())).size()])
 	for row: Dictionary in _rows:
-		_log.info("advisor_row current=%s payload=%s infection=%s %s" % [row.current, ",".join(row.scenario.payload), ",".join(row.scenario.infection), _row_text(row)])
+		_log.info("advisor_row current=%s insufficient=%s %s" % [row.current, ",".join(row.insufficient), _row_text(row)])
 	for item: Dictionary in _upgrade_rows:
-		_log.info("advisor_upgrade name=%s cost=%s affordable=%s %s" % [item.upgrade.name, item.upgrade.cost, item.upgrade.affordable, _row_text(item.row)])
-	_log.info("advisor_current %s" % _row_text(current))
+		_log.info("advisor_upgrade name=%s cost=%s affordable=%s followed=%s %s" % [item.upgrade.name, item.upgrade.cost, item.upgrade.affordable, item.upgrade.followed, _row_text(item.row) if not item.row.is_empty() else "no_figure"])
+	_log.info("advisor_current %s" % _row_text(_current))
 
 
 func _row_text(row: Dictionary) -> String:
 	var parts := PackedStringArray(["xp_rate=%.0f" % row.xp_rate])
-	for type: String in row.targets:
-		var target: Dictionary = row.targets[type]
-		parts.append("%s=%d/%.2f/%.2fs/%.0f" % [type, target.level, target.chance, target.used, target.reward_rate])
+	for key: String in row.targets:
+		var target: Dictionary = row.targets[key]
+		parts.append("%s=%d/%.2f/%.2fs/%.2fs/%.0f" % [key, target.level, target.chance, target.used, target.cycle, target.reward_rate])
 	return " ".join(parts)

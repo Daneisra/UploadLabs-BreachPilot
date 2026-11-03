@@ -14,11 +14,13 @@ const COLORS := {
 
 var _label := Label.new()
 var _button := Button.new()
+var _advice_button := Button.new()
 var _shown: Dictionary = {}
 
 
 ## source gives the look of the game's own buttons. on_pressed is called once per click.
-func setup(source: Button, on_pressed: Callable) -> void:
+## on_advice, when given, adds a button opening the advice.
+func setup(source: Button, on_pressed: Callable, on_advice: Callable = Callable()) -> void:
 	name = NODE_NAME
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -31,6 +33,14 @@ func setup(source: Button, on_pressed: Callable) -> void:
 	_button.pressed.connect(on_pressed)
 	add_child(_label)
 	add_child(_button)
+	if on_advice.is_valid():
+		_advice_button.text = "Conseil"
+		_advice_button.theme_type_variation = source.theme_type_variation
+		_advice_button.custom_minimum_size.y = BUTTON_HEIGHT
+		_advice_button.add_theme_font_size_override("font_size", FONT_SIZE)
+		_advice_button.focus_mode = Control.FOCUS_NONE
+		_advice_button.pressed.connect(on_advice)
+		add_child(_advice_button)
 
 
 ## view: kind, text, button (empty for none), tooltip. Nothing is touched if it did not change.

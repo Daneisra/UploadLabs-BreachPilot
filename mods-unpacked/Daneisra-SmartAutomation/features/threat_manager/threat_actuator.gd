@@ -70,6 +70,11 @@ func pending_direction() -> String:
 	return _pending.get("direction", "")
 
 
+## The waiting action moves to a level chosen for what it brings, not away from failures.
+func pending_by_choice() -> bool:
+	return _pending.get("decision", {}).get("by_choice", false)
+
+
 ## Stops everything until the session ends. The first reason is the one kept.
 func halt(reason: String) -> void:
 	if halt_reason.is_empty():

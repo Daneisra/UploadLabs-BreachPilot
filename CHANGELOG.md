@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
+
+### Ajouté
+
+- Choix de l'objectif dans le panneau : XP, données, renseignements ou équilibré. Le compromis équilibré écarte un branchement qui ne rapporte plus rien d'une des trois.
+- Recommandations en clair pour le branchement et pour les achats : quoi changer, pourquoi, le gain et l'inconvénient.
+- Achats classés selon vos ressources : ce que vous pouvez payer d'abord, par ressource, avec ce qu'il manque pour le reste.
+- Bouton `Conseil` sur les nœuds d'infiltration, en plus de `Ctrl+Alt+F8`.
+- Le panneau ouvert se recalcule de lui-même quand le joueur change la chaîne ou peut payer un nouvel achat, et seulement alors.
+- Lecture générique de la chaîne : n'importe quels nœuds et branchements, sans liste de noms. Un nœud inconnu ne bloque plus rien, et ses effets sont pris en compte par les coups réellement mesurés sur la chaîne.
+- Les noms viennent du jeu, et tout achat lié au hacking apparaît seul. Un achat dont l'effet ne peut pas être suivi est listé sans chiffre.
+
+### Modifié
+
+- Tout nœud d'infiltration est régulé, y compris Banque et Anonymous ou le nœud d'un autre mod.
+- Sans prévision possible, quelle qu'en soit la raison, le mod passe par des essais de niveau réels en profil équilibré ou agressif, au lieu de ne plus monter.
+- « Données insuffisantes » remplace les chiffres tant que la chaîne n'a pas assez été mesurée, et un scénario contredit par les attaques réelles sort du classement.
+- Après un rebranchement, une nouvelle mesure démarre ; les anciennes restent, en cas de retour à cette chaîne.
+- Attaque Ghost est prise en compte, par le signal que le jeu expose et non par son nom : les dégâts furtifs ignorent le pare-feu, flux par flux. Le panneau redonne ses chiffres, et la régulation ne tente plus un niveau sans aucune chance.
+- L'infection est mesurée à chaque attaque, quel que soit le nœud qui la produit : sa croissance par seconde, ce que chaque tir lui ajoute, et si ce gain suit les coups réels. Spread Infection et Infecter Payload sont ainsi pris en compte sans être nommés dans le code.
+- Un effet inconnu du jeu ne bloque plus le conseil : il reste sans chiffre jusqu'à ce que des attaques l'aient montré, puis il est compté, et le contrôle contre les attaques réelles s'applique.
+- Les nombres qui dépassent les entiers s'affichent sous la forme `4.60e18` au lieu d'un coût négatif.
+- Le journal relève, à chaque attaque réussie, ce que la cible produit selon le jeu, pour vérifier la récompense des niveaux élites.
+- La régulation vise le niveau qui rapporte le plus par minute pour l'objectif choisi dans le panneau, au lieu du plus haut niveau qui tient. Un niveau élite qui paie davantage est gardé. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Sans mesure suffisante ou sans les récompenses du jeu, elle vise le plus haut niveau comme avant.
+- Le panneau indique ces mêmes niveaux.
+- En équilibré, un niveau est préféré s'il rapporte plus en données et en XP, ou s'il perd au plus 5 % de l'une pour au moins 10 % de plus de l'autre. Les objectifs XP et Données ne regardent que leur ressource.
+- Un achat qui change ce qu'une cible exige, comme plus de temps d'attaque, relance la régulation autant qu'un changement de puissance.
+- Dès que la chaîne a été mesurée, la décision d'essayer un niveau se fonde sur le même calcul que le panneau : ce qu'il juge possible est essayé, ce qui n'a aucune chance ne l'est plus.
+- L'objectif équilibré cherche la meilleure amélioration de ce qui progresse le moins : il ne sacrifie plus une ressource pour en doubler une autre.
+
+### Corrigé
+
+- La vulnérabilité était lue dans le mauvais champ par le conseiller.
+- Un inconvénient annoncé par le jeu, comme les -40 % de dégâts Payload de Spécialiste d'infection, n'était pas affiché.
+- Temps entre deux attaques : l'attaque suivante part au prochain tir du lanceur, au lieu d'un délai fixe de 0,7 s qui sous-estimait les gains.
+
 ## 0.3.0 – 2026-11-01 : Smart Hacking Advisor
 
 ### Ajouté
