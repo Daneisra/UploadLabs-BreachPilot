@@ -761,6 +761,7 @@ func _trial_desktop() -> FakeDesktop:
 		_node("virus", [_slot("F2", "hack_power", 0.0), _slot("V", "infection_damage", 0.0)]),
 		_node("injector", [_slot("F3", "hack_power", 0.0), _slot("J", "vulnerability", 0.0)]),
 		_node("spare", [_slot("F4", "hack_power", 150.0, "S"), _slot("X", "payload_damage", 50.0)]),
+		_node("splitter", [_slot("F5", "hack_power", 150.0, "S"), _slot("Y1", "payload_damage", 50.0, "", ["elsewhere"]), _slot("Y2", "payload_damage", 50.0)]),
 		_node("modifier", [_slot("M1", "vulnerability", 0.0), _slot("M2", "vulnerability", 0.0, "", ["elsewhere"])]),
 		_breach("corps", "L", ""),
 		_breach("gov", "L", ""),
@@ -774,7 +775,7 @@ func _trial_desktop() -> FakeDesktop:
 
 func _trial_windows() -> Dictionary:
 	var windows := {}
-	for type: String in ["src", "launcher", "virus", "injector", "spare", "modifier", "corps", "gov", "anon"]:
+	for type: String in ["src", "launcher", "virus", "injector", "spare", "splitter", "modifier", "corps", "gov", "anon"]:
 		windows[type] = {"name": type.capitalize(), "category": "hacking", "requirement": []}
 	windows["bank"] = {"name": "Infiltrer Banque", "category": "hacking", "requirement": ["research.bank"], "description": "Récupère des Jetons si elle réussit."}
 	windows["locked"] = {"name": "Verrouillé", "category": "hacking", "requirement": ["research.locked"]}
@@ -803,6 +804,7 @@ func _test_trials() -> void:
 	_check.call(keys.has("no_power|virus") and keys.has("no_power|injector"), "nodes without power are found: %s" % ", ".join(keys))
 	_check.call(keys.has("no_damage|anon") and texts["no_damage|anon"].contains("Anon ne reçoit aucun dégât"), "and a target that never attacks")
 	_check.call(keys.has("unused|spare") and texts["unused|spare"].contains("Dégâts Payload"), "and an output plugged into nothing")
+	_check.call(texts["unused|spare"].contains("sa sortie") and texts.get("unused|splitter", "").contains("une de ses sorties"), "a split with one free output says so: %s" % texts.get("unused|splitter", ""))
 	_check.call(keys.has("empty|vulnerability") and texts["empty|vulnerability"].contains("Vulnérabilité est vide sur Corps, Gov") and texts["empty|vulnerability"].contains("Injector") and texts["empty|vulnerability"].contains("Alimentez-le"), "an empty input another node could fill: %s" % texts.get("empty|vulnerability", ""))
 	_check.call(not texts.get("empty|vulnerability", "").contains("Modifier") and not texts.get("empty|vulnerability", "").contains("Anon"), "an idle input in the middle makes nothing, and a target without damage is told on its own")
 	_check.call(keys.has("empty|infection_damage") and texts["empty|infection_damage"].contains("Virus"), "the infection a node could bring once powered")

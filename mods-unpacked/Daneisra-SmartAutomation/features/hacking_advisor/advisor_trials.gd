@@ -51,9 +51,11 @@ static func _idle(list: Array[Dictionary], graph: Dictionary, entry: Dictionary,
 	if _lacks_power(entry):
 		list.append({"key": "no_power|%s" % entry.type, "priority": IDLE, "text": "%s n'a pas de puissance de hack, il ne produit rien. Branchez-y une sortie de puissance ; elle sera partagée avec ce qu'elle alimente déjà." % name})
 		return
+	var plugged: bool = entry.slots.any(func(slot: Dictionary) -> bool: return not slot.outputs_id.is_empty())
 	for slot: Dictionary in entry.slots:
 		if slot.resource != HackingGraph.POWER_RESOURCE and slot.production > 0.0 and slot.input_id == "" and slot.outputs_id.is_empty():
-			list.append({"key": "unused|%s" % entry.type, "priority": IDLE, "text": "%s produit %s, mais sa sortie n'est branchée nulle part. Branchez-la vers une cible ou la suite de la chaîne." % [name, _resource(data, slot.resource)]})
+			var which := "une de ses sorties n'est branchée" if plugged else "sa sortie n'est branchée"
+			list.append({"key": "unused|%s" % entry.type, "priority": IDLE, "text": "%s produit %s, mais %s nulle part. Branchez-la vers une cible ou la suite de la chaîne." % [name, _resource(data, slot.resource), which]})
 			return
 
 

@@ -370,6 +370,12 @@ func _test_fast_successes() -> void:
 		_check(_names(events) == ["success"], "one observation per fast attack")
 		ids.append(events[0].cycle_id)
 	_check(ids == [1, 2, 3, 4, 5], "each fast attack has its own cycle")
+	var whole: Dictionary = c.on_breached(_sample({"time": 10.0, "detected": true}))[0]
+	_check(whole.complete and whole.observed_start, "an attack won within its first tick is whole: Anonymous on 2026-11-04")
+	var unseen := Classifier.new()
+	_check(not unseen.on_breached(_sample({"time": 10.0, "detected": true}))[0].complete, "but not when the tick before was never seen")
+	var paused: Dictionary = c.on_breached(_sample({"time": 10.0, "detected": true, "paused": true}))[0]
+	_check(not paused.complete, "nor when the window is paused")
 	_check(c.observe(_sample()).is_empty(), "nothing to classify afterwards")
 
 

@@ -372,6 +372,9 @@ func _drop_tracker(id: int, reason: String) -> void:
 	if tracker.is_empty():
 		return
 	_trackers.erase(id)
+	if reason == "window_deleted" and _actuator != null and _level_of_type(tracker.type) < 0:
+		_cancel_action(tracker.type, reason)
+		_log_verification(_actuator.on_window_removed(tracker.type))
 	_report(tracker, tracker.classifier.invalidate(reason))
 	if _gap_stats != null:
 		_finish_probe(tracker)

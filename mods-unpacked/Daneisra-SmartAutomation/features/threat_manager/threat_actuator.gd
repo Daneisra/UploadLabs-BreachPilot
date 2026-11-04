@@ -187,6 +187,17 @@ func on_reload() -> Dictionary:
 	return _end_verification("interrupted", "reload_during_verification", {})
 
 
+## The player removed the node: the action being verified on it can no longer be judged. The removal
+## is the player's, not an anomaly of the action, so the regulation of the other nodes goes on.
+## A waiting action is dropped by cancel_pending.
+func on_window_removed(type: String) -> Dictionary:
+	if not _claim.is_empty() and _claim.type == type:
+		_claim = {}
+	if not is_verifying() or _verifying.type != type:
+		return {}
+	return _end_verification("interrupted", "window_removed", {})
+
+
 func summary() -> String:
 	return "actuator_summary armed=%s actions=%d deferred_no_safe_window=%d refused=%s halted=%s" % [is_armed(), actions_done, deferred_total, JSON.stringify(refused_counts), halt_reason if not halt_reason.is_empty() else "no"]
 

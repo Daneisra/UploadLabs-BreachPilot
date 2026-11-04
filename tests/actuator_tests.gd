@@ -300,6 +300,14 @@ func _test_verification() -> void:
 	_check(loaded.actuator.halt_reason.is_empty(), "a load is not an anomaly")
 	_free(loaded)
 
+	# 2026-11-04: the Bank was removed while its raise was being verified, and every node stopped.
+	var removed := _verified_setup()
+	_check(removed.actuator.on_window_removed("breach_gov").is_empty(), "removing another node leaves the verification")
+	var gone: Dictionary = removed.actuator.on_window_removed("breach_corps")
+	_check(gone.outcome == "interrupted" and gone.reason == "window_removed", "removing the node ends its verification")
+	_check(removed.actuator.halt_reason.is_empty() and not removed.actuator.is_verifying(), "without stopping the regulation of the others")
+	_free(removed)
+
 
 ## One action can cover several levels: the game's own "times" argument, and the level read back.
 func _test_jumps() -> void:

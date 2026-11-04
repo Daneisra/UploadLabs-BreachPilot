@@ -14,6 +14,8 @@ const THRESHOLD_TICKS := 2.0
 const THRESHOLD_STEPS := 1.5
 const CONTINUOUS_MARGIN := 1.5
 const EPSILON_DAMAGE := 1e-6
+## How far the timer may be from full for an attack to have started and ended within one tick.
+const WHOLE_TICK_TOLERANCE := 0.001
 const TRACE_POINTS := 64
 const TRACE_STEP := 0.25
 ## Ticks needed to tell how the infection moves by itself.
@@ -69,8 +71,11 @@ func observe(sample: Dictionary) -> Array[Dictionary]:
 func on_breached(sample: Dictionary) -> Array[Dictionary]:
 	var observed_start := not _cycle.is_empty()
 	if not observed_start:
-		_open_cycle(sample, true)
-		_cycle.observed_start = false
+		# A target that falls within the tick its attack starts: the tick before was seen idle and the timer
+		# has not moved, so nothing of the attack was missed.
+		var whole: bool = not _previous.is_empty() and not sample.paused and sample.time >= sample.max_time - WHOLE_TICK_TOLERANCE
+		_open_cycle(sample, not whole)
+		_cycle.observed_start = whole
 	if _is_volley(sample, _dealt(sample) - _cycle.last_progress):
 		_note_volley(sample)
 	_record_hit(sample)

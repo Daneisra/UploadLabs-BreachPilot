@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-dev.3 – en cours : recommandations et panneau
+## 0.5.0-dev.4 – en cours : recommandations et panneau
 
 ### Ajouté
 
@@ -14,6 +14,12 @@
 - L'objectif équilibré du panneau suit la même règle que la régulation : au plus 5 % de moins sur une ressource pour au moins 10 % de plus sur une autre. Son gain est la variation moyenne.
 - Un achat que l'équilibré refuse, parce qu'il gagne d'un côté mais perd trop de l'autre, n'est plus affiché à -100 % : le panneau dit ce qu'il coûterait, et la recommandation le nomme avec son gain, pour que vous choisissiez un autre objectif si vous le voulez.
 - En équilibré, la régulation garde le niveau qu'elle a quand aucun autre ne l'améliore selon les règles de l'équilibré, au lieu de monter au plus haut. Une montée pour débloquer un niveau compare avec le niveau d'où elle part, pour y revenir.
+- Une piste « À essayer » sur une sortie libre dit « une de ses sorties » quand les autres sorties du nœud sont branchées.
+
+### Corrigé
+
+- Supprimer un nœud pendant que le mod vérifie son dernier changement de niveau n'arrête plus la régulation de tous les autres nœuds : la vérification est simplement abandonnée.
+- Une cible battue dans le tick même où son attaque commence, comme Anonymous aux premiers niveaux, compte comme une attaque complète : elle est régulée et mesurée au lieu de rester « non comparable ».
 
 ## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
 
