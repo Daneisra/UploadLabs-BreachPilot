@@ -15,7 +15,7 @@
 | Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Daneisra le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 | Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Daneisra le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
 | BreachPilot, `0.5.1` (première publication publique) | **Terminée**, validée en jeu par Daneisra le 2026-11-04, tag `v0.5.1` |
-| Interface bilingue, `0.6.0` | **Préparée**, `0.6.0-dev.1` validée en jeu par Daneisra le 2026-11-04 (français, anglais, français sans redémarrage) |
+| Interface bilingue, `0.6.0` | **Terminée**, validée en jeu par Daneisra le 2026-11-04 (français, anglais, français sans redémarrage, pause et régulation désactivée), tag `v0.6.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
