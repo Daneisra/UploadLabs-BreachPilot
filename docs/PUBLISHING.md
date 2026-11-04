@@ -71,12 +71,39 @@ Le fichier `.vdf` :
 - Le premier envoi donne un `publishedfileid`. Il faut le reporter ici et dans le `.vdf` pour chaque mise à jour, sinon un nouvel objet est créé.
 - **L'identifiant `3833196182` est celui de Research Freedom.** Il ne doit jamais servir pour BreachPilot.
 
-**Contenu attendu :**
+**Préparation, sans rien envoyer :** `python tools/workshop_vdf.py --version X.Y.Z --sha256 <empreinte publiée> --out C:/BreachPilotWorkshop`.
 
-- Le dossier envoyé ne contient que `Daneisra-BreachPilot-vX.Y.Z.zip`.
-- L'image de présentation se trouve dans `docs/workshop/preview.png`.
-- La description, en BBCode Steam, se trouve dans `docs/workshop/description_en.txt` et `description_fr.txt`.
-- Captures d'écran : à ajouter depuis la page de l'objet.
+- **Contenu :** l'outil retélécharge le zip de la Release GitHub et vérifie son empreinte. Le Workshop reçoit donc exactement les mêmes octets que GitHub, sans nouvelle construction.
+- **Dossier d'envoi :** il prépare un dossier `content/` qui ne contient que ce zip, l'aperçu `preview.png` (moins de 1 Mo) et le fichier `BreachPilot.vdf`.
+- **Description :** le texte anglais puis le texte français de `docs/workshop/`, séparés par `[hr][/hr]`, dans la limite de 8 000 caractères.
+- **Refus :**
+  - tout guillemet droit dans le titre, la description ou la note de version ;
+  - l'identifiant `3833196182` de Research Freedom ;
+  - un zip dont l'empreinte diffère de celle de la Release.
+- **Relecture :** l'outil relit le VDF comme SteamCMD, sans séquence d'échappement, pour vérifier qu'aucune valeur n'est coupée.
+- **Visibilité :** privée par défaut (`2`). Un chemin sans accent (`--out`) est le plus sûr pour SteamCMD.
+- **Captures :** ajoutées à la main sur la page Steam, après la création de l'élément.
+- **Catégorie `QOL` :** posée à part, comme pour Research Freedom, car SteamCMD ne pose pas les tags.
+
+**Essai par abonnement, avant tout passage en public :**
+
+1. Jeu fermé.
+2. Parties, profil du Mod Loader et réglages des mods copiés et vérifiés par leur SHA-256.
+3. Zip local de BreachPilot déplacé dans le dossier de sauvegarde, sans le supprimer.
+4. Abonnement à l'élément privé, puis attente du téléchargement par Steam.
+5. Vérification avant de lancer le jeu :
+   - dans `steamapps/workshop/content/3606890/<id>/`, le seul fichier est le zip, avec l'empreinte de la Release ;
+   - aucune autre copie de BreachPilot dans `mods`, `mods-unpacked` ou d'autres éléments du Workshop.
+6. Lancement du jeu.
+7. Contrôle du journal :
+   - `Checking workshop item path` sur l'identifiant de l'élément, puis le zip chargé ;
+   - `Loaded build=X.Y.Z` une seule fois ;
+   - dans `mod_user_profiles.json`, une seule entrée `Daneisra-BreachPilot`, dont `zip_path` pointe vers le dossier du Workshop.
+8. Réglages repris par ModManager (configuration `user`, régulation `active`), puis vérification de la régulation et du conseiller.
+9. Analyse du journal après la partie.
+10. Retour arrière possible :
+    - désabonnement, puis remise du zip local depuis la sauvegarde ;
+    - les réglages, rangés par identifiant, servent aux deux installations.
 
 **Dépendances :** aucune. Le Mod Loader est intégré au jeu, et le manifeste ne déclare aucune dépendance. ModManager n'est utile que pour régler les options : il est recommandé dans la description, pas exigé.
 
