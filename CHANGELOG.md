@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-dev.4 – en cours : recommandations et panneau
+## 0.5.0 – 2026-11-04 : recommandations claires et pistes à essayer
 
 ### Ajouté
 
@@ -15,6 +15,7 @@
 - Un achat que l'équilibré refuse, parce qu'il gagne d'un côté mais perd trop de l'autre, n'est plus affiché à -100 % : le panneau dit ce qu'il coûterait, et la recommandation le nomme avec son gain, pour que vous choisissiez un autre objectif si vous le voulez.
 - En équilibré, la régulation garde le niveau qu'elle a quand aucun autre ne l'améliore selon les règles de l'équilibré, au lieu de monter au plus haut. Une montée pour débloquer un niveau compare avec le niveau d'où elle part, pour y revenir.
 - Une piste « À essayer » sur une sortie libre dit « une de ses sorties » quand les autres sorties du nœud sont branchées.
+- En conservateur et en équilibré, un essai raté pour débloquer un niveau n'est retenté que lorsque la chance d'y gagner a augmenté d'au moins 10 points, par exemple après un gain de puissance. L'agressif garde ses essais périodiques.
 
 ### Corrigé
 

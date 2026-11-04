@@ -13,6 +13,7 @@
 | Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
 | Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
 | Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Jérémy le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
+| Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Jérémy le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -89,6 +90,12 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 **Vérifié en jeu sur la `0.4.0-dev.11`, 2026-11-03 :** 408 attaques réussies, 10 échecs, aucune erreur ; 12 changements de niveau, tous vérifiés. Entreprises et Gouvernement restent sur l'élite 40 et montent une fois pour ouvrir 41 à 44, puis reviennent. En équilibré, Gouvernement finit sur 43 et non sur l'élite 40 : celle-ci donne 2,3 fois plus de données mais 1 % d'XP en moins, et l'équilibré exige un gain sur les deux.
 
 **Sortie de la `0.4.0`, 2026-11-03 :** à la demande de Jérémy, l'équilibré accepte de perdre au plus 5 % d'une ressource si l'autre gagne au moins 10 %. Rejouée sur les 31 tableaux de niveaux de la session dev.11, la règle garde les mêmes choix, sauf Gouvernement en fin de session : l'élite 40 au lieu de 43. Les objectifs XP et Données ne changent pas, ni les protections contre les allers-retours et les changements manuels. Restent à mesurer plus tard, sans bloquer la version : l'infection sur d'autres chaînes et une croissance d'infection achetée.
+
+**Partie sur la `0.5.0-dev.3`, 2026-11-04, 01:41 à 02:28 :** la suppression d'Infiltrer Banque pendant la vérification de sa montée a arrêté la régulation de tous les nœuds jusqu'à la fin, 135 actions refusées. Anonymous, battu dans le tick même où son attaque commence, n'a jamais eu d'attaque jugée complète et restait au niveau 0. Les deux sont corrigés en `dev.4`.
+
+**Vérifié en jeu sur la `0.5.0-dev.4`, 2026-11-04, 15:15 à 17:51 :** 57 changements de niveau, tous vérifiés, aucun arrêt, aucun refus, aucune erreur. Anonymous remonte seul de 0 à 35 en moins d'une minute, puis reste sur son niveau rentable. En équilibré, Gouvernement et Entreprises gardent leur niveau et reviennent après chaque déblocage. La suppression d'un nœud n'a pas été refaite en jeu : elle reste couverte par les tests automatiques, à la demande de Jérémy.
+
+**Sortie de la `0.5.0`, 2026-11-04 :** Entreprises a perdu trois essais à 44 prévus à 40 %, toutes les vingt attaques environ, avant de réussir après un gain de puissance. À la demande de Jérémy, le conservateur et l'équilibré ne retentent un déblocage raté que lorsque la chance prévue a gagné au moins 10 points ; l'agressif garde ses essais périodiques. Restent pour plus tard : les achats combinés, les emplacements libres des nœuds déjà posés (« 1/3 », probablement via le champ `attribute`), et l'infection sur d'autres chaînes.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 

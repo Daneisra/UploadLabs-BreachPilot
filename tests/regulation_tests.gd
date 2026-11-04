@@ -773,6 +773,31 @@ func _test_level_choice() -> void:
 	_check(LevelChoice.to_unlock(_measured_levels(), 30, 34, 0.3) == -1, "nor for a level never measured")
 
 
+## A try to open level 33 from 30, forecast at 40 %, lost twice; then, long after, the same try at later_chance.
+func _after_failed_unlock(profile: String, later_chance: float) -> Dictionary:
+	var reg := Regulator.new(profile)
+	var elite := {"event": "success", "complete": true, "level": 30, "max_level": 33, "signature": "s", "profitable_level": 30, "unlock_level": 33, "unlock_chance": 0.4}
+	var decision := {}
+	for i: int in 12:
+		reg.advance(10.0)
+		decision = reg.on_attack(elite, {}, {})
+		if decision.decision == "raise":
+			break
+	reg.on_level_changed(33)
+	for i: int in 2:
+		reg.advance(10.0)
+		reg.on_attack({"event": "failure_power", "complete": true, "level": 33, "max_level": 33, "signature": "s", "target_down": 30}, {}, {})
+	reg.on_level_changed(30)
+	var later := elite.duplicate()
+	later.unlock_chance = later_chance
+	for i: int in 40:
+		reg.advance(30.0)
+		decision = reg.on_attack(later, {}, {})
+		if decision.decision != "hold" or decision.reason == "unlock_waits_for_better_odds":
+			break
+	return decision
+
+
 func _test_profitable_regulation() -> void:
 	var reg := Regulator.new("balanced")
 	var high := {"event": "success", "complete": true, "level": 32, "max_level": 33, "signature": "s", "profitable_level": 30, "unlock_level": -1}
@@ -813,6 +838,14 @@ func _test_profitable_regulation() -> void:
 	var back := trying.on_attack({"event": "failure_power", "complete": true, "level": 33, "max_level": 33, "signature": "s", "target_down": 30}, {}, {})
 	_check(back.decision == "lower" and back.assumed_level == 30, "a failed try goes straight back to the profitable level: %s" % str(back))
 	_check(not trying.can_reach(33), "and the failed level waits")
+
+	# Entreprises on 2026-11-04: three tries at 44, forecast at 40 %, all lost, then won once the power rose.
+	_check(_after_failed_unlock("balanced", 0.45).reason == "unlock_waits_for_better_odds", "balanced does not try again on the same odds")
+	_check(_after_failed_unlock("conservative", 0.45).reason == "unlock_waits_for_better_odds", "nor does conservative")
+	var better_odds := _after_failed_unlock("balanced", 0.6)
+	_check(better_odds.decision == "raise" and better_odds.aim == "unlock", "clearly better odds bring the try back: %s" % str(better_odds))
+	var periodic := _after_failed_unlock("aggressive", 0.4)
+	_check(periodic.decision == "raise" and periodic.aim == "unlock", "aggressive keeps trying from time to time: %s" % str(periodic))
 
 	# Opening level after level, then coming back, must not freeze the regulator.
 	var climbing := Regulator.new("balanced")

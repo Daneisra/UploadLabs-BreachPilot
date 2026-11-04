@@ -676,6 +676,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	if event.complete and event.event == "success" and not choice.is_empty():
 		attack.profitable_level = choice.profitable
 		attack.unlock_level = choice.unlock
+		attack.unlock_chance = choice.get("unlock_chance", 0.0)
 	elif event.complete and event.event == "success":
 		var best := _best_raise(tracker, profile, regulator, event)
 		if best > event.level:
@@ -1045,6 +1046,8 @@ func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatR
 		return {}
 	var trial: float = TRIAL_CHANCE if regulator.allows_trials() else regulator.required_success()
 	var choice := {"profitable": profitable, "unlock": LevelChoice.to_unlock(reachable, event.level, event.max_level, trial)}
+	if choice.unlock >= 0:
+		choice.unlock_chance = reachable[choice.unlock].chance
 	var text := "%s|%d|%d" % [_objective, choice.profitable, choice.unlock]
 	if _last_choice.get(tracker.type, "") != text:
 		_last_choice[tracker.type] = text

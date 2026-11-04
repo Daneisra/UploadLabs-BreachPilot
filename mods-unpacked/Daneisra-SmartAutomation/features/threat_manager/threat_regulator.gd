@@ -3,9 +3,9 @@ extends RefCounted
 ## and only returns hypothetical decisions. Time values are seconds of the game's timer.
 
 const PROFILES := {
-	"conservative": {"p": 1.0, "margin": 0.20, "raise_after": 5, "raise_delay": 60.0, "block": 600.0, "probes": false},
-	"balanced": {"p": 0.99, "margin": 0.10, "raise_after": 3, "raise_delay": 30.0, "block": 300.0, "probes": true},
-	"aggressive": {"p": 0.95, "margin": 0.0, "raise_after": 2, "raise_delay": 15.0, "block": 120.0, "probes": true},
+	"conservative": {"p": 1.0, "margin": 0.20, "raise_after": 5, "raise_delay": 60.0, "block": 600.0, "probes": false, "retries_unlock": false},
+	"balanced": {"p": 0.99, "margin": 0.10, "raise_after": 3, "raise_delay": 30.0, "block": 300.0, "probes": true, "retries_unlock": false},
+	"aggressive": {"p": 0.95, "margin": 0.0, "raise_after": 2, "raise_delay": 15.0, "block": 120.0, "probes": true, "retries_unlock": true},
 }
 const WINDOW := 20
 const STABILIZE_ATTACKS := 1
@@ -28,6 +28,8 @@ const VERIFY_CERTAIN := 1
 const FAILURES_IN_ROW_TO_LOWER := 2
 ## Successes here before trying a level that may work but is not sure.
 const PROBE_AFTER := 2
+## How much better the chance of winning a level must be before a failed try to open it is made again.
+const RETRY_GAIN := 0.10
 const VERIFY_CAREFUL := 3
 const RELIABILITY_WINDOW := 50
 const MIN_RELIABILITY_EVENTS := 20
@@ -71,6 +73,10 @@ var _action_busy := false
 var _probed_level := -1
 ## The level a try to open the next one started from: the regulation compares with it to come back.
 var _trial_from := -1
+## The try to open a level under way: {level, chance}. Once it failed, the level waits in _failed_unlocks,
+## level -> chance forecast then, until the chance of winning there is RETRY_GAIN higher.
+var _unlock_try := {}
+var _failed_unlocks := {}
 
 
 func _init(profile: String = "balanced", max_allowed: int = -1, min_level: int = 0, fast_raises: bool = true) -> void:
@@ -174,6 +180,8 @@ func on_resume(level: int) -> void:
 ## A game was loaded: what was seen before says nothing about this one. Pauses, blocks and the budget stay.
 func on_game_loaded() -> void:
 	_level = -1
+	_unlock_try = {}
+	_failed_unlocks.clear()
 	_reset_window()
 	_stabilizing = STABILIZE_ATTACKS
 	_proposal = ""
@@ -222,6 +230,7 @@ func on_attack(attack: Dictionary, current: Dictionary, next: Dictionary) -> Dic
 			return _decision("hold", "power_changed", attack)
 	if attack.level != _level:
 		on_level_changed(attack.level)
+	_note_unlock_try(attack)
 
 	var is_failure: bool = attack.event == "failure_power"
 	if not attack.complete or not (is_failure or attack.event == "success"):
@@ -361,11 +370,14 @@ func _try_raise(attack: Dictionary, next: Dictionary) -> Dictionary:
 ## failure: the level left stays open.
 func _try_profitable(attack: Dictionary) -> Dictionary:
 	var unlock: int = attack.get("unlock_level", -1)
+	var waits: bool = unlock > attack.level and _failed_unlocks.has(unlock) and attack.get("unlock_chance", 0.0) < _failed_unlocks[unlock] + RETRY_GAIN
+	if waits:
+		unlock = -1
 	var target: int = unlock if unlock > attack.level else attack.profitable_level
 	if target < 0:
 		return _decision("hold", "levels_being_measured", attack)
 	if target == attack.level:
-		return _decision("hold", "most_profitable", attack)
+		return _decision("hold", "unlock_waits_for_better_odds" if waits else "most_profitable", attack)
 	if target < attack.level:
 		if _timer - _last_lower < LOWER_DELAY:
 			return _decision("hold", "lower_delay", attack)
@@ -383,10 +395,24 @@ func _try_profitable(attack: Dictionary) -> Dictionary:
 	if target == unlock:
 		_probed_level = target
 		_trial_from = attack.level
+		_unlock_try = {"level": target, "chance": attack.get("unlock_chance", 0.0)}
 		return _act("raise", attack, {"certain": false, "probe": true, "aim": "unlock", "verify_attacks": VERIFY_CERTAIN, "target": target})
 	if _timer - _last_raise < _profile.raise_delay:
 		return _decision("hold", "raise_delay", attack)
 	return _act("raise", attack, {"certain": false, "aim": "profit", "verify_attacks": VERIFY_CAREFUL, "target": target})
+
+
+## A try left without opening the next level failed: except for the aggressive profile, it is not made
+## again until the odds there are clearly better. A level opened some other way no longer waits.
+func _note_unlock_try(attack: Dictionary) -> void:
+	for level: int in _failed_unlocks.keys():
+		if level < attack.max_level:
+			_failed_unlocks.erase(level)
+	if _unlock_try.is_empty() or attack.level == _unlock_try.level:
+		return
+	if attack.max_level <= _unlock_try.level and not _profile.retries_unlock:
+		_failed_unlocks[_unlock_try.level] = _unlock_try.chance
+	_unlock_try = {}
 
 
 func _act(direction: String, attack: Dictionary, details: Dictionary) -> Dictionary:
