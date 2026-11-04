@@ -49,6 +49,8 @@ func show_state(view: Dictionary) -> void:
 	if view == _shown:
 		return
 	_shown = view
+	# The state's words change with the game's language, and the advice button's with them.
+	_advice_button.text = I18n.t("control.advice")
 	_label.text = view.text
 	_label.add_theme_color_override("font_color", COLORS[view.kind])
 	_label.tooltip_text = view.tooltip

@@ -60,6 +60,8 @@ func _test_ids_in_code() -> void:
 	var id := RegEx.create_from_string(ID_PATTERN)
 	var literal := RegEx.create_from_string("\"([^\"]*)\"")
 	var counted := RegEx.create_from_string("t_count\\(\"([^\"]+)\"")
+	# The first literal given to t() is an id whatever it looks like: a typo must not slip through.
+	var direct := RegEx.create_from_string("I18n\\.t\\(\"([^\"]+)\"")
 	var variant := RegEx.create_from_string("vowel_variant\\(\"([^\"]+)\"")
 	var prefixes := {}
 	for known: String in I18n.TABLES.en:
@@ -75,6 +77,10 @@ func _test_ids_in_code() -> void:
 				var text := found.get_string(1)
 				if id.search(text) != null and prefixes.has(text.get_slice(".", 0)):
 					asked[text] = true
+		for found: RegExMatch in direct.search_all(source):
+			# An id built from a name, like block.%s, is checked by its family below.
+			if not found.get_string(1).contains("%"):
+				asked[found.get_string(1)] = true
 		for found: RegExMatch in counted.search_all(source):
 			asked[found.get_string(1) + ".one"] = true
 			asked[found.get_string(1) + ".other"] = true
@@ -123,6 +129,10 @@ func _test_language() -> void:
 	_check(I18n.t("panel.close") == "Fermer" and I18n.t("state.active") == "Auto : actif", "French texts")
 	_check(I18n.t("card.keep", {"goal": "XP"}) == "Gardez votre branchement : c'est déjà le meilleur pour XP.", "values are filled in")
 	_check(I18n.t("no.such.text") == "no.such.text", "an unknown id shows itself, which the table tests forbid")
+	I18n.forced = "de_DE"
+	_check(I18n.language() == "en", "a forced language without a table falls back too")
+	I18n.forced = "fr_FR"
+	_check(I18n.language() == "fr", "and a forced locale is read like the game's")
 
 
 func _test_formats() -> void:

@@ -103,9 +103,9 @@ func _look_at_chain() -> void:
 ## becoming sufficient, and the objective, which picks the levels. What moves by itself, like hits piling
 ## up or research growing, must not recalculate.
 func _state_of(chain: Dictionary, upgrades: Array[Dictionary], trials: Array[Dictionary] = []) -> String:
-	if chain.error != "":
-		return chain.error
 	# The language too: the texts are written when the figures are shown.
+	if chain.error != "":
+		return "%s|%s" % [I18n.language(), chain.error]
 	var parts := PackedStringArray([I18n.language(), _objective, str(chain.current)])
 	for trial: Dictionary in trials:
 		parts.append(trial.key)

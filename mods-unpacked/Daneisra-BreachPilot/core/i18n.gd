@@ -23,7 +23,7 @@ static var forced := ""
 ## "fr" for fr, fr_FR or fr_CA; English for a language the mod has no table for, or no locale at all.
 static func language() -> String:
 	if forced != "":
-		return forced
+		return language_of(forced)
 	return language_of(TranslationServer.get_locale())
 
 
