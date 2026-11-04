@@ -372,6 +372,9 @@ func _drop_tracker(id: int, reason: String) -> void:
 	if tracker.is_empty():
 		return
 	_trackers.erase(id)
+	if reason == "window_deleted" and _actuator != null and _level_of_type(tracker.type) < 0:
+		_cancel_action(tracker.type, reason)
+		_log_verification(_actuator.on_window_removed(tracker.type))
 	_report(tracker, tracker.classifier.invalidate(reason))
 	if _gap_stats != null:
 		_finish_probe(tracker)
@@ -673,6 +676,7 @@ func _regulate(tracker: Dictionary, event: Dictionary) -> void:
 	if event.complete and event.event == "success" and not choice.is_empty():
 		attack.profitable_level = choice.profitable
 		attack.unlock_level = choice.unlock
+		attack.unlock_chance = choice.get("unlock_chance", 0.0)
 	elif event.complete and event.event == "success":
 		var best := _best_raise(tracker, profile, regulator, event)
 		if best > event.level:
@@ -1037,11 +1041,13 @@ func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatR
 	for level: int in table.levels:
 		if level >= _regulation.min_level and level <= event.max_level and regulator.can_reach(level):
 			reachable[level] = table.levels[level]
-	var profitable := LevelChoice.profitable(reachable, _objective, tracker.type, regulator.required_success())
+	var profitable := LevelChoice.profitable(reachable, _objective, tracker.type, regulator.required_success(), regulator.home_level(event.level))
 	if profitable < 0:
 		return {}
 	var trial: float = TRIAL_CHANCE if regulator.allows_trials() else regulator.required_success()
 	var choice := {"profitable": profitable, "unlock": LevelChoice.to_unlock(reachable, event.level, event.max_level, trial)}
+	if choice.unlock >= 0:
+		choice.unlock_chance = reachable[choice.unlock].chance
 	var text := "%s|%d|%d" % [_objective, choice.profitable, choice.unlock]
 	if _last_choice.get(tracker.type, "") != text:
 		_last_choice[tracker.type] = text
@@ -1461,6 +1467,11 @@ func _log_inventory(root: Node) -> void:
 			var is_unlocked: Variant = unlocked.has(key) if unlocked != null else "unknown"
 			hacking.append("%s:%s:%s" % [key, is_unlocked, definition.get("requirement", [])])
 	_log.info("inventory hacking_windows=%s" % ";".join(hacking))
+	# What a node's definition holds, to learn how the game counts the nodes one may place.
+	for key: String in _data.windows:
+		if _data.windows[key] is Dictionary and _data.windows[key].get("category") == "hacking":
+			_log.info("inventory window_fields=%s:%s" % [key, ",".join(_data.windows[key].keys())])
+			break
 
 
 func _format(type: String, event: Dictionary) -> String:

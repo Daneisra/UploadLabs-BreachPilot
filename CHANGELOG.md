@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.0 – 2026-11-04 : recommandations claires et pistes à essayer
+
+### Ajouté
+
+- Le panneau commence par la recommandation : les branchements à changer, un par étape, le gain estimé, les inconvénients et la fiabilité, avec sa raison. Les tableaux de calcul sont dans une section repliable, qui reste ouverte si vous l'ouvrez.
+- Section « À essayer », trois pistes au plus sur la carte et les autres dans le détail : un nœud sans puissance, une cible qui ne reçoit aucun dégât, une sortie branchée nulle part, une entrée de cible vide qu'un autre nœud pourrait remplir, un achat à garder en vue, puis les nœuds débloqués mais pas encore posés, avec la description du jeu. Chaque piste dit à quoi elle sert et quoi faire, sans chiffre tant que le nœud n'a pas été mesuré, sauf pour l'achat, estimé sur vos coups mesurés.
+- La fiabilité est élevée pour ce qui est mesuré sur votre chaîne, et baisse d'un cran quand un flux est envoyé vers une cible qu'il n'a jamais attaquée, et d'un autre quand une réussite est incertaine.
+
+### Modifié
+
+- Sur une chaîne trop grande pour essayer tous les branchements, le conseiller ne s'arrête plus au meilleur changement unique : il repart du meilleur trouvé et réessaie chaque changement, jusqu'à ne plus rien gagner. Plusieurs changements peuvent donc être conseillés ensemble.
+- L'objectif équilibré du panneau suit la même règle que la régulation : au plus 5 % de moins sur une ressource pour au moins 10 % de plus sur une autre. Son gain est la variation moyenne.
+- Un achat que l'équilibré refuse, parce qu'il gagne d'un côté mais perd trop de l'autre, n'est plus affiché à -100 % : le panneau dit ce qu'il coûterait, et la recommandation le nomme avec son gain, pour que vous choisissiez un autre objectif si vous le voulez.
+- En équilibré, la régulation garde le niveau qu'elle a quand aucun autre ne l'améliore selon les règles de l'équilibré, au lieu de monter au plus haut. Une montée pour débloquer un niveau compare avec le niveau d'où elle part, pour y revenir.
+- Une piste « À essayer » sur une sortie libre dit « une de ses sorties » quand les autres sorties du nœud sont branchées.
+- En conservateur et en équilibré, un essai raté pour débloquer un niveau n'est retenté que lorsque la chance d'y gagner a augmenté d'au moins 10 points, par exemple après un gain de puissance. L'agressif garde ses essais périodiques.
+
+### Corrigé
+
+- Supprimer un nœud pendant que le mod vérifie son dernier changement de niveau n'arrête plus la régulation de tous les autres nœuds : la vérification est simplement abandonnée.
+- Une cible battue dans le tick même où son attaque commence, comme Anonymous aux premiers niveaux, compte comme une attaque complète : elle est régulée et mesurée au lieu de rester « non comparable ».
+
 ## 0.4.0 – 2026-11-03 : conseiller générique et niveau le plus rentable
 
 ### Ajouté

@@ -39,19 +39,23 @@ static func score(entry: Dictionary, objective: String, own_key: String, referen
 
 ## levels: level -> {chance, cycle, reward, xp}, only those that can be reached. Returns the level that
 ## brings the most among those holding with the required chance, or -1 when none does. The highest one
-## stays unless another is really better.
-static func profitable(levels: Dictionary, objective: String, own_key: String, required: float) -> int:
+## stays unless another is really better. Balanced keeps current instead, when it holds: two levels that
+## each win on one resource are a trade it does not make, and the level it has stays.
+static func profitable(levels: Dictionary, objective: String, own_key: String, required: float, current: int = -1) -> int:
 	var highest := -1
 	for level: int in levels:
 		if levels[level].chance >= required and level > highest:
 			highest = level
 	if highest < 0:
 		return -1
-	var reference := rates(levels[highest])
-	var best := highest
 	# The reference is worth 1.0 when balanced; a level only counts there once it passes the rules above.
 	var balanced: bool = objective != XP and objective != own_key
-	var best_score := 1.0 if balanced else score(levels[highest], objective, own_key, reference) * (1.0 + MIN_GAIN)
+	var kept := highest
+	if balanced and levels.has(current) and levels[current].chance >= required:
+		kept = current
+	var reference := rates(levels[kept])
+	var best := kept
+	var best_score := 1.0 if balanced else score(levels[kept], objective, own_key, reference) * (1.0 + MIN_GAIN)
 	for level: int in levels:
 		var entry: Dictionary = levels[level]
 		if entry.chance < required:

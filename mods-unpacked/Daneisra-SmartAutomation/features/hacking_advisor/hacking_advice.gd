@@ -2,12 +2,15 @@ extends RefCounted
 ## Turns compared rows into advice for one objective: what to change, why, the gain and the drawback.
 ## Pure text and arithmetic: the player decides and does everything.
 
+const LevelChoice := preload("../threat_manager/level_choice.gd")
+
 const XP := "xp"
 const BALANCED := "balanced"
 ## Below this, a difference is noise from the random attacks, and not worth rewiring anything.
 const MIN_GAIN := 0.01
 ## Below this chance, the player should know a level may slip.
 const SAFE_CHANCE := 0.95
+const RELIABILITY_TEXTS: Array[String] = ["faible", "moyenne", "élevée"]
 
 
 static func objectives(chain: Dictionary) -> Array[Dictionary]:
@@ -18,17 +21,25 @@ static func objectives(chain: Dictionary) -> Array[Dictionary]:
 	return list
 
 
-## Balanced is the worst change against the current chain: a compromise improves everything, and doubling
-## the XP does not make up for halving something else. What the current chain does not bring does not count.
+## Balanced compares with the current chain, as the regulation compares levels: a chain counts when it loses
+## nothing, or a little of one thing for much more of another. It is then worth the average change, and 0.0
+## otherwise: doubling the XP does not make up for halving something else. What the current chain does not
+## bring does not count.
 static func score(row: Dictionary, objective: String, current: Dictionary) -> float:
 	if objective == XP:
 		return row.xp_rate
 	if objective != BALANCED:
 		return row.targets[objective].reward_rate
-	var worst := _ratio(row.xp_rate, current.xp_rate)
+	var changes: Array[float] = [_ratio(row.xp_rate, current.xp_rate)]
 	for key: String in row.targets:
-		worst = minf(worst, _ratio(row.targets[key].reward_rate, current.targets[key].reward_rate))
-	return worst
+		changes.append(_ratio(row.targets[key].reward_rate, current.targets[key].reward_rate))
+	var low: float = changes.min()
+	if low < 1.0 and (low < 1.0 - LevelChoice.MAX_LOSS or changes.max() < 1.0 + LevelChoice.MIN_TRADE):
+		return 0.0
+	var product := 1.0
+	for change: float in changes:
+		product *= change
+	return pow(product, 1.0 / changes.size())
 
 
 static func _ratio(value: float, reference: float) -> float:
@@ -48,6 +59,11 @@ static func best_row(rows: Array[Dictionary], current: Dictionary, objective: St
 	return best
 
 
+## Balanced refuses a chain that loses too much of one thing for what it gains: not a loss of everything.
+static func is_refused_trade(row: Dictionary, current: Dictionary, objective: String) -> bool:
+	return objective == BALANCED and score(row, objective, current) <= 0.0 and score(current, objective, current) > 0.0
+
+
 ## Relative gain for the objective, or 1 when starting from nothing.
 static func gain(row: Dictionary, current: Dictionary, objective: String) -> float:
 	var before := score(current, objective, current)
@@ -58,6 +74,11 @@ static func gain(row: Dictionary, current: Dictionary, objective: String) -> flo
 
 
 static func connection_text(chain: Dictionary, current: Dictionary, best: Dictionary) -> String:
+	return ". ".join(steps(chain, current, best)) + "."
+
+
+## One cable to change per step, in the game's names.
+static func steps(chain: Dictionary, current: Dictionary, best: Dictionary) -> PackedStringArray:
 	var parts := PackedStringArray()
 	for kind: String in ["payload", "infection"]:
 		for key: String in chain.targets:
@@ -72,7 +93,35 @@ static func connection_text(chain: Dictionary, current: Dictionary, best: Dictio
 		if not _feeds(stream, current.scenario) or _feeds(stream, best.scenario) or stream.source == "":
 			continue
 		parts.append("Débranchez aussi %s de sa source, pour rendre sa puissance aux autres" % stream.label)
-	return ". ".join(parts) + "."
+	return parts
+
+
+## How far a figure can be trusted, and why: {"level": 0 to 2, "text": ..., "reasons": ...}. What the current
+## chain does is measured. A stream sent where it never attacked is estimated from its hits elsewhere, and a
+## level that may slip is less sure. Each doubt takes one step down.
+static func reliability(chain: Dictionary, row: Dictionary) -> Dictionary:
+	var reasons := PackedStringArray()
+	var level := 2
+	var moved := PackedStringArray()
+	for kind: String in ["payload", "infection"]:
+		for key: String in chain.targets:
+			var stream_id: String = row.scenario[kind][key]
+			if stream_id != "" and chain.streams.has(stream_id) and not chain.streams[stream_id].targets.has(key):
+				moved.append("%s vers %s" % [_stream_label(chain, stream_id, kind), chain.targets[key].label])
+	if not moved.is_empty():
+		level -= 1
+		reasons.append("jamais essayé : %s, estimé d'après ses coups ailleurs" % ", ".join(moved))
+	var risky := PackedStringArray()
+	for key: String in row.targets:
+		var target: Dictionary = row.targets[key]
+		if target.level >= 0 and target.chance < SAFE_CHANCE:
+			risky.append("%s %d %%" % [chain.targets[key].label, roundi(target.chance * 100.0)])
+	if not risky.is_empty():
+		level -= 1
+		reasons.append("réussite incertaine : %s" % ", ".join(risky))
+	if reasons.is_empty():
+		reasons.append("mesuré sur votre chaîne" if row.current else "mêmes coups que mesurés, autre répartition")
+	return {"level": level, "text": RELIABILITY_TEXTS[level], "reasons": "; ".join(reasons)}
 
 
 ## What changes on each target. An unchanged target is left out.

@@ -11,6 +11,8 @@ const HackingUpgrades := preload(ADVISOR + "hacking_upgrades.gd")
 const HackingAdvice := preload(ADVISOR + "hacking_advice.gd")
 const HitLog := preload(ADVISOR + "hit_log.gd")
 const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
+const AdvisorPanel := preload(ADVISOR + "advisor_panel.gd")
+const AdvisorTrials := preload(ADVISOR + "advisor_trials.gd")
 const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
 const Regulator := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_regulator.gd")
 const SaLog := preload("res://mods-unpacked/Daneisra-SmartAutomation/core/sa_log.gd")
@@ -111,6 +113,11 @@ func run(check: Callable) -> void:
 	_test_profit_choice()
 	_test_profitable_level_in_panel()
 	_test_refresh_state()
+	_test_balanced_trade()
+	_test_reliability()
+	_test_chain_search()
+	_test_recommendation_card()
+	_test_trials()
 	_test_stealth()
 	_test_target_rules()
 	_test_infection_measure()
@@ -601,6 +608,239 @@ func _test_advice() -> void:
 	_check.call(HackingAdvice.effects(chain, current, current).drawbacks == "aucun", "no drawback is said plainly")
 	var own := HackingAdvice.effects(chain, current, current, PackedStringArray(["Dégâts Payload -40 %"]))
 	_check.call(own.drawbacks == "Dégâts Payload -40 %", "the game's own drawback shows even when the result is a gain")
+
+
+func _changed(current: Dictionary, xp: float, corps: float, gov: float) -> Dictionary:
+	var row := current.duplicate(true)
+	row.current = false
+	row.xp_rate = current.xp_rate * xp
+	row.targets.corps.reward_rate = current.targets.corps.reward_rate * corps
+	row.targets.gov.reward_rate = current.targets.gov.reward_rate * gov
+	return row
+
+
+## Balanced takes the same trade as the regulation: up to 5 % less of one thing for 10 % more of another.
+func _test_balanced_trade() -> void:
+	var model := HackingModel.new(_chain())
+	var current: Dictionary = model.evaluate(_chain().current)
+	var trade := _changed(current, 1.0, 2.3, 0.97)
+	_check.call(HackingAdvice.best_row([current, trade] as Array[Dictionary], current, "balanced") == trade, "balanced gives up 3 % of one resource for 130 % more of another")
+	_check.call(HackingAdvice.best_row([current, _changed(current, 1.0, 2.3, 0.94)] as Array[Dictionary], current, "balanced") == current, "but not 6 %")
+	_check.call(HackingAdvice.best_row([current, _changed(current, 1.0, 1.08, 0.99)] as Array[Dictionary], current, "balanced") == current, "nor for only 8 % more")
+	var even := _changed(current, 1.04, 1.04, 1.04)
+	_check.call(HackingAdvice.best_row([current, trade, even] as Array[Dictionary], current, "balanced") == trade, "the larger average gain wins")
+	_check.call(absf(HackingAdvice.gain(even, current, "balanced") - 0.04) < 1e-6, "balanced's gain is the average change")
+	_check.call(HackingAdvice.best_row([current, trade] as Array[Dictionary], current, "gov") == current, "an objective naming a resource still keeps it")
+	var refused := _changed(current, 1.25, 1.0, 0.6)
+	_check.call(HackingAdvice.is_refused_trade(refused, current, "balanced") and not HackingAdvice.is_refused_trade(refused, current, "xp") and not HackingAdvice.is_refused_trade(trade, current, "balanced"), "a refused trade is told apart from a loss")
+	var advisor := HackingAdvisor.new()
+	advisor._chain = _chain()
+	advisor._current = current
+	advisor._objective = HackingAdvice.BALANCED
+	var cell := advisor._purchase_gain(refused)
+	_check.call(cell.begins_with("compromis : ") and cell.contains("Renseignements -40 %") and not cell.contains("-100"), "a purchase balanced refuses says what it costs, not -100 %%: %s" % cell)
+	advisor._upgrade_rows = [{"upgrade": {"name": "Dégâts Payload", "affordable": true, "resource": "points", "cost": 1.0, "cost_text": "1 point", "held": 12.0, "changes": {}}, "row": refused}]
+	advisor._rows = [current]
+	advisor._model = HackingModel.new(_chain())
+	var card := advisor._card()
+	var said := false
+	for line: Dictionary in card:
+		said = said or (line.text.contains("Dégâts Payload donnerait XP +25 %") and line.text.contains("Renseignements -40 %"))
+	_check.call(said, "and the card names the trade it refused")
+	advisor.free()
+
+
+func _test_reliability() -> void:
+	var chain := _chain()
+	chain.streams.I.targets = ["corps"]
+	chain.current.infection.gov = ""
+	var model := HackingModel.new(chain)
+	var current: Dictionary = model.evaluate(chain.current)
+	var sure := HackingAdvice.reliability(chain, current)
+	_check.call(sure.level == 2 and sure.reasons.contains("mesuré"), "what the chain does today is measured: %s" % str(sure))
+	var moved := model.evaluate({"payload": {"corps": "P", "gov": "P"}, "infection": {"corps": "I", "gov": "I"}, "vulnerability": false})
+	var estimated := HackingAdvice.reliability(chain, moved)
+	_check.call(estimated.level <= 1 and estimated.reasons.contains("Produit d'infection vers Infiltrer Gouvernement"), "a stream sent where it never attacked is estimated: %s" % str(estimated))
+	var shaky := moved.duplicate(true)
+	shaky.targets.gov.chance = 0.85
+	shaky.targets.gov.level = 7
+	var weak := HackingAdvice.reliability(chain, shaky)
+	_check.call(weak.level == 0 and weak.text == "faible" and weak.reasons.contains("85 %"), "and a level that may slip on top of it is weak")
+	var steps := HackingAdvice.steps(chain, current, moved)
+	_check.call(steps.size() == 1 and steps[0] == "Produit d'infection : brancher vers Infiltrer Gouvernement", "one step per cable: %s" % str(steps))
+
+
+## A chain too large to try whole is searched change after change, until nothing better turns up.
+func _test_chain_search() -> void:
+	var big := _chain()
+	for index: int in 3:
+		big.targets["extra%d" % index] = _target("Extra %d" % index, "Extra", 100.0, 100.0)
+		big.current.payload["extra%d" % index] = ""
+		big.current.infection["extra%d" % index] = ""
+	var advisor := HackingAdvisor.new()
+	advisor._chain = big
+	advisor._model = HackingModel.new(big)
+	advisor._objective = HackingAdvice.XP
+	_check.call(advisor._model.searches(), "a chain this large is searched")
+	advisor._pending = advisor._model.scenarios()
+	var first_round: int = advisor._pending.size()
+	for scenario: Dictionary in advisor._pending:
+		advisor._seen[str(scenario)] = true
+	advisor._search_base = big.current
+	var evaluated := 0
+	while true:
+		while not advisor._pending.is_empty():
+			advisor._rows.append(advisor._model.evaluate(advisor._pending.pop_back()))
+			evaluated += 1
+		if not advisor._next_round():
+			break
+	var current := advisor._current_row()
+	var one_change := HackingAdvice.best_row(advisor._rows.slice(0, first_round), current, HackingAdvice.XP)
+	var found := HackingAdvice.best_row(advisor._rows, current, HackingAdvice.XP)
+	_check.call(found.xp_rate >= one_change.xp_rate and advisor._rounds >= 1, "the search finds at least the best single change, then goes on: %d rounds" % advisor._rounds)
+	_check.call(advisor._rounds <= HackingModel.MAX_SEARCH_ROUNDS and evaluated <= first_round * (HackingModel.MAX_SEARCH_ROUNDS + 1), "and stays bounded: %d chains" % evaluated)
+	var differences := 0
+	for kind: String in ["payload", "infection"]:
+		for key: String in big.targets:
+			if found.scenario[kind][key] != big.current[kind][key]:
+				differences += 1
+	_check.call(differences >= 2, "several changes add up: %d" % differences)
+	var keys := {}
+	for row: Dictionary in advisor._rows:
+		keys[str(row.scenario)] = true
+	_check.call(keys.size() == advisor._rows.size(), "no chain is tried twice")
+	advisor.free()
+
+
+## The recommendation comes first, with its gain, drawbacks and reliability; the tables fold away.
+func _test_recommendation_card() -> void:
+	var chain := _chain()
+	var advisor := HackingAdvisor.new()
+	advisor._chain = chain
+	advisor._model = HackingModel.new(chain)
+	advisor._objective = HackingAdvice.XP
+	for scenario: Dictionary in advisor._model.scenarios():
+		advisor._rows.append(advisor._model.evaluate(scenario))
+	advisor._current = advisor._model.evaluate(chain.current)
+	var card := advisor._card()
+	var texts := PackedStringArray()
+	for line: Dictionary in card:
+		texts.append(line.text)
+	var all := "\n".join(texts)
+	_check.call(card[0].kind == "title" and (all.contains("Meilleur branchement pour XP") or all.contains("Gardez votre branchement")), "the card opens on the recommendation: %s" % all)
+	_check.call(all.contains("Fiabilité : "), "with its reliability")
+	if all.contains("Meilleur branchement"):
+		_check.call(all.contains("Gain estimé : ") and all.contains("Inconvénients : ") and all.contains("   1. "), "its gain, drawbacks and steps")
+	advisor._current.insufficient = PackedStringArray([HackingModel.REASON_HITS])
+	_check.call(advisor._card()[0].text.begins_with("Données insuffisantes"), "without a measure, the card says so first")
+
+	var panel := AdvisorPanel.new()
+	var options: Array[Dictionary] = [{"key": "xp", "label": "XP"}]
+	panel.show_advice(options, "xp", func(_key: String) -> void: pass, card, {"rows": [["a"], ["b"]], "kinds": ["header", ""]}, {"rows": [], "kinds": []}, "note")
+	_check.call(panel._card.get_child_count() == card.size() and not panel._details.visible, "the details start folded")
+	panel._on_toggle()
+	_check.call(panel._details.visible and panel._toggle.text == AdvisorPanel.HIDE_DETAILS, "a click unfolds them")
+	panel.show_advice(options, "xp", func(_key: String) -> void: pass, card, {"rows": [["a"], ["b"]], "kinds": ["header", ""]}, {"rows": [], "kinds": []}, "note")
+	_check.call(panel._details.visible, "and they stay open on the next calculation")
+	panel.show_message("Calcul en cours…")
+	_check.call(not panel._toggle.visible and panel._summary.visible, "a message hides the card")
+	panel.free()
+	advisor.free()
+
+
+class FakeGlobalsTable extends Node:
+	var unlocks := {}
+
+
+## A chain like the one of 2026-11-03: two nodes without power, a target with no damage, empty inputs.
+func _trial_desktop() -> FakeDesktop:
+	var desktop := FakeDesktop.new()
+	var nodes: Array[Node] = [
+		_node("src", [_slot("S", "hack_power", 300.0, "", ["F1", "F4"])]),
+		_node("launcher", [_slot("F1", "hack_power", 150.0, "S"), _slot("L", "payload_damage", 110.0, "", ["corps_p", "gov_p"])]),
+		_node("virus", [_slot("F2", "hack_power", 0.0), _slot("V", "infection_damage", 0.0)]),
+		_node("injector", [_slot("F3", "hack_power", 0.0), _slot("J", "vulnerability", 0.0)]),
+		_node("spare", [_slot("F4", "hack_power", 150.0, "S"), _slot("X", "payload_damage", 50.0)]),
+		_node("splitter", [_slot("F5", "hack_power", 150.0, "S"), _slot("Y1", "payload_damage", 50.0, "", ["elsewhere"]), _slot("Y2", "payload_damage", 50.0)]),
+		_node("modifier", [_slot("M1", "vulnerability", 0.0), _slot("M2", "vulnerability", 0.0, "", ["elsewhere"])]),
+		_breach("corps", "L", ""),
+		_breach("gov", "L", ""),
+		_breach("anon", "", ""),
+		_node("collector", [_slot("C", "reward", 0.0)]),
+	]
+	for node: Node in nodes:
+		desktop.windows.add_child(node)
+	return desktop
+
+
+func _trial_windows() -> Dictionary:
+	var windows := {}
+	for type: String in ["src", "launcher", "virus", "injector", "spare", "splitter", "modifier", "corps", "gov", "anon"]:
+		windows[type] = {"name": type.capitalize(), "category": "hacking", "requirement": []}
+	windows["bank"] = {"name": "Infiltrer Banque", "category": "hacking", "requirement": ["research.bank"], "description": "Récupère des Jetons si elle réussit."}
+	windows["locked"] = {"name": "Verrouillé", "category": "hacking", "requirement": ["research.locked"]}
+	windows["collector"] = {"name": "Collecteur", "category": "other", "requirement": []}
+	windows["shop"] = {"name": "Boutique", "category": "other", "requirement": []}
+	return windows
+
+
+class TrialTable extends FakeTable:
+	var windows := {}
+	var resources := {"vulnerability": {"name": "Vulnérabilité"}, "infection_damage": {"name": "Dégâts d'infection"}, "payload_damage": {"name": "Dégâts Payload"}}
+
+
+func _test_trials() -> void:
+	var desktop := _trial_desktop()
+	var data := TrialTable.new()
+	data.windows = _trial_windows()
+	var globals := FakeGlobalsTable.new()
+	globals.unlocks = {"research.bank": true, "research.locked": false}
+	var trials := AdvisorTrials.read(HackingGraph.snapshot(desktop), data, globals)
+	var keys := PackedStringArray()
+	var texts := {}
+	for trial: Dictionary in trials:
+		keys.append(trial.key)
+		texts[trial.key] = trial.text
+	_check.call(keys.has("no_power|virus") and keys.has("no_power|injector"), "nodes without power are found: %s" % ", ".join(keys))
+	_check.call(keys.has("no_damage|anon") and texts["no_damage|anon"].contains("Anon ne reçoit aucun dégât"), "and a target that never attacks")
+	_check.call(keys.has("unused|spare") and texts["unused|spare"].contains("Dégâts Payload"), "and an output plugged into nothing")
+	_check.call(texts["unused|spare"].contains("sa sortie") and texts.get("unused|splitter", "").contains("une de ses sorties"), "a split with one free output says so: %s" % texts.get("unused|splitter", ""))
+	_check.call(keys.has("empty|vulnerability") and texts["empty|vulnerability"].contains("Vulnérabilité est vide sur Corps, Gov") and texts["empty|vulnerability"].contains("Injector") and texts["empty|vulnerability"].contains("Alimentez-le"), "an empty input another node could fill: %s" % texts.get("empty|vulnerability", ""))
+	_check.call(not texts.get("empty|vulnerability", "").contains("Modifier") and not texts.get("empty|vulnerability", "").contains("Anon"), "an idle input in the middle makes nothing, and a target without damage is told on its own")
+	_check.call(keys.has("empty|infection_damage") and texts["empty|infection_damage"].contains("Virus"), "the infection a node could bring once powered")
+	_check.call(keys.has("new|bank") and texts["new|bank"].contains("Récupère des Jetons si elle réussit") and texts["new|bank"].contains("Add Node"), "a node unlocked but not placed, with what the game says")
+	_check.call(not keys.has("new|locked") and not keys.has("new|shop") and not keys.has("new|corps"), "neither what is locked, nor what is not hacking, nor what is placed")
+	_check.call(trials[0].priority == AdvisorTrials.IDLE and trials[-1].key == "new|bank", "what can be done with the nodes already there comes first")
+	for trial: Dictionary in trials:
+		_check.call(not trial.text.contains("%"), "no figure in a suggestion: %s" % trial.text)
+	_check.call(AdvisorTrials.read({"windows": []}, null, null).is_empty(), "without the game's tables, nothing is suggested")
+
+	var advisor := HackingAdvisor.new()
+	advisor._chain = _chain()
+	advisor._model = HackingModel.new(advisor._chain)
+	advisor._objective = HackingAdvice.XP
+	for scenario: Dictionary in advisor._model.scenarios():
+		advisor._rows.append(advisor._model.evaluate(scenario))
+	advisor._current = advisor._model.evaluate(advisor._chain.current)
+	advisor._trials = trials
+	var richer := advisor._current.duplicate(true)
+	richer.xp_rate *= 1.3
+	advisor._upgrade_rows = [{"upgrade": {"name": "Dégâts Payload", "affordable": false, "resource": "points", "cost": 10.0, "cost_text": "10 points", "held": 4.0, "changes": {}}, "row": richer}]
+	var card := advisor._card()
+	var shown := 0
+	var titled := false
+	for line: Dictionary in card:
+		titled = titled or line.text == "À essayer"
+		shown += 1 if line.text.begins_with("• ") else 0
+	_check.call(titled and shown == AdvisorTrials.SHOWN, "the card keeps a short list: %d" % shown)
+	_check.call(advisor._note().contains("Autres pistes à essayer") and advisor._note().contains("Infiltrer Banque"), "the others wait in the details")
+	_check.call(advisor._saving_trial().text.contains("Il vous manque 6") and advisor._saving_trial().text.contains("+30 %"), "a purchase worth saving for: %s" % advisor._saving_trial().get("text", ""))
+	var state: String = advisor._state_of(advisor._chain, [], trials)
+	_check.call(state != advisor._state_of(advisor._chain, [], trials.slice(1)), "a node powered or placed refreshes the panel")
+	advisor.free()
+	globals.free()
+	data.free()
+	_free_desktop(desktop)
 
 
 ## A recalculation stutters: only a gesture of the player may start one.

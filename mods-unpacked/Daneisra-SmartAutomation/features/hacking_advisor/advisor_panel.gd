@@ -1,5 +1,6 @@
 extends CanvasLayer
 ## The advisor's panel. It only shows: its buttons change what is displayed, never the game.
+## The recommendation comes first; the tables behind it fold away.
 
 const LAYER := 90
 const TITLE_SIZE := 26
@@ -13,12 +14,21 @@ const TEXT := Color(0.93, 0.95, 0.98)
 const GOOD := Color(0.45, 0.9, 0.55)
 const CURRENT := Color(0.5, 0.78, 1.0)
 const MUTED := Color(0.62, 0.68, 0.75)
+const BAD := Color(1.0, 0.7, 0.45)
+const CARD := Color(0.1, 0.13, 0.19)
+const SHOW_DETAILS := "Afficher le détail des calculs"
+const HIDE_DETAILS := "Masquer le détail des calculs"
 
 var _objectives: HBoxContainer
 var _summary: Label
+var _card: VBoxContainer
+var _toggle: Button
+var _details: VBoxContainer
 var _grid: GridContainer
 var _upgrade_grid: GridContainer
 var _note: Label
+## Kept while the game runs: a player who wants the figures should not have to unfold them each time.
+var _details_open := false
 
 
 func _init() -> void:
@@ -56,28 +66,58 @@ func _init() -> void:
 	_summary = _label("", SUMMARY_SIZE, TEXT)
 	_wrap(_summary)
 	column.add_child(_summary)
+	var card_panel := PanelContainer.new()
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = CARD
+	card_style.set_corner_radius_all(6)
+	card_style.set_content_margin_all(14)
+	card_panel.add_theme_stylebox_override("panel", card_style)
+	column.add_child(card_panel)
+	_card = VBoxContainer.new()
+	_card.add_theme_constant_override("separation", 6)
+	card_panel.add_child(_card)
+	_toggle = _button(SHOW_DETAILS)
+	_toggle.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_toggle.pressed.connect(_on_toggle)
+	column.add_child(_toggle)
+	_details = VBoxContainer.new()
+	_details.add_theme_constant_override("separation", 14)
+	column.add_child(_details)
 	_grid = _new_grid()
-	column.add_child(_grid)
+	_details.add_child(_grid)
 	_upgrade_grid = _new_grid()
-	column.add_child(_upgrade_grid)
+	_details.add_child(_upgrade_grid)
 	_note = _label("", NOTE_SIZE, MUTED)
 	_wrap(_note)
-	column.add_child(_note)
+	_details.add_child(_note)
+	_show_details()
 
 
 func show_message(text: String) -> void:
 	visible = true
 	_summary.text = text
+	_summary.visible = true
 	_note.text = ""
 	_clear(_objectives)
+	_clear(_card)
+	_card.get_parent().visible = false
+	_toggle.visible = false
 	_fill(_grid, {"rows": [], "kinds": []})
 	_fill(_upgrade_grid, {"rows": [], "kinds": []})
 
 
-## tables hold rows, lists of cells, and kinds, each row's color: "header", "current", "best", "muted" or "".
-func show_advice(options: Array[Dictionary], selected: String, on_select: Callable, advice: String, connections: Dictionary, purchases: Dictionary, note: String) -> void:
+## card holds lines {text, kind}, kind being "title", "good", "bad", "muted" or "". tables hold rows, lists
+## of cells, and kinds, each row's color: "header", "current", "best", "muted" or "".
+func show_advice(options: Array[Dictionary], selected: String, on_select: Callable, card: Array[Dictionary], connections: Dictionary, purchases: Dictionary, note: String) -> void:
 	visible = true
-	_summary.text = advice
+	_summary.visible = false
+	_card.get_parent().visible = true
+	_toggle.visible = true
+	_clear(_card)
+	for line: Dictionary in card:
+		var label := _label(line.text, SUMMARY_SIZE if line.kind == "title" else CELL_SIZE, _color(line.kind))
+		_wrap(label)
+		_card.add_child(label)
 	_note.text = note
 	_clear(_objectives)
 	_objectives.add_child(_label("Objectif :", CELL_SIZE, MUTED))
@@ -90,6 +130,16 @@ func show_advice(options: Array[Dictionary], selected: String, on_select: Callab
 		_objectives.add_child(button)
 	_fill(_grid, connections)
 	_fill(_upgrade_grid, purchases)
+
+
+func _on_toggle() -> void:
+	_details_open = not _details_open
+	_show_details()
+
+
+func _show_details() -> void:
+	_details.visible = _details_open
+	_toggle.text = HIDE_DETAILS if _details_open else SHOW_DETAILS
 
 
 func _fill(grid: GridContainer, table: Dictionary) -> void:
@@ -115,8 +165,10 @@ func _color(kind: String) -> Color:
 			return MUTED
 		"current":
 			return CURRENT
-		"best":
+		"best", "good":
 			return GOOD
+		"bad":
+			return BAD
 	return TEXT
 
 
