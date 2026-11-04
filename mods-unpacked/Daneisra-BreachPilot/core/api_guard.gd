@@ -13,6 +13,21 @@ const SLOT_FIELDS := {
 }
 
 
+## The mod's former identifier: both copies at once would regulate the same nodes twice.
+const FORMER_IDS := ["Daneisra-SmartAutomation"]
+
+
+## The former copy of this mod still loaded, or "". The Mod Loader names each mod's main node after its id.
+static func former_install(root: Node) -> String:
+	var loader := root.get_node_or_null("ModLoader")
+	if loader == null:
+		return ""
+	for id: String in FORMER_IDS:
+		if loader.get_node_or_null(NodePath(id)) != null:
+			return id
+	return ""
+
+
 static func missing_autoload_api(root: Node) -> PackedStringArray:
 	var missing := PackedStringArray()
 	var signals := root.get_node_or_null("Signals")

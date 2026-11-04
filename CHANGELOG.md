@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.1 – en préparation : première publication publique
+## 0.5.1 – en préparation : BreachPilot, première publication publique
 
 ### Corrigé
 
@@ -10,6 +10,8 @@
 
 ### Modifié
 
+- **Le mod s'appelle désormais BreachPilot.** Son identifiant devient `Daneisra-BreachPilot`, et l'archive `Daneisra-BreachPilot-vX.Y.Z.zip`. Les réglages de l'ancien identifiant `Daneisra-SmartAutomation` ne sont pas repris : il faut remettre `regulation_mode` sur `active`. Si l'ancien mod est encore chargé, BreachPilot ne démarre pas et le journal l'indique, pour ne pas réguler deux fois les mêmes nœuds. Le manifeste le déclare aussi incompatible.
+- Licence MIT, incluse dans l'archive.
 - Le manifeste décrit la régulation par rentabilité et le Smart Hacking Advisor.
 - README en français et en anglais, avec l'installation, la désinstallation, les options et les limites connues.
 - `tools/verify_zip.py` vérifie l'archive avant publication et écrit son empreinte SHA-256.

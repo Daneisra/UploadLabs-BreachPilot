@@ -1,4 +1,4 @@
-First public release of **Smart Automation**, a hacking quality-of-life mod for Upload Labs. *Première publication publique de Smart Automation, mod de confort pour le hacking d'Upload Labs.*
+First public release of **BreachPilot**, a hacking quality-of-life mod for Upload Labs. *Première publication publique de BreachPilot, mod de confort pour le hacking d'Upload Labs.*
 
 Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans lien avec EnigmaDev Studios.*
 
@@ -18,7 +18,7 @@ Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans l
   - The panel no longer fails on an empty resource name.
   - Bilingual README and archive checks.
 
-**Install:** copy `Daneisra-SmartAutomation-0.5.1.zip`, without extracting it, into the `mods` folder next to `Upload Labs.exe`. To turn the regulation on, set `regulation_mode` to `active`, for example with ModManager. See the README for details and known limitations. The in-game interface is in French for now.
+**Install:** copy `Daneisra-BreachPilot-v0.5.1.zip`, without extracting it, into the `mods` folder next to `Upload Labs.exe`. To turn the regulation on, set `regulation_mode` to `active`, for example with ModManager. See the README for details and known limitations. The in-game interface is in French for now.
 
 **Tested on:** Upload Labs 3.0.12, Godot Mod Loader 7.0.1, Windows.
 
@@ -38,10 +38,10 @@ Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans l
   - Le panneau ne plante plus sur un nom de ressource vide.
   - README bilingue et vérification de l'archive.
 
-**Installation :** copiez `Daneisra-SmartAutomation-0.5.1.zip`, sans le décompresser, dans le dossier `mods` à côté de `Upload Labs.exe`. Pour activer la régulation, mettez `regulation_mode` sur `active`, par exemple avec ModManager. Le README détaille les options et les limites connues.
+**Installation :** copiez `Daneisra-BreachPilot-v0.5.1.zip`, sans le décompresser, dans le dossier `mods` à côté de `Upload Labs.exe`. Pour activer la régulation, mettez `regulation_mode` sur `active`, par exemple avec ModManager. Le README détaille les options et les limites connues.
 
 **Testé sur :** Upload Labs 3.0.12, Godot Mod Loader 7.0.1, Windows.
 
 ## SHA-256
 
-`Daneisra-SmartAutomation-0.5.1.zip` : see the attached `.sha256` file. *Voir le fichier `.sha256` joint.*
+`Daneisra-BreachPilot-v0.5.1.zip` : see the attached `.sha256` file. *Voir le fichier `.sha256` joint.*

@@ -4,5 +4,5 @@ config_version=5
 
 [application]
 
-config/name="Smart Automation (dev)"
+config/name="BreachPilot (dev)"
 config/features=PackedStringArray("4.7")

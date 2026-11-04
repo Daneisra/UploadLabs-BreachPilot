@@ -1,4 +1,4 @@
-# Upload Labs – Smart Automation
+# Upload Labs – BreachPilot
 
 [Français](#français) · [English](#english)
 
@@ -48,7 +48,7 @@ Le mod n'étend aucun script du jeu. Au démarrage, il vérifie les fonctions du
 
 **Depuis GitHub** :
 
-1. Téléchargez `Daneisra-SmartAutomation-<version>.zip` dans les [Releases](https://github.com/Daneisra/UploadLabs-SmartAutomation/releases). Vous pouvez contrôler son empreinte SHA-256, indiquée à côté.
+1. Téléchargez `Daneisra-BreachPilot-v<version>.zip` dans les [Releases](https://github.com/Daneisra/UploadLabs-BreachPilot/releases). Vous pouvez contrôler son empreinte SHA-256, indiquée à côté.
 2. Ouvrez le dossier du jeu : dans Steam, clic droit sur Upload Labs, *Gérer*, *Parcourir les fichiers locaux*.
 3. Créez un dossier `mods` à côté de `Upload Labs.exe` s'il n'existe pas, et copiez-y le zip **sans le décompresser**.
 4. Lancez le jeu.
@@ -68,7 +68,7 @@ La régulation est **désactivée par défaut** : le mod observe et le conseille
 
 ### Désinstallation
 
-Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos parties restent intactes : le mod n'écrit rien dans les sauvegardes, et les niveaux qu'il a choisis restent des niveaux normaux du jeu. Ses réglages sont dans `%APPDATA%\Upload Labs\mod_configs\Daneisra-SmartAutomation`, que vous pouvez supprimer.
+Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos parties restent intactes : le mod n'écrit rien dans les sauvegardes, et les niveaux qu'il a choisis restent des niveaux normaux du jeu. Ses réglages sont dans `%APPDATA%\Upload Labs\mod_configs\Daneisra-BreachPilot`, que vous pouvez supprimer.
 
 ### Limites connues
 
@@ -82,7 +82,7 @@ Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos par
 
 ### Journal et signalement d'un problème
 
-Le journal est `%APPDATA%\Upload Labs\logs\modloader.log`, lignes `Daneisra-SmartAutomation`. Pour signaler un problème, ouvrez une issue avec la version du jeu, la liste de vos mods et ces lignes du journal.
+Le journal est `%APPDATA%\Upload Labs\logs\modloader.log`, lignes `Daneisra-BreachPilot`. Pour signaler un problème, ouvrez une issue avec la version du jeu, la liste de vos mods et ces lignes du journal.
 
 ---
 
@@ -128,7 +128,7 @@ The mod extends no game script. At start-up it checks the game functions it reli
 
 **From GitHub**:
 
-1. Download `Daneisra-SmartAutomation-<version>.zip` from the [Releases](https://github.com/Daneisra/UploadLabs-SmartAutomation/releases). Its SHA-256 checksum is listed next to it.
+1. Download `Daneisra-BreachPilot-v<version>.zip` from the [Releases](https://github.com/Daneisra/UploadLabs-BreachPilot/releases). Its SHA-256 checksum is listed next to it.
 2. Open the game folder: in Steam, right-click Upload Labs, *Manage*, *Browse local files*.
 3. Create a `mods` folder next to `Upload Labs.exe` if there is none, and copy the zip into it **without extracting it**.
 4. Start the game.
@@ -148,7 +148,7 @@ The regulation is **off by default**: the mod observes and the advisor works, bu
 
 ### Uninstalling
 
-Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your saves stay intact: the mod writes nothing into them, and the levels it chose are ordinary game levels. Its settings live in `%APPDATA%\Upload Labs\mod_configs\Daneisra-SmartAutomation`, which you may delete.
+Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your saves stay intact: the mod writes nothing into them, and the levels it chose are ordinary game levels. Its settings live in `%APPDATA%\Upload Labs\mod_configs\Daneisra-BreachPilot`, which you may delete.
 
 ### Known limitations
 
@@ -162,7 +162,7 @@ Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your save
 
 ### Log and bug reports
 
-The log is `%APPDATA%\Upload Labs\logs\modloader.log`, lines starting with `Daneisra-SmartAutomation`. To report a problem, open an issue with the game version, your mod list and those log lines.
+The log is `%APPDATA%\Upload Labs\logs\modloader.log`, lines starting with `Daneisra-BreachPilot`. To report a problem, open an issue with the game version, your mod list and those log lines.
 
 ---
 
@@ -174,6 +174,8 @@ The log is `%APPDATA%\Upload Labs\logs\modloader.log`, lines starting with `Dane
 
 Ce dépôt ne contient aucun fichier du jeu, aucune sauvegarde et aucun secret. *This repository contains no game file, no save and no secret.*
 
-## Droits · Rights
+## Licence · License
 
-Upload Labs et ses contenus appartiennent à EnigmaDev Studios. Ce mod ne contient aucun code, asset ni donnée du jeu : il lit l'état du jeu pendant l'exécution. *Upload Labs and its content belong to EnigmaDev Studios. This mod contains no code, asset or data from the game: it reads the game's state while it runs.*
+Le code et la documentation de BreachPilot sont publiés sous [licence MIT](LICENSE), © 2026 Daneisra. Cette licence ne porte que sur ce projet. Elle n'accorde aucun droit sur Upload Labs, son code, ses ressources graphiques ou sonores, ses données ni ses autres éléments protégés, qui appartiennent à EnigmaDev Studios. Le mod ne contient aucun de ces éléments : il lit l'état du jeu pendant l'exécution.
+
+*BreachPilot's code and documentation are released under the [MIT License](LICENSE), © 2026 Daneisra. The license covers this project only. It grants no right on Upload Labs, its code, art, sound, data or any other protected element, which belong to EnigmaDev Studios. The mod contains none of them: it reads the game's state while it runs.*

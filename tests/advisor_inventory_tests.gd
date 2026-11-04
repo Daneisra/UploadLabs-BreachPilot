@@ -1,7 +1,7 @@
 extends RefCounted
 ## The inventory stays bounded, hides what it must not read, and only reads.
 
-const AdvisorInventory := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/hacking_advisor/advisor_inventory.gd")
+const AdvisorInventory := preload("res://mods-unpacked/Daneisra-BreachPilot/features/hacking_advisor/advisor_inventory.gd")
 
 
 class FakeContainer extends Node:

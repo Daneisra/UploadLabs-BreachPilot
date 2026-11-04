@@ -1,6 +1,6 @@
 extends Node
 
-const MOD_ID := "Daneisra-SmartAutomation"
+const MOD_ID := "Daneisra-BreachPilot"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
 const BUILD := "0.5.1"
 const ApiGuard := preload("core/api_guard.gd")
@@ -26,6 +26,10 @@ func _ready() -> void:
 	var settings := _read_settings()
 	_log = SaLog.new(settings.log_level)
 
+	var former := ApiGuard.former_install(get_tree().root)
+	if not former.is_empty():
+		_log.error("start result=refused reason=former_install_loaded mod=%s: remove its zip from the mods folder" % former)
+		return
 	var missing := ApiGuard.missing_autoload_api(get_tree().root)
 	if not missing.is_empty():
 		_log.error("api_check result=failed missing=%s" % ",".join(missing))

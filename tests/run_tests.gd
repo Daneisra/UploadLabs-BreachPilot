@@ -3,7 +3,7 @@ extends SceneTree
 ## Godot_console.exe --headless --path . --script res://tests/run_tests.gd
 ## These scenarios are built from our reading of the game: they do not replace the in-game tests.
 
-const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/"
+const MOD := "res://mods-unpacked/Daneisra-BreachPilot/"
 const Classifier := preload(MOD + "features/threat_manager/breach_classifier.gd")
 const Prediction := preload(MOD + "features/threat_manager/breach_prediction.gd")
 const Simulator := preload(MOD + "features/threat_manager/breach_simulator.gd")
@@ -766,6 +766,16 @@ func _test_guard() -> void:
 	window.free()
 	var breach := FakeBreach.new()
 	_check(ApiGuard.missing_breach_api(breach).is_empty(), "complete window passes")
+	var fake_root := Node.new()
+	var loader := Node.new()
+	loader.name = "ModLoader"
+	fake_root.add_child(loader)
+	_check(ApiGuard.former_install(fake_root) == "", "alone, the mod starts")
+	var former := Node.new()
+	former.name = "Daneisra-SmartAutomation"
+	loader.add_child(former)
+	_check(ApiGuard.former_install(fake_root) == "Daneisra-SmartAutomation", "the former Smart Automation still loaded is found, so as not to regulate twice")
+	fake_root.free()
 	var hollow := FakeBreach.new()
 	hollow.data = {}
 	hollow.vulnerability = null
@@ -1190,7 +1200,7 @@ func _play_volleys(game: Dictionary, breach: FakeBreach, restart: bool = false) 
 
 
 func _control_of(window: Node) -> Node:
-	return window.find_child("SmartAutomationControl", true, false)
+	return window.find_child("BreachPilotControl", true, false)
 
 
 ## Plays attacks and lets the game's timer pass, until a condition holds or the attempts run out.
@@ -1494,14 +1504,14 @@ func _test_automation_control() -> void:
 	observer.start()
 	game.Signals.desktop_ready.emit()
 	game.Signals.window_initialized.emit(corps)
-	_check(corps.find_children("SmartAutomationControl", "", true, false).size() == 1, "no duplicate")
+	_check(corps.find_children("BreachPilotControl", "", true, false).size() == 1, "no duplicate")
 	_check(_control_of(corps).button().pressed.get_connections().size() == 1, "no duplicate connection")
 
 	# Restarting the observer twice leaves a single control, with a single connection.
 	for round_index: int in 2:
 		observer.stop()
 		observer.start()
-	_check(corps.find_children("SmartAutomationControl", "", true, false).size() == 1 and _control_of(corps).button().pressed.get_connections().size() == 1, "restarts leave one control")
+	_check(corps.find_children("BreachPilotControl", "", true, false).size() == 1 and _control_of(corps).button().pressed.get_connections().size() == 1, "restarts leave one control")
 
 	# The pause belongs to the type: it survives the node, and the observer.
 	_control_of(corps).button().pressed.emit()
@@ -1518,7 +1528,7 @@ func _test_automation_control() -> void:
 	game.desktop.windows.add_child(corps)
 	game.Signals.window_created.emit(corps)
 	_check(_control_of(corps).shown().kind == "pause", "and the node being deleted and made again")
-	_check(corps.find_children("SmartAutomationControl", "", true, false).size() == 1, "with one control")
+	_check(corps.find_children("BreachPilotControl", "", true, false).size() == 1, "with one control")
 
 	# A block is not a pause, and the resume button does not lift it.
 	_control_of(corps).button().pressed.emit()

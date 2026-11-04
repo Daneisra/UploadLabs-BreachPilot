@@ -1,6 +1,6 @@
 """Check a built mod archive before it is published, and write its SHA-256 next to it.
 
-Usage: python tools/verify_zip.py [build/Daneisra-SmartAutomation-<version>.zip]
+Usage: python tools/verify_zip.py [build/Daneisra-BreachPilot-v<version>.zip]
 Without an argument, the archive matching the current BUILD is checked. Exit code 0 when every check passes.
 """
 import hashlib
@@ -11,10 +11,10 @@ import sys
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-MOD_ID = "Daneisra-SmartAutomation"
+MOD_ID = "Daneisra-BreachPilot"
 PREFIX = f"mods-unpacked/{MOD_ID}/"
 ALLOWED = {".gd", ".uid", ".json"}
-REQUIRED = ["manifest.json", "mod_main.gd"]
+REQUIRED = ["manifest.json", "mod_main.gd", "LICENSE"]
 # Anything that must never ship: saves, secrets, game data, logs, tests, editor or build leftovers.
 FORBIDDEN = re.compile(r"(?i)(savegame|token|\.dat$|\.bak$|\.pck$|\.gdc$|\.log$|\.env$|tests?/|\.godot/|\.import$|__pycache__|\.zip$)")
 PRIVATE = re.compile(r"(?i)(C:\\\\Users|C:/Users|AppData|steamapps|@gmail|password|ghp_|github_pat)")
@@ -27,7 +27,7 @@ def fail(errors: list, message: str) -> None:
 def main() -> int:
     mod_dir = ROOT / "mods-unpacked" / MOD_ID
     build = re.search(r'const BUILD := "([^"]+)"', (mod_dir / "mod_main.gd").read_text(encoding="utf-8")).group(1)
-    path = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / f"{MOD_ID}-{build}.zip"
+    path = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / f"{MOD_ID}-v{build}.zip"
     errors: list = []
     if not path.is_file():
         print(f"FAIL archive not found: {path}")
@@ -46,7 +46,7 @@ def main() -> int:
             if FORBIDDEN.search(name):
                 fail(errors, f"forbidden file: {name}")
         for name in files:
-            if pathlib.PurePosixPath(name).suffix not in ALLOWED:
+            if pathlib.PurePosixPath(name).suffix not in ALLOWED and name != PREFIX + "LICENSE":
                 fail(errors, f"unexpected file type: {name}")
             text = archive.read(name).decode("utf-8", errors="replace")
             if PRIVATE.search(text):
@@ -56,10 +56,12 @@ def main() -> int:
                 fail(errors, f"missing {required}")
 
         # Every file of the mod folder ships, and only those.
-        on_disk = {p.relative_to(ROOT).as_posix() for p in mod_dir.rglob("*") if p.is_file()}
+        on_disk = {p.relative_to(ROOT).as_posix() for p in mod_dir.rglob("*") if p.is_file()} | {PREFIX + "LICENSE"}
         if set(files) != on_disk:
             fail(errors, "archive differs from the mod folder: missing %s, extra %s" % (sorted(on_disk - set(files)), sorted(set(files) - on_disk)))
 
+        if PREFIX + "LICENSE" in names and archive.read(PREFIX + "LICENSE") != (ROOT / "LICENSE").read_bytes():
+            fail(errors, "LICENSE differs from the repository's")
         manifest = json.loads(archive.read(PREFIX + "manifest.json").decode("utf-8"))
         main_gd = archive.read(PREFIX + "mod_main.gd").decode("utf-8")
         shipped_build = re.search(r'const BUILD := "([^"]+)"', main_gd).group(1)
@@ -69,7 +71,7 @@ def main() -> int:
             fail(errors, "version_number is not major.minor.patch: %s" % manifest.get("version_number"))
         if shipped_build != manifest.get("version_number"):
             fail(errors, f"BUILD {shipped_build} is not the release version {manifest.get('version_number')} (a dev build?)")
-        if not path.name == f"{MOD_ID}-{shipped_build}.zip":
+        if not path.name == f"{MOD_ID}-v{shipped_build}.zip":
             fail(errors, f"archive name {path.name} does not match BUILD {shipped_build}")
         schema = manifest.get("extra", {}).get("godot", {}).get("config_schema", {}).get("properties", {})
         if schema.get("regulation_mode", {}).get("default") != "off":

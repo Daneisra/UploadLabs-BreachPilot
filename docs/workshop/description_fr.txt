@@ -1,4 +1,4 @@
-[h1]Smart Automation – Régulation et conseil du hacking[/h1]
+[h1]BreachPilot – Hacking Automation & Advisor[/h1]
 
 Mod de confort consacré au hacking. Il garde chaque nœud d'infiltration sur son niveau de menace le plus rentable, et un conseiller en lecture seule propose le meilleur branchement de votre chaîne. Il respecte les règles du jeu : aucun dégât, aucune récompense ni ressource modifiés, rien de gratuit.
 
@@ -46,4 +46,4 @@ Mod de confort consacré au hacking. Il garde chaque nœud d'infiltration sur so
 [*]Certaines mécaniques d'infection n'ont été mesurées que sur une chaîne.
 [/list]
 
-Code source, changelog et signalements : [url=https://github.com/Daneisra/UploadLabs-SmartAutomation]GitHub[/url]. Joignez les lignes [b]Daneisra-SmartAutomation[/b] de %APPDATA%\Upload Labs\logs\modloader.log.
+Code source, changelog et signalements : [url=https://github.com/Daneisra/UploadLabs-BreachPilot]GitHub[/url]. Joignez les lignes [b]Daneisra-BreachPilot[/b] de %APPDATA%\Upload Labs\logs\modloader.log.

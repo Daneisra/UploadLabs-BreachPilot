@@ -2,7 +2,7 @@ extends RefCounted
 ## Actuator checks, tested without the game. The fake window only follows what we think the game does:
 ## these tests cannot prove what a real call to the game's methods would do.
 
-const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/"
+const MOD := "res://mods-unpacked/Daneisra-BreachPilot/"
 const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 const Regulator := preload(MOD + "features/threat_manager/threat_regulator.gd")
 const Forecast := preload(MOD + "features/threat_manager/breach_forecast.gd")
