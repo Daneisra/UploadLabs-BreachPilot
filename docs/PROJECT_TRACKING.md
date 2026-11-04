@@ -115,7 +115,7 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
   - Le Mod Loader a chargé ce zip depuis le Workshop, une seule fois. Il a retiré de lui-même l'ancienne entrée locale du profil, dont le zip n'existait plus, et l'entrée BreachPilot pointe maintenant vers le Workshop.
   - ModManager a repris la configuration `user` : régulation `active`, profil équilibré, en français.
   - Régulation et conseiller normaux : 34 attaques réussies, aucun échec, aucun changement de niveau nécessaire, aucun arrêt, aucune erreur du mod.
-- **Catégorie `QOL` :** pas encore posée. Deux envois par `ISteamUGC::SetItemTags` ont reçu de Steam le code 3, « pas de connexion », alors que l'essai à blanc était bon. Rien d'autre n'a été modifié.
+- **Catégorie `QOL` :** posée le 2026-11-05 par `tools/set_workshop_tags.py` (`ISteamUGC::SetItemTags`, tags seuls), avec le résultat `OK` de Steam. Les deux premiers envois, la veille, avaient reçu le code 3 (« pas de connexion ») tant que le client Steam n'était pas en ligne. L'élément est resté privé.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
