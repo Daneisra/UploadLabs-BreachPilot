@@ -1258,6 +1258,13 @@ func _test_regulation_in_observer() -> void:
 	game.Signals.tick.emit()
 	_check(_control_of(government).shown().text == "Auto : actif", "the node says it is active: %s" % str(_control_of(government).shown()))
 	_check(_control_of(corps).shown().text == "Auto : actif", "and so does the other one")
+	# The game's language changes with nothing else happening: the states follow at once, and come back.
+	I18n.forced = "en"
+	observer.notification(Node.NOTIFICATION_TRANSLATION_CHANGED)
+	_check(_control_of(government).shown().text == "Auto: on" and _control_of(government)._advice_button.text == "Advice", "a language change rewrites the node's state: %s" % str(_control_of(government).shown()))
+	I18n.forced = "fr"
+	observer.notification(Node.NOTIFICATION_TRANSLATION_CHANGED)
+	_check(_control_of(government).shown().text == "Auto : actif" and _control_of(government)._advice_button.text == "Conseil", "and back")
 
 	# Straight from 0 to 4 in one action, verified, then a deliberate hold.
 	var attacks_before := _count("event=success type=breach_government")

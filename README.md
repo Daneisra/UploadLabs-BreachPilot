@@ -10,7 +10,7 @@
 
 Mod de confort consacré au **hacking** d'[Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). Il règle le niveau de menace de vos nœuds d'infiltration sur le niveau le plus rentable, et un panneau de conseil vous propose le meilleur branchement de votre chaîne. Le mod respecte les mécaniques du jeu : il ne modifie ni les dégâts, ni les récompenses, ni les ressources, et ne crée rien gratuitement.
 
-**Version actuelle : 0.5.1.** Interface en français. La prochaine version est bilingue, en français et en anglais.
+**Version actuelle : 0.6.0.** Interface en français et en anglais : le mod suit la langue du jeu, sans redémarrage.
 
 ### Fonctionnalités
 
@@ -26,7 +26,7 @@ Mod de confort consacré au **hacking** d'[Upload Labs](https://store.steampower
 
 **Smart Hacking Advisor : conseiller en lecture seule**
 
-- `Ctrl+Alt+F8`, ou le bouton `Conseil` d'un nœud d'infiltration.
+- `Ctrl+Alt+F8`, ou le bouton `Conseil` (`Advice` en anglais) d'un nœud d'infiltration.
 - Affiche d'abord le meilleur branchement pour l'objectif choisi, étape par étape, avec le gain estimé, les inconvénients et la fiabilité, puis l'achat conseillé.
 - Section **« À essayer »** : nœuds sans puissance ou sans dégâts, sorties ou entrées libres, nœuds débloqués pas encore posés. Pas de chiffre tant que rien n'est mesuré.
 - Le détail des calculs (branchements comparés, achats, niveaux) est dans une section repliable.
@@ -73,7 +73,7 @@ Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos par
 
 ### Limites connues
 
-- Interface en français uniquement dans la 0.5.1. La prochaine version suit la langue du jeu : français, ou anglais pour toute autre langue.
+- Interface en français et en anglais. Une autre langue du jeu donne l'interface anglaise. Après un changement de langue, le jeu laisse certains de ses propres textes dans l'ancienne langue jusqu'à son redémarrage : BreachPilot, lui, change aussitôt.
 - Une nouvelle chaîne ou un nouveau nœud demande quelques attaques avant d'être chiffré : le panneau affiche alors « données insuffisantes ».
 - Une anomalie (niveau inattendu, état incohérent) arrête la régulation de tous les nœuds jusqu'au redémarrage du jeu. C'est voulu, par prudence.
 - Les achats sont comparés un par un : leurs gains ne s'additionnent pas.
@@ -91,7 +91,7 @@ Le journal est `%APPDATA%\Upload Labs\logs\modloader.log`, lignes `Daneisra-Brea
 
 A quality-of-life mod for **hacking** in [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). It sets the threat level of your Breach nodes to the most profitable level, and an advisor panel suggests the best wiring for your chain. It plays by the game's rules: no damage, reward or resource is changed, and nothing is created for free.
 
-**Current version: 0.5.1.** The in-game interface is in French in 0.5.1; the next version is bilingual, French and English.
+**Current version: 0.6.0.** The interface is in English and French: the mod follows the game's language, without a restart.
 
 ### Features
 
@@ -107,9 +107,9 @@ A quality-of-life mod for **hacking** in [Upload Labs](https://store.steampowere
 
 **Smart Hacking Advisor: read-only**
 
-- `Ctrl+Alt+F8`, or the `Conseil` button of a Breach node.
+- `Ctrl+Alt+F8`, or the `Advice` button (`Conseil` in French) of a Breach node.
 - Shows the best wiring for the chosen objective first, step by step, with the estimated gain, the drawbacks and how reliable it is, then the recommended purchase.
-- **"À essayer"** (things to try): nodes without power or damage, free outputs or inputs, unlocked nodes not placed yet. No figure until something has been measured.
+- **"Things to try"**: nodes without power or damage, free outputs or inputs, unlocked nodes not placed yet. No figure until something has been measured.
 - The detailed figures (wirings compared, purchases, levels) are in a collapsible section.
 - It only displays: your wiring and purchases stay in your hands.
 
@@ -154,7 +154,7 @@ Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your save
 
 ### Known limitations
 
-- The interface is in French only in 0.5.1. The next version follows the game's language: French, or English for any other language.
+- The interface is in English and French. Any other game language gives the English interface. After a language change, the game keeps some of its own texts in the former language until it restarts: BreachPilot switches at once.
 - A new chain or node needs a few attacks before it gets figures; meanwhile the panel shows "données insuffisantes" (not enough data).
 - An anomaly (unexpected level, inconsistent state) stops the regulation of every node until the game is restarted. This is deliberate, out of caution.
 - Purchases are compared one at a time: their gains do not add up.

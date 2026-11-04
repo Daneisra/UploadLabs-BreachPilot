@@ -939,7 +939,7 @@ func _test_refresh_state() -> void:
 	var measuring := _chain()
 	measuring.streams.P.multipliers = PackedFloat32Array([0.6])
 	_check.call(advisor._state_of(measuring, upgrades) != state, "a measure becoming sufficient recalculates")
-	_check.call(advisor._state_of({"error": "no_target"}, upgrades) == "fr|no_target", "an error is a state too, in its language")
+	_check.call(advisor._state_of({"error": "no_target"}, upgrades).ends_with("|no_target") and advisor._state_of({"error": "no_target"}, upgrades).begins_with("fr:"), "an error is a state too, in its language")
 	advisor.free()
 
 

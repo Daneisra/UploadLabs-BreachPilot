@@ -1,10 +1,10 @@
 # Changelog
 
-## Non publié : interface bilingue
+## 0.6.0 – 2026-11-04 : interface bilingue
 
 ### Ajouté
 
-- Interface en français et en anglais. Le mod suit la langue du jeu : français si le jeu est en français, anglais pour toute autre langue ou si la langue ne peut être lue. Les noms des nœuds, des ressources et des achats restent ceux que le jeu traduit lui-même.
+- Interface en français et en anglais. Le mod suit la langue du jeu : français si le jeu est en français, anglais pour toute autre langue ou si la langue ne peut être lue. Un changement de langue dans les options du jeu s'applique aussitôt, sans redémarrage : panneau, boutons et états des nœuds, infobulles. Les noms des nœuds, des ressources et des achats restent ceux que le jeu traduit lui-même.
 - Nombres et pourcentages écrits à la manière de chaque langue : `26 113 829` et `99 %` en français, `26,113,829` et `99%` en anglais.
 - Le journal indique la langue retenue au démarrage.
 

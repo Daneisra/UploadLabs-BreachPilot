@@ -252,6 +252,13 @@ func stop() -> void:
 	_log.info("observer state=stopped")
 
 
+## Godot tells every node when the game's language changes: the states under the nodes are written again,
+## even with nothing else happening. Nothing runs at each tick for this.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and not _trackers.is_empty():
+		_refresh_controls()
+
+
 func _exit_tree() -> void:
 	stop()
 

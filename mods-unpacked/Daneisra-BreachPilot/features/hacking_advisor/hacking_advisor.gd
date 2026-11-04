@@ -104,9 +104,11 @@ func _look_at_chain() -> void:
 ## up or research growing, must not recalculate.
 func _state_of(chain: Dictionary, upgrades: Array[Dictionary], trials: Array[Dictionary] = []) -> String:
 	# The language too: the texts are written when the figures are shown.
+	# The full locale, not only the table used: the game's names change with it even when the mod's do not.
+	var language := "%s:%s" % [I18n.language(), TranslationServer.get_locale()]
 	if chain.error != "":
-		return "%s|%s" % [I18n.language(), chain.error]
-	var parts := PackedStringArray([I18n.language(), _objective, str(chain.current)])
+		return "%s|%s" % [language, chain.error]
+	var parts := PackedStringArray([language, _objective, str(chain.current)])
 	for trial: Dictionary in trials:
 		parts.append(trial.key)
 	for key: String in chain.targets:

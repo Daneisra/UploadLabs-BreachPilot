@@ -2,7 +2,7 @@ extends Node
 
 const MOD_ID := "Daneisra-BreachPilot"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.6.0-dev.1"
+const BUILD := "0.6.0"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const I18n := preload("core/i18n.gd")
