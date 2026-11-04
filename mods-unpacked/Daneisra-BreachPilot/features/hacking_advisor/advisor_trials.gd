@@ -95,7 +95,9 @@ static func _empty_inputs(list: Array[Dictionary], graph: Dictionary, data: Vari
 		if makers.is_empty():
 			continue
 		var values := {"resource": _resource(data, resource), "targets": ", ".join(empty[resource]), "makers": I18n.join_and(makers)}
-		list.append({"key": "empty|%s" % resource, "priority": EMPTY_INPUT, "text": I18n.t("trial.empty_input_plug" if powered else "trial.empty_input_power", values)})
+		# One maker or several: the sentence agrees with them.
+		var text := I18n.t_count("trial.empty_input_plug", makers.size(), values) if powered else I18n.t_count("trial.empty_input_power", makers.size(), values)
+		list.append({"key": "empty|%s" % resource, "priority": EMPTY_INPUT, "text": text})
 
 
 ## A hacking node the player can place but has not, with what the game says it does.

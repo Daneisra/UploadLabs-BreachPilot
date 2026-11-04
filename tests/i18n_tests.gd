@@ -144,10 +144,19 @@ func _test_formats() -> void:
 	_check(I18n.t(I18n.vowel_variant("step.unplug", "Anonymous"), {"stream": "Payload", "target": "Anonymous"}) == "Payload : débrancher d'Anonymous", "French elides before a vowel")
 	_check(I18n.t(I18n.vowel_variant("step.unplug", "Gouvernement"), {"stream": "Payload", "target": "Gouvernement"}) == "Payload : débrancher de Gouvernement", "and not before a consonant")
 	_check(HackingUpgrades.cost_text(1.0, "hack_points") == "1 point de piratage" and HackingUpgrades.cost_text(3.0, "hack_points") == "3 points de piratage", "French costs")
+	var values := {"resource": "Vulnérabilité", "targets": "Entreprises", "makers": "Injection"}
+	_check(I18n.t_count("trial.empty_input_power", 1, values).contains("alors que Injection en produit. Alimentez-le, puis branchez-y sa sortie"), "one maker: singular")
+	values.makers = I18n.join_and(PackedStringArray(["Injection", "Virus"]))
+	_check(I18n.t_count("trial.empty_input_power", 2, values).contains("alors que Injection et Virus en produisent. Alimentez-les, puis branchez-y une de leurs sorties"), "two makers: plural")
+	_check(I18n.t_count("trial.empty_input_plug", 2, values).contains("en produisent. Branchez-y une de leurs sorties"), "and when they are powered")
 	I18n.forced = "en"
 	_check(I18n.percent(99) == "99%" and I18n.percent(2, true) == "+2%" and HackingAdvice.percent(120.0, 100.0) == "+20%", "English percentages")
 	_check(HackingUpgrades.grouped(26113829114.0) == "26,113,829,114" and HackingUpgrades.grouped(4603854016022367232.0) == "4.60e18", "English digit groups")
 	_check(I18n.join_and(PackedStringArray(["A", "B"])) == "A and B", "English lists")
 	_check(I18n.t(I18n.vowel_variant("step.unplug", "Anonymous"), {"stream": "Payload", "target": "Anonymous"}) == "Payload: disconnect from Anonymous", "English ignores elision")
 	_check(HackingUpgrades.cost_text(1.0, "hack_points") == "1 hack point" and HackingUpgrades.cost_text(2.0, "token") == "2 tokens", "English costs")
+	var makers := {"resource": "Vulnerability", "targets": "Corporations", "makers": "Injection"}
+	_check(I18n.t_count("trial.empty_input_plug", 1, makers).contains("while Injection makes it. Connect its output"), "one maker in English")
+	makers.makers = "Injection and Virus"
+	_check(I18n.t_count("trial.empty_input_power", 2, makers).contains("while Injection and Virus make it. Give them hack power, then connect one of their outputs"), "several makers in English")
 	_check(HackingUpgrades.downsides({"breach_damage_multiplier": {"ratio": 0.6}}) == PackedStringArray(["Payload damage -40%"]), "a purchase's loss in English")

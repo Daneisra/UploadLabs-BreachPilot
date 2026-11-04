@@ -34,6 +34,6 @@ Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans l
 
 `Daneisra-BreachPilot-v0.6.0.zip`
 
-`c1f3a979d0531d4baf0b2d224c67fa3b8c858a7d31ecbadeb4672285de763e63`
+`337064939011531a0cd7deb40f0582faea5d085c872068d1417c3bd1c86e5241`
 
 Also in the attached `.sha256` file. *Aussi dans le fichier `.sha256` joint.*
