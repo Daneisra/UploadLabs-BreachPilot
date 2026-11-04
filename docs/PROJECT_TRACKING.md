@@ -109,6 +109,12 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 - **Vérifications :**
   - SteamCMD a inscrit l'identifiant dans le VDF, et une copie du VDF de création est conservée à côté ;
   - pour un visiteur non connecté, l'API publique de Steam ne trouve pas l'élément (code 9) : il est bien privé.
+- **Essai par abonnement, 2026-11-05, 00 h 15 à 00 h 18 : réussi.**
+  - Le zip local de la v0.6.0 a d'abord été mis de côté dans la sauvegarde `2026-11-04_23-56-29_avant-essai-workshop-breachpilot`.
+  - Steam a téléchargé l'élément dans `workshop/content/3606890/3833859813/` : un seul zip, de 101 295 octets, identique octet par octet à la Release (`33706493…6e5241`), manifeste `3860899550807678473`.
+  - Le Mod Loader a chargé ce zip depuis le Workshop, une seule fois. Il a retiré de lui-même l'ancienne entrée locale du profil, dont le zip n'existait plus, et l'entrée BreachPilot pointe maintenant vers le Workshop.
+  - ModManager a repris la configuration `user` : régulation `active`, profil équilibré, en français.
+  - Régulation et conseiller normaux : 34 attaques réussies, aucun échec, aucun changement de niveau nécessaire, aucun arrêt, aucune erreur du mod.
 - **Catégorie `QOL` :** pas encore posée. Deux envois par `ISteamUGC::SetItemTags` ont reçu de Steam le code 3, « pas de connexion », alors que l'essai à blanc était bon. Rien d'autre n'a été modifié.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
