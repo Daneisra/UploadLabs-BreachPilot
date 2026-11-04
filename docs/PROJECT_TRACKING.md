@@ -14,6 +14,7 @@
 | Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Daneisra, tag `v0.3.0` |
 | Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Daneisra le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 | Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Daneisra le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
+| BreachPilot, `0.5.1` (première publication publique) | **Terminée**, validée en jeu par Daneisra le 2026-11-04, tag `v0.5.1` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -96,6 +97,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 **Vérifié en jeu sur la `0.5.0-dev.4`, 2026-11-04, 15:15 à 17:51 :** 57 changements de niveau, tous vérifiés, aucun arrêt, aucun refus, aucune erreur. Anonymous remonte seul de 0 à 35 en moins d'une minute, puis reste sur son niveau rentable. En équilibré, Gouvernement et Entreprises gardent leur niveau et reviennent après chaque déblocage. La suppression d'un nœud n'a pas été refaite en jeu : elle reste couverte par les tests automatiques, à la demande de Daneisra.
 
 **Sortie de la `0.5.0`, 2026-11-04 :** Entreprises a perdu trois essais à 44 prévus à 40 %, toutes les vingt attaques environ, avant de réussir après un gain de puissance. À la demande de Daneisra, le conservateur et l'équilibré ne retentent un déblocage raté que lorsque la chance prévue a gagné au moins 10 points ; l'agressif garde ses essais périodiques. Restent pour plus tard : les achats combinés, les emplacements libres des nœuds déjà posés (« 1/3 », probablement via le champ `attribute`), et l'infection sur d'autres chaînes.
+
+**BreachPilot `0.5.1`, 2026-11-04 :** le mod Smart Automation devient BreachPilot (identifiant `Daneisra-BreachPilot`, licence MIT). Trois corrections viennent d'une revue Codex : un nœud d'un autre mod qui imite une cible est écarté, la rentabilité est remesurée quand la chaîne change, et le panneau tient face à un nom de ressource vide. `max_allowed_level` à 0 veut dire « sans limite », comme -1, car ModManager ne descend pas sous 0. Essais en jeu, deux parties : chargement unique de BreachPilot, réglages repris par ModManager, 6 changements de niveau tous vérifiés, aucune erreur. Non vérifiés en jeu, couverts par les tests : un nœud d'un autre mod qui imite une cible, la remesure après un changement de chaîne, le refus de démarrer avec l'ancien mod, et l'enregistrement d'un plafond par ModManager.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
