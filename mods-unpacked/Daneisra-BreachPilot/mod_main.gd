@@ -2,9 +2,10 @@ extends Node
 
 const MOD_ID := "Daneisra-BreachPilot"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.5.1"
+const BUILD := "0.6.0-dev.1"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
+const I18n := preload("core/i18n.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
 const AdvisorInventory := preload("features/hacking_advisor/advisor_inventory.gd")
 const HackingAdvisor := preload("features/hacking_advisor/hacking_advisor.gd")
@@ -35,6 +36,7 @@ func _ready() -> void:
 		_log.error("api_check result=failed missing=%s" % ",".join(missing))
 		return
 	_log.info("api_check result=ok")
+	_log.info("language=%s locale=%s" % [I18n.language(), TranslationServer.get_locale()])
 
 	_observer = ThreatObserver.new()
 	_observer.name = "ThreatObserver"

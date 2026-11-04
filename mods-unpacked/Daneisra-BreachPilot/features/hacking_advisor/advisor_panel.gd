@@ -16,9 +16,10 @@ const CURRENT := Color(0.5, 0.78, 1.0)
 const MUTED := Color(0.62, 0.68, 0.75)
 const BAD := Color(1.0, 0.7, 0.45)
 const CARD := Color(0.1, 0.13, 0.19)
-const SHOW_DETAILS := "Afficher le détail des calculs"
-const HIDE_DETAILS := "Masquer le détail des calculs"
+const I18n := preload("../../core/i18n.gd")
 
+var _title: Label
+var _close: Button
 var _objectives: HBoxContainer
 var _summary: Label
 var _card: VBoxContainer
@@ -53,12 +54,12 @@ func _init() -> void:
 
 	var header := HBoxContainer.new()
 	column.add_child(header)
-	var title := _label("Conseil hacking", TITLE_SIZE, TEXT)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var close := _button("Fermer")
-	close.pressed.connect(func() -> void: visible = false)
-	header.add_child(close)
+	_title = _label("", TITLE_SIZE, TEXT)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_title)
+	_close = _button("")
+	_close.pressed.connect(func() -> void: visible = false)
+	header.add_child(_close)
 
 	_objectives = HBoxContainer.new()
 	_objectives.add_theme_constant_override("separation", 8)
@@ -76,7 +77,7 @@ func _init() -> void:
 	_card = VBoxContainer.new()
 	_card.add_theme_constant_override("separation", 6)
 	card_panel.add_child(_card)
-	_toggle = _button(SHOW_DETAILS)
+	_toggle = _button("")
 	_toggle.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_toggle.pressed.connect(_on_toggle)
 	column.add_child(_toggle)
@@ -95,6 +96,7 @@ func _init() -> void:
 
 func show_message(text: String) -> void:
 	visible = true
+	_relabel()
 	_summary.text = text
 	_summary.visible = true
 	_note.text = ""
@@ -110,6 +112,7 @@ func show_message(text: String) -> void:
 ## of cells, and kinds, each row's color: "header", "current", "best", "muted" or "".
 func show_advice(options: Array[Dictionary], selected: String, on_select: Callable, card: Array[Dictionary], connections: Dictionary, purchases: Dictionary, note: String) -> void:
 	visible = true
+	_relabel()
 	_summary.visible = false
 	_card.get_parent().visible = true
 	_toggle.visible = true
@@ -120,7 +123,7 @@ func show_advice(options: Array[Dictionary], selected: String, on_select: Callab
 		_card.add_child(label)
 	_note.text = note
 	_clear(_objectives)
-	_objectives.add_child(_label("Objectif :", CELL_SIZE, MUTED))
+	_objectives.add_child(_label(I18n.t("panel.objective"), CELL_SIZE, MUTED))
 	for option: Dictionary in options:
 		var button := _button(option.label)
 		if option.key == selected:
@@ -139,7 +142,14 @@ func _on_toggle() -> void:
 
 func _show_details() -> void:
 	_details.visible = _details_open
-	_toggle.text = HIDE_DETAILS if _details_open else SHOW_DETAILS
+	_toggle.text = I18n.t("panel.hide_details" if _details_open else "panel.show_details")
+
+
+## The fixed words follow the game's language each time the panel shows, without rebuilding anything.
+func _relabel() -> void:
+	_title.text = I18n.t("panel.title")
+	_close.text = I18n.t("panel.close")
+	_show_details()
 
 
 func _fill(grid: GridContainer, table: Dictionary) -> void:

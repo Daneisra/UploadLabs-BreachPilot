@@ -10,7 +10,7 @@
 
 Mod de confort consacré au **hacking** d'[Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). Il règle le niveau de menace de vos nœuds d'infiltration sur le niveau le plus rentable, et un panneau de conseil vous propose le meilleur branchement de votre chaîne. Le mod respecte les mécaniques du jeu : il ne modifie ni les dégâts, ni les récompenses, ni les ressources, et ne crée rien gratuitement.
 
-**Version actuelle : 0.5.1.** Interface en français.
+**Version actuelle : 0.5.1.** Interface en français. La prochaine version est bilingue, en français et en anglais.
 
 ### Fonctionnalités
 
@@ -73,7 +73,7 @@ Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos par
 
 ### Limites connues
 
-- Interface en français uniquement pour l'instant.
+- Interface en français uniquement dans la 0.5.1. La prochaine version suit la langue du jeu : français, ou anglais pour toute autre langue.
 - Une nouvelle chaîne ou un nouveau nœud demande quelques attaques avant d'être chiffré : le panneau affiche alors « données insuffisantes ».
 - Une anomalie (niveau inattendu, état incohérent) arrête la régulation de tous les nœuds jusqu'au redémarrage du jeu. C'est voulu, par prudence.
 - Les achats sont comparés un par un : leurs gains ne s'additionnent pas.
@@ -91,7 +91,7 @@ Le journal est `%APPDATA%\Upload Labs\logs\modloader.log`, lignes `Daneisra-Brea
 
 A quality-of-life mod for **hacking** in [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). It sets the threat level of your Breach nodes to the most profitable level, and an advisor panel suggests the best wiring for your chain. It plays by the game's rules: no damage, reward or resource is changed, and nothing is created for free.
 
-**Current version: 0.5.1.** The in-game interface is in French for now.
+**Current version: 0.5.1.** The in-game interface is in French in 0.5.1; the next version is bilingual, French and English.
 
 ### Features
 
@@ -154,7 +154,7 @@ Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your save
 
 ### Known limitations
 
-- The interface is in French only for now.
+- The interface is in French only in 0.5.1. The next version follows the game's language: French, or English for any other language.
 - A new chain or node needs a few attacks before it gets figures; meanwhile the panel shows "données insuffisantes" (not enough data).
 - An anomaly (unexpected level, inconsistent state) stops the regulation of every node until the game is restarted. This is deliberate, out of caution.
 - Purchases are compared one at a time: their gains do not add up.

@@ -11,11 +11,13 @@ const Observer := preload(MOD + "features/threat_manager/threat_observer.gd")
 const ApiGuard := preload(MOD + "core/api_guard.gd")
 const SaLog := preload(MOD + "core/sa_log.gd")
 const ModMain := preload(MOD + "mod_main.gd")
+const I18n := preload(MOD + "core/i18n.gd")
 const RegulationTests := preload("regulation_tests.gd")
 const GapProbeTests := preload("gap_probe_tests.gd")
 const ActuatorTests := preload("actuator_tests.gd")
 const AdvisorInventoryTests := preload("advisor_inventory_tests.gd")
 const HackingAdvisorTests := preload("hacking_advisor_tests.gd")
+const I18nTests := preload("i18n_tests.gd")
 const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 
 const TICK := 0.05
@@ -150,6 +152,8 @@ class FakeGetterless extends Node:
 
 
 func _initialize() -> void:
+	# The texts checked below are the French ones; i18n_tests.gd checks both languages.
+	I18n.forced = "fr"
 	# A runtime error ends _run before it can quit: fail instead of hanging.
 	create_timer(TIME_LIMIT).timeout.connect(_on_time_limit)
 	_run.call_deferred()
@@ -198,6 +202,7 @@ func _run() -> void:
 	ActuatorTests.new().run(_check)
 	AdvisorInventoryTests.new().run(_check)
 	HackingAdvisorTests.new().run(_check)
+	I18nTests.new().run(_check)
 	await _test_actions_in_observer()
 	await _test_regulation_in_observer()
 	await _test_automation_control()

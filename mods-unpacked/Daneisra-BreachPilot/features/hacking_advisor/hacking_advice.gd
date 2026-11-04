@@ -3,6 +3,7 @@ extends RefCounted
 ## Pure text and arithmetic: the player decides and does everything.
 
 const LevelChoice := preload("../threat_manager/level_choice.gd")
+const I18n := preload("../../core/i18n.gd")
 
 const XP := "xp"
 const BALANCED := "balanced"
@@ -10,14 +11,13 @@ const BALANCED := "balanced"
 const MIN_GAIN := 0.01
 ## Below this chance, the player should know a level may slip.
 const SAFE_CHANCE := 0.95
-const RELIABILITY_TEXTS: Array[String] = ["faible", "moyenne", "élevée"]
 
 
 static func objectives(chain: Dictionary) -> Array[Dictionary]:
-	var list: Array[Dictionary] = [{"key": XP, "label": "XP"}]
+	var list: Array[Dictionary] = [{"key": XP, "label": I18n.t("objective.xp")}]
 	for key: String in chain.targets:
 		list.append({"key": key, "label": chain.targets[key].reward_name})
-	list.append({"key": BALANCED, "label": "Équilibré"})
+	list.append({"key": BALANCED, "label": I18n.t("objective.balanced")})
 	return list
 
 
@@ -88,11 +88,14 @@ static func steps(chain: Dictionary, current: Dictionary, best: Dictionary) -> P
 				continue
 			var name: String = _stream_label(chain, after if after != "" else before, kind)
 			var target: String = chain.targets[key].label
-			parts.append("%s : brancher vers %s" % [name, target] if after != "" else "%s : débrancher %s" % [name, _of(target)])
+			if after != "":
+				parts.append(I18n.t("step.plug", {"stream": name, "target": target}))
+			else:
+				parts.append(I18n.t(I18n.vowel_variant("step.unplug", target), {"stream": name, "target": target}))
 	for stream: Dictionary in chain.streams.values():
 		if not _feeds(stream, current.scenario) or _feeds(stream, best.scenario) or stream.source == "":
 			continue
-		parts.append("Débranchez aussi %s de sa source, pour rendre sa puissance aux autres" % stream.label)
+		parts.append(I18n.t("step.unplug_source", {"stream": stream.label}))
 	return parts
 
 
@@ -107,21 +110,21 @@ static func reliability(chain: Dictionary, row: Dictionary) -> Dictionary:
 		for key: String in chain.targets:
 			var stream_id: String = row.scenario[kind][key]
 			if stream_id != "" and chain.streams.has(stream_id) and not chain.streams[stream_id].targets.has(key):
-				moved.append("%s vers %s" % [_stream_label(chain, stream_id, kind), chain.targets[key].label])
+				moved.append(I18n.t("reliability.moved", {"stream": _stream_label(chain, stream_id, kind), "target": chain.targets[key].label}))
 	if not moved.is_empty():
 		level -= 1
-		reasons.append("jamais essayé : %s, estimé d'après ses coups ailleurs" % ", ".join(moved))
+		reasons.append(I18n.t("reliability.never_tried", {"items": ", ".join(moved)}))
 	var risky := PackedStringArray()
 	for key: String in row.targets:
 		var target: Dictionary = row.targets[key]
 		if target.level >= 0 and target.chance < SAFE_CHANCE:
-			risky.append("%s %d %%" % [chain.targets[key].label, roundi(target.chance * 100.0)])
+			risky.append("%s %s" % [chain.targets[key].label, I18n.percent(roundi(target.chance * 100.0))])
 	if not risky.is_empty():
 		level -= 1
-		reasons.append("réussite incertaine : %s" % ", ".join(risky))
+		reasons.append(I18n.t("reliability.uncertain", {"items": ", ".join(risky)}))
 	if reasons.is_empty():
-		reasons.append("mesuré sur votre chaîne" if row.current else "mêmes coups que mesurés, autre répartition")
-	return {"level": level, "text": RELIABILITY_TEXTS[level], "reasons": "; ".join(reasons)}
+		reasons.append(I18n.t("reliability.measured" if row.current else "reliability.same_hits"))
+	return {"level": level, "text": I18n.t("reliability.%d" % level), "reasons": "; ".join(reasons)}
 
 
 ## What changes on each target. An unchanged target is left out.
@@ -132,15 +135,16 @@ static func why_text(chain: Dictionary, current: Dictionary, row: Dictionary) ->
 		var after: Dictionary = row.targets[key]
 		var label: String = chain.targets[key].label
 		if after.level < 0 and before.level >= 0:
-			parts.append("%s ne reçoit plus assez de dégâts" % label)
+			parts.append(I18n.t("why.no_damage", {"target": label}))
 		elif after.level != before.level:
-			parts.append("%s passe du niveau %d au niveau %d" % [label, before.level, after.level])
+			parts.append(I18n.t("why.level", {"target": label, "from": before.level, "to": after.level}))
 		elif after.level >= 0 and after.cycle < before.cycle * (1.0 - MIN_GAIN):
-			parts.append("%s attaque plus vite" % label)
-	return ", ".join(parts) + "." if not parts.is_empty() else "Aucun niveau ne change."
+			parts.append(I18n.t("why.faster", {"target": label}))
+	return ", ".join(parts) + "." if not parts.is_empty() else I18n.t("why.nothing")
 
 
-## gains and drawbacks, for everything a chain brings and not only the objective.
+## gains and drawbacks, for everything a chain brings and not only the objective; has_drawbacks says
+## whether there is any, so that no one has to compare the text.
 static func effects(chain: Dictionary, current: Dictionary, row: Dictionary, own_drawbacks: PackedStringArray = PackedStringArray()) -> Dictionary:
 	var gains := PackedStringArray()
 	var drawbacks := own_drawbacks.duplicate()
@@ -149,17 +153,18 @@ static func effects(chain: Dictionary, current: Dictionary, row: Dictionary, own
 		_add_effect(gains, drawbacks, chain.targets[key].reward_name, row.targets[key].reward_rate, current.targets[key].reward_rate)
 		var target: Dictionary = row.targets[key]
 		if target.level >= 0 and target.chance < SAFE_CHANCE:
-			drawbacks.append("%s moins sûr (%d %% de réussite)" % [chain.targets[key].label, roundi(target.chance * 100.0)])
+			drawbacks.append(I18n.t("effects.less_sure", {"target": chain.targets[key].label, "chance": I18n.percent(roundi(target.chance * 100.0))}))
 	return {
-		"gains": ", ".join(gains) if not gains.is_empty() else "aucun",
-		"drawbacks": ", ".join(drawbacks) if not drawbacks.is_empty() else "aucun",
+		"gains": ", ".join(gains) if not gains.is_empty() else I18n.t("effects.none"),
+		"drawbacks": ", ".join(drawbacks) if not drawbacks.is_empty() else I18n.t("effects.none"),
+		"has_drawbacks": not drawbacks.is_empty(),
 	}
 
 
 static func percent(value: float, reference: float) -> String:
 	if reference <= 0.0:
 		return "–"
-	return "%+d %%" % roundi((value / reference - 1.0) * 100.0)
+	return I18n.percent(roundi((value / reference - 1.0) * 100.0), true)
 
 
 static func _feeds(stream: Dictionary, scenario: Dictionary) -> bool:
@@ -177,7 +182,7 @@ static func _stream_label(chain: Dictionary, stream_id: String, kind: String) ->
 static func _add_effect(gains: PackedStringArray, drawbacks: PackedStringArray, name: String, value: float, reference: float) -> void:
 	if reference <= 0.0:
 		if value > 0.0:
-			gains.append("%s en plus" % name)
+			gains.append(I18n.t("effects.extra", {"name": name}))
 		return
 	var change := value / reference - 1.0
 	if change >= MIN_GAIN:
@@ -185,6 +190,3 @@ static func _add_effect(gains: PackedStringArray, drawbacks: PackedStringArray, 
 	elif change <= -MIN_GAIN:
 		drawbacks.append("%s %s" % [name, percent(value, reference)])
 
-
-static func _of(label: String) -> String:
-	return ("d'%s" if "AEIOU".contains(label.left(1)) else "de %s") % label

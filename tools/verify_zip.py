@@ -1,6 +1,7 @@
 """Check a built mod archive before it is published, and write its SHA-256 next to it.
 
-Usage: python tools/verify_zip.py [build/Daneisra-BreachPilot-v<version>.zip]
+Usage: python tools/verify_zip.py [--dev] [build/Daneisra-BreachPilot-v<version>.zip]
+--dev accepts a development build (0.6.0-dev.1); every other check stays.
 Without an argument, the archive matching the current BUILD is checked. Exit code 0 when every check passes.
 """
 import hashlib
@@ -27,7 +28,9 @@ def fail(errors: list, message: str) -> None:
 def main() -> int:
     mod_dir = ROOT / "mods-unpacked" / MOD_ID
     build = re.search(r'const BUILD := "([^"]+)"', (mod_dir / "mod_main.gd").read_text(encoding="utf-8")).group(1)
-    path = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / f"{MOD_ID}-v{build}.zip"
+    args = [a for a in sys.argv[1:] if a != "--dev"]
+    dev = "--dev" in sys.argv[1:]
+    path = pathlib.Path(args[0]) if args else ROOT / "build" / f"{MOD_ID}-v{build}.zip"
     errors: list = []
     if not path.is_file():
         print(f"FAIL archive not found: {path}")
@@ -72,7 +75,9 @@ def main() -> int:
             fail(errors, "manifest namespace-name is not %s" % MOD_ID)
         if not re.fullmatch(r"\d+\.\d+\.\d+", manifest.get("version_number", "")):
             fail(errors, "version_number is not major.minor.patch: %s" % manifest.get("version_number"))
-        if shipped_build != manifest.get("version_number"):
+        if dev and not re.fullmatch(re.escape(manifest.get("version_number", "")) + r"-dev\.\d+", shipped_build):
+            fail(errors, f"BUILD {shipped_build} is not a development build of {manifest.get('version_number')}")
+        if not dev and shipped_build != manifest.get("version_number"):
             fail(errors, f"BUILD {shipped_build} is not the release version {manifest.get('version_number')} (a dev build?)")
         if not path.name == f"{MOD_ID}-v{shipped_build}.zip":
             fail(errors, f"archive name {path.name} does not match BUILD {shipped_build}")

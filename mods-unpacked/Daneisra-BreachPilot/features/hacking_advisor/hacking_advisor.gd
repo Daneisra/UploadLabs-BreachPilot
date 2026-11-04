@@ -10,17 +10,16 @@ const AdvisorPanel := preload("advisor_panel.gd")
 const AdvisorTrials := preload("advisor_trials.gd")
 const HackingGraph := preload("hacking_graph.gd")
 const LevelChoice := preload("../threat_manager/level_choice.gd")
+const I18n := preload("../../core/i18n.gd")
 
-const ERROR_TEXTS := {
-	"no_desktop": "Aucune partie en cours.",
-	"no_target": "Aucun nœud d'infiltration trouvé.",
-}
+## The chain's errors with their own words, as error.<name>.
+const ERROR_TEXTS: Array[String] = ["no_desktop", "no_target"]
+## Why a figure is missing, as insufficient.<reason>.
 const INSUFFICIENT_TEXTS := {
-	HackingModel.REASON_HITS: "pas encore assez de coups mesurés sur cette chaîne",
-	HackingModel.REASON_INTERVAL: "pas encore d'attaque vue",
-	HackingModel.REASON_UNMEASURED: "effet nouveau sur cette chaîne, aucune attaque ne l'a encore montré",
+	HackingModel.REASON_HITS: "insufficient.hits",
+	HackingModel.REASON_INTERVAL: "insufficient.interval",
+	HackingModel.REASON_UNMEASURED: "insufficient.unmeasured",
 }
-const CHANCE_NOT_FOLLOWED := "effet non chiffré"
 ## How often an open panel looks at the chain. A second is quick enough for a player plugging a cable.
 const REFRESH_SECONDS := 1.0
 
@@ -62,7 +61,7 @@ func toggle() -> void:
 		_panel.visible = false
 		set_process(false)
 		return
-	_panel.show_message("Calcul en cours…")
+	_panel.show_message(I18n.t("panel.computing"))
 	_shown_state = ""
 	set_process(true)
 	_look_at_chain()
@@ -83,7 +82,7 @@ func _look_at_chain() -> void:
 	if chain.error != "":
 		_computing = false
 		_log.info("advisor_compare result=%s" % chain.error)
-		_panel.show_message(ERROR_TEXTS.get(chain.error, chain.error))
+		_panel.show_message(I18n.t("error.%s" % chain.error) if ERROR_TEXTS.has(chain.error) else chain.error)
 		return
 	_chain = chain
 	_trials = trials
@@ -106,7 +105,8 @@ func _look_at_chain() -> void:
 func _state_of(chain: Dictionary, upgrades: Array[Dictionary], trials: Array[Dictionary] = []) -> String:
 	if chain.error != "":
 		return chain.error
-	var parts := PackedStringArray([_objective, str(chain.current)])
+	# The language too: the texts are written when the figures are shown.
+	var parts := PackedStringArray([I18n.language(), _objective, str(chain.current)])
 	for trial: Dictionary in trials:
 		parts.append(trial.key)
 	for key: String in chain.targets:
@@ -210,11 +210,11 @@ func _card() -> Array[Dictionary]:
 	var lines := _recommendation()
 	var trials := _all_trials()
 	if not trials.is_empty():
-		lines.append({"text": "À essayer", "kind": "title"})
+		lines.append({"text": I18n.t("card.trials"), "kind": "title"})
 		for trial: Dictionary in trials.slice(0, AdvisorTrials.SHOWN):
 			lines.append({"text": "• %s" % trial.text, "kind": ""})
 		if trials.size() > AdvisorTrials.SHOWN:
-			lines.append({"text": "%d autres pistes dans le détail des calculs." % (trials.size() - AdvisorTrials.SHOWN), "kind": "muted"})
+			lines.append({"text": I18n.t_count("card.more_trials", trials.size() - AdvisorTrials.SHOWN), "kind": "muted"})
 	return lines
 
 
@@ -242,41 +242,44 @@ func _saving_trial() -> Dictionary:
 	if best.is_empty():
 		return {}
 	var upgrade: Dictionary = best.item.upgrade
-	return {"key": "save|%s" % upgrade.name, "priority": AdvisorTrials.SAVING, "text": "%s aiderait cet objectif, %s. Il vous manque %s : à garder en vue." % [upgrade.name, _gain_text(best.item.row), _number(upgrade.cost - upgrade.held)]}
+	return {"key": "save|%s" % upgrade.name, "priority": AdvisorTrials.SAVING, "text": I18n.t("trial.saving", {"name": upgrade.name, "gain": _gain_text(best.item.row), "missing": _number(upgrade.cost - upgrade.held)})}
 
 
 func _recommendation() -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	if not _current.insufficient.is_empty():
-		lines.append({"text": "Données insuffisantes pour conseiller : %s." % _insufficient_text(_current.insufficient), "kind": "title"})
-		lines.append({"text": "Le conseil reviendra de lui-même, laissez tourner quelques attaques.", "kind": "muted"})
+		lines.append({"text": I18n.t("card.insufficient", {"reasons": _insufficient_text(_current.insufficient)}), "kind": "title"})
+		lines.append({"text": I18n.t("card.insufficient_hint"), "kind": "muted"})
 		return lines
 	var refuted := _model.contradictions(_current)
 	if not refuted.is_empty():
-		lines.append({"text": "Aucun conseil chiffré : le calcul ne correspond pas à ce qui est mesuré.", "kind": "title"})
+		lines.append({"text": I18n.t("card.refuted"), "kind": "title"})
 		for found: Dictionary in refuted:
+			var values := {"target": found.label, "level": found.level, "attacks": found.attacks}
 			if found.duration:
-				lines.append({"text": "%s niveau %d : %.1f s prévues, %.1f s réelles sur %d attaques." % [found.label, found.level, found.expected_used, found.real_used, found.attacks], "kind": "bad"})
+				values.merge({"expected": "%.1f" % found.expected_used, "real": "%.1f" % found.real_used})
+				lines.append({"text": I18n.t("card.refuted_duration", values), "kind": "bad"})
 			else:
-				lines.append({"text": "%s niveau %d : %d %% de réussite prévus, %d %% réels sur %d attaques." % [found.label, found.level, roundi(found.expected * 100.0), roundi(found.real * 100.0), found.attacks], "kind": "bad"})
+				values.merge({"expected": I18n.percent(roundi(found.expected * 100.0)), "real": I18n.percent(roundi(found.real * 100.0))})
+				lines.append({"text": I18n.t("card.refuted_chance", values), "kind": "bad"})
 		return lines
 	var goal := _objective_label()
 	var best := HackingAdvice.best_row(_rows, _current, _objective)
 	if best == _current:
 		var sure := HackingAdvice.reliability(_chain, _current)
-		lines.append({"text": "Gardez votre branchement : c'est déjà le meilleur pour %s." % goal, "kind": "title"})
-		lines.append({"text": "Fiabilité : %s (%s)." % [sure.text, sure.reasons], "kind": "muted"})
+		lines.append({"text": I18n.t("card.keep", {"goal": goal}), "kind": "title"})
+		lines.append({"text": I18n.t("card.reliability", {"level": sure.text, "reasons": sure.reasons}), "kind": "muted"})
 	else:
 		var effects := HackingAdvice.effects(_chain, _current, best)
 		var sure := HackingAdvice.reliability(_chain, best)
-		lines.append({"text": "Meilleur branchement pour %s, %s :" % [goal, _gain_text(best)], "kind": "title"})
+		lines.append({"text": I18n.t("card.best", {"goal": goal, "gain": _gain_text(best)}), "kind": "title"})
 		var steps := HackingAdvice.steps(_chain, _current, best)
 		for index: int in steps.size():
 			lines.append({"text": "   %d. %s." % [index + 1, steps[index]], "kind": ""})
-		lines.append({"text": "Gain estimé : %s." % effects.gains, "kind": "good"})
-		lines.append({"text": "Inconvénients : %s." % effects.drawbacks, "kind": "bad" if effects.drawbacks != "aucun" else "muted"})
-		lines.append({"text": "Fiabilité : %s (%s)." % [sure.text, sure.reasons], "kind": "" if sure.level == 2 else "bad"})
-		lines.append({"text": "Pourquoi : %s" % HackingAdvice.why_text(_chain, _current, best), "kind": "muted"})
+		lines.append({"text": I18n.t("card.gain", {"gains": effects.gains}), "kind": "good"})
+		lines.append({"text": I18n.t("card.drawbacks", {"drawbacks": effects.drawbacks}), "kind": "bad" if effects.has_drawbacks else "muted"})
+		lines.append({"text": I18n.t("card.reliability", {"level": sure.text, "reasons": sure.reasons}), "kind": "" if sure.level == 2 else "bad"})
+		lines.append({"text": I18n.t("card.why", {"why": HackingAdvice.why_text(_chain, _current, best)}), "kind": "muted"})
 	var by_resource := {}
 	for item: Dictionary in _ranked_purchases():
 		if item.row.is_empty() or not item.upgrade.affordable or by_resource.has(item.upgrade.resource):
@@ -284,16 +287,16 @@ func _recommendation() -> Array[Dictionary]:
 		if HackingAdvice.gain(item.row, _current, _objective) >= HackingAdvice.MIN_GAIN:
 			by_resource[item.upgrade.resource] = item
 	if by_resource.is_empty():
-		lines.append({"text": "Achat : rien de ce que vous pouvez payer n'aide cet objectif de façon chiffrable pour l'instant.", "kind": "muted"})
+		lines.append({"text": I18n.t("card.no_purchase"), "kind": "muted"})
 		var trade := _refused_trade()
 		if not trade.is_empty():
 			var effects := HackingAdvice.effects(_chain, _current, trade.row)
-			lines.append({"text": "   %s donnerait %s, mais %s : un compromis que l'équilibré refuse. Choisissez un autre objectif pour trancher." % [trade.upgrade.name, effects.gains, effects.drawbacks], "kind": "muted"})
+			lines.append({"text": "   " + I18n.t("card.refused_trade", {"name": trade.upgrade.name, "gains": effects.gains, "drawbacks": effects.drawbacks}), "kind": "muted"})
 	for resource: String in by_resource:
 		var item: Dictionary = by_resource[resource]
 		var effects := HackingAdvice.effects(_chain, _current, item.row, HackingUpgrades.downsides(item.upgrade.changes))
-		lines.append({"text": "Achat conseillé : %s (%s, vous en avez %s), %s." % [item.upgrade.name, item.upgrade.cost_text, _number(item.upgrade.held), _gain_text(item.row)], "kind": "title"})
-		lines.append({"text": "   Gain : %s. Inconvénients : %s." % [effects.gains, effects.drawbacks], "kind": ""})
+		lines.append({"text": I18n.t("card.purchase", {"name": item.upgrade.name, "cost": item.upgrade.cost_text, "held": _number(item.upgrade.held), "gain": _gain_text(item.row)}), "kind": "title"})
+		lines.append({"text": "   " + I18n.t("card.purchase_effects", {"gains": effects.gains, "drawbacks": effects.drawbacks}), "kind": ""})
 	return lines
 
 
@@ -311,32 +314,32 @@ func _refused_trade() -> Dictionary:
 func _objective_label() -> String:
 	for option: Dictionary in HackingAdvice.objectives(_chain):
 		if option.key == _objective:
-			return option.label if option.key != HackingAdvice.BALANCED else "l'équilibre"
+			return option.label if option.key != HackingAdvice.BALANCED else I18n.t("objective.balanced_goal")
 	return _objective
 
 
 ## The gain for the objective; balanced gives the average change of what the chain brings.
 func _gain_text(row: Dictionary) -> String:
-	var value := roundi(HackingAdvice.gain(row, _current, _objective) * 100.0)
-	return "%+d %% en moyenne" % value if _objective == HackingAdvice.BALANCED else "%+d %%" % value
+	var value := I18n.percent(roundi(HackingAdvice.gain(row, _current, _objective) * 100.0), true)
+	return I18n.t("gain.average", {"value": value}) if _objective == HackingAdvice.BALANCED else value
 
 
 ## The current connections, then the best for each objective. One row can win several titles.
 func _connections_table() -> Dictionary:
 	var keys: Array = _chain.targets.keys()
-	var header := ["", "Payload vers", "Infection vers"]
+	var header := ["", I18n.t("table.payload_to"), I18n.t("table.infection_to")]
 	if _chain.current.vulnerability:
-		header.append("Vulnérabilité")
+		header.append(I18n.t("table.vulnerability"))
 	for key: String in keys:
 		header.append(_chain.targets[key].label)
-	header.append("XP/min")
+	header.append(I18n.t("table.xp_rate"))
 	for key: String in keys:
 		var words: PackedStringArray = str(_chain.targets[key].reward_name).split(" ", false)
-		header.append("%s/min" % (words[0] if not words.is_empty() else _chain.targets[key].label))
-	header.append("Fiabilité")
+		header.append(I18n.t("table.rate", {"name": words[0] if not words.is_empty() else _chain.targets[key].label}))
+	header.append(I18n.t("table.reliability"))
 	var rows: Array = [header]
 	var kinds: Array = ["header"]
-	var picked: Array[Dictionary] = [{"titles": PackedStringArray(["Actuel"]), "row": _current}]
+	var picked: Array[Dictionary] = [{"titles": PackedStringArray([I18n.t("table.current")]), "row": _current}]
 	if _current.insufficient.is_empty() and _model.contradictions(_current).is_empty():
 		for option: Dictionary in HackingAdvice.objectives(_chain):
 			var best := HackingAdvice.best_row(_rows, _current, option.key)
@@ -355,7 +358,7 @@ func _connections_table() -> Dictionary:
 		var row: Dictionary = entry.row
 		var cells := [" + ".join(entry.titles), _sent_to(row.scenario.payload), _sent_to(row.scenario.infection)]
 		if _chain.current.vulnerability:
-			cells.append("gardée" if row.scenario.vulnerability else "retirée")
+			cells.append(I18n.t("table.kept" if row.scenario.vulnerability else "table.removed"))
 		for key: String in keys:
 			cells.append(_level_text(row.targets[key]))
 		cells.append(_with_change(row.xp_rate, _current.xp_rate, row.current))
@@ -368,7 +371,7 @@ func _connections_table() -> Dictionary:
 
 
 func _purchases_table() -> Dictionary:
-	var rows: Array = [["Achat", "Coût", "Disponible", "Niveaux", "XP/min", "Gain pour l'objectif"]]
+	var rows: Array = [[I18n.t("table.purchase"), I18n.t("table.cost"), I18n.t("table.available"), I18n.t("table.levels"), I18n.t("table.xp_rate"), I18n.t("table.objective_gain")]]
 	var kinds: Array = ["header"]
 	var usable: bool = _current.insufficient.is_empty() and _model.contradictions(_current).is_empty()
 	for item: Dictionary in _ranked_purchases():
@@ -381,7 +384,7 @@ func _purchases_table() -> Dictionary:
 			item.upgrade.name, item.upgrade.cost_text, _held_text(item.upgrade),
 			", ".join(levels) if followed else "–",
 			_estimate(item.row.xp_rate) if followed else "–",
-			_purchase_gain(item.row) if followed else CHANCE_NOT_FOLLOWED,
+			_purchase_gain(item.row) if followed else I18n.t("purchase.not_followed"),
 		])
 		kinds.append("" if item.upgrade.affordable and followed else "muted")
 	return {"rows": rows, "kinds": kinds}
@@ -390,8 +393,8 @@ func _purchases_table() -> Dictionary:
 ## A trade balanced refuses is not a loss of everything: what it would lose is said instead.
 func _purchase_gain(row: Dictionary) -> String:
 	if HackingAdvice.is_refused_trade(row, _current, _objective):
-		return "compromis : %s" % HackingAdvice.effects(_chain, _current, row).drawbacks
-	return "%+d %%" % roundi(HackingAdvice.gain(row, _current, _objective) * 100.0)
+		return I18n.t("purchase.trade", {"drawbacks": HackingAdvice.effects(_chain, _current, row).drawbacks})
+	return I18n.percent(roundi(HackingAdvice.gain(row, _current, _objective) * 100.0), true)
 
 
 ## What can be paid and is understood first, each resource together: a point and a token cannot be compared.
@@ -422,14 +425,14 @@ func _note() -> String:
 		var rest := PackedStringArray()
 		for trial: Dictionary in trials.slice(AdvisorTrials.SHOWN):
 			rest.append("• %s" % trial.text)
-		more = "Autres pistes à essayer :\n%s\n\n" % "\n".join(rest)
-	return more + "Niveaux réels : %s. Le niveau indiqué est celui qui rapporte le plus pour l'objectif choisi, élites comprises, et la régulation le vise aussi. Fiabilité : élevée pour ce qui est mesuré sur votre chaîne ou les mêmes coups autrement répartis ; elle baisse d'un cran quand un flux est envoyé là où il n'a jamais attaqué, et d'un autre quand une réussite est incertaine. Le pourcentage est la chance de réussir une attaque. Les achats sont estimés sur votre branchement, un à la fois : leurs gains ne s'additionnent pas, rouvrez le panneau après chaque achat." % ", ".join(levels)
+		more = "%s\n%s\n\n" % [I18n.t("note.more"), "\n".join(rest)]
+	return more + I18n.t("note.text", {"levels": ", ".join(levels)})
 
 
 func _insufficient_text(reasons: PackedStringArray) -> String:
 	var parts := PackedStringArray()
 	for reason: String in reasons:
-		parts.append(INSUFFICIENT_TEXTS.get(reason, reason))
+		parts.append(I18n.t(INSUFFICIENT_TEXTS[reason]) if INSUFFICIENT_TEXTS.has(reason) else reason)
 	return ", ".join(parts)
 
 
@@ -438,7 +441,7 @@ func _sent_to(assignment: Dictionary) -> String:
 	for key: String in assignment:
 		if assignment[key] != "":
 			names.append(_chain.targets[key].label)
-	return " + ".join(names) if not names.is_empty() else "aucune"
+	return " + ".join(names) if not names.is_empty() else I18n.t("table.none")
 
 
 func _short(key: String) -> String:
@@ -448,18 +451,18 @@ func _short(key: String) -> String:
 
 func _level_text(target: Dictionary) -> String:
 	if target.insufficient != "":
-		return "données insuffisantes"
+		return I18n.t("table.insufficient")
 	if target.level < 0:
 		return "–"
-	return "niv. %d, %d %%" % [target.level, roundi(target.chance * 100.0)]
+	return I18n.t("table.level", {"level": target.level, "chance": I18n.percent(roundi(target.chance * 100.0))})
 
 
 func _held_text(upgrade: Dictionary) -> String:
 	if upgrade.held < 0.0:
-		return "inconnu"
+		return I18n.t("held.unknown")
 	if upgrade.affordable:
 		return _number(upgrade.held)
-	return "%s (manque %s)" % [_number(upgrade.held), _number(upgrade.cost - upgrade.held)]
+	return I18n.t("held.missing", {"held": _number(upgrade.held), "missing": _number(upgrade.cost - upgrade.held)})
 
 
 func _with_change(value: float, reference: float, is_reference: bool) -> String:

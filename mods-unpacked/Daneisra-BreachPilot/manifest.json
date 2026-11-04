@@ -1,7 +1,7 @@
 {
 	"name": "BreachPilot",
 	"namespace": "Daneisra",
-	"version_number": "0.5.1",
+	"version_number": "0.6.0",
 	"description": "Hacking quality of life. Sets each Breach node to its most profitable threat level for the chosen objective, elite levels included, from the attacks it observes. A read-only Smart Hacking Advisor (Ctrl+Alt+F8) suggests the best wiring, purchases and things to try. Regulation off by default.",
 	"website_url": "https://github.com/Daneisra/UploadLabs-BreachPilot",
 	"dependencies": [],

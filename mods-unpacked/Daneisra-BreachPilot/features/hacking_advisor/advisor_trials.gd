@@ -5,6 +5,7 @@ extends RefCounted
 
 const HackingGraph := preload("hacking_graph.gd")
 const HackingChain := preload("hacking_chain.gd")
+const I18n := preload("../../core/i18n.gd")
 
 const HACKING_CATEGORY := "hacking"
 const TARGET_INPUTS: Array[String] = ["breach_damage", "infection_damage", "vulnerability"]
@@ -46,16 +47,16 @@ static func _idle(list: Array[Dictionary], graph: Dictionary, entry: Dictionary,
 	if entry.node is Node and HackingGraph.is_target(entry.node):
 		if _connected(entry.node.get("breach_damage")) or _connected(entry.node.get("infection_damage")):
 			return
-		list.append({"key": "no_damage|%s" % entry.type, "priority": IDLE, "text": "%s ne reçoit aucun dégât, il n'attaque donc jamais. Branchez-y une sortie de dégâts ; une sortie déjà utilisée sera partagée." % name})
+		list.append({"key": "no_damage|%s" % entry.type, "priority": IDLE, "text": I18n.t("trial.no_damage", {"node": name})})
 		return
 	if _lacks_power(entry):
-		list.append({"key": "no_power|%s" % entry.type, "priority": IDLE, "text": "%s n'a pas de puissance de hack, il ne produit rien. Branchez-y une sortie de puissance ; elle sera partagée avec ce qu'elle alimente déjà." % name})
+		list.append({"key": "no_power|%s" % entry.type, "priority": IDLE, "text": I18n.t("trial.no_power", {"node": name})})
 		return
 	var plugged: bool = entry.slots.any(func(slot: Dictionary) -> bool: return not slot.outputs_id.is_empty())
 	for slot: Dictionary in entry.slots:
 		if slot.resource != HackingGraph.POWER_RESOURCE and slot.production > 0.0 and slot.input_id == "" and slot.outputs_id.is_empty():
-			var which := "une de ses sorties n'est branchée" if plugged else "sa sortie n'est branchée"
-			list.append({"key": "unused|%s" % entry.type, "priority": IDLE, "text": "%s produit %s, mais %s nulle part. Branchez-la vers une cible ou la suite de la chaîne." % [name, _resource(data, slot.resource), which]})
+			var text := I18n.t("trial.unused_some" if plugged else "trial.unused", {"node": name, "resource": _resource(data, slot.resource)})
+			list.append({"key": "unused|%s" % entry.type, "priority": IDLE, "text": text})
 			return
 
 
@@ -93,8 +94,8 @@ static func _empty_inputs(list: Array[Dictionary], graph: Dictionary, data: Vari
 					powered = powered or slot.production > 0.0
 		if makers.is_empty():
 			continue
-		var todo := "Branchez-y sa sortie" if powered else "Alimentez-le, puis branchez-y sa sortie"
-		list.append({"key": "empty|%s" % resource, "priority": EMPTY_INPUT, "text": "%s est vide sur %s, alors que %s en produit. %s ; le conseiller mesurera ce qu'elle apporte." % [_resource(data, resource), ", ".join(empty[resource]), " et ".join(makers), todo]})
+		var values := {"resource": _resource(data, resource), "targets": ", ".join(empty[resource]), "makers": I18n.join_and(makers)}
+		list.append({"key": "empty|%s" % resource, "priority": EMPTY_INPUT, "text": I18n.t("trial.empty_input_plug" if powered else "trial.empty_input_power", values)})
 
 
 ## A hacking node the player can place but has not, with what the game says it does.
@@ -110,8 +111,10 @@ static func _not_placed(list: Array[Dictionary], placed: Dictionary, windows: Di
 			continue
 		var name: String = HackingChain._label(data, "windows", type, type)
 		var description := str(windows[type].get("description", ""))
-		var what := " : %s" % data.tr(description).strip_edges().trim_suffix(".") if description != "" else ""
-		list.append({"key": "new|%s" % type, "priority": NOT_PLACED, "text": "%s n'est pas encore posé%s. Ajoutez-le depuis Add Node et branchez-le : il sera chiffré après quelques attaques." % [name, what]})
+		var text := I18n.t("trial.not_placed", {"node": name})
+		if description != "":
+			text = I18n.t("trial.not_placed_described", {"node": name, "description": data.tr(description).strip_edges().trim_suffix(".")})
+		list.append({"key": "new|%s" % type, "priority": NOT_PLACED, "text": text})
 
 
 static func _lacks_power(entry: Dictionary) -> bool:
