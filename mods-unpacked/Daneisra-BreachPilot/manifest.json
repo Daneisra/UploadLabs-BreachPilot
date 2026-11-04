@@ -48,8 +48,8 @@
 					},
 					"max_allowed_level": {
 						"type": "integer",
-						"minimum": -1,
-						"default": -1
+						"minimum": 0,
+						"default": 0
 					},
 					"gap_probe": {
 						"type": "boolean",

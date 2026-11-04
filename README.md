@@ -63,7 +63,8 @@ La régulation est **désactivée par défaut** : le mod observe et le conseille
 |---|---|---|
 | `regulation_mode` | `off` (défaut), `dry_run`, `active` | `dry_run` journalise les décisions sans agir |
 | `regulation_profile` | `conservative`, `balanced` (défaut), `aggressive` | Prudence de la régulation |
-| `max_allowed_level` / `min_level` | entier, `-1` = sans limite | Bornes des niveaux visés |
+| `max_allowed_level` | entier, `0` (défaut) = sans limite | Plus haut niveau visé |
+| `min_level` | entier, `0` par défaut | Plus bas niveau visé |
 | `log_level` | `debug`, `info` (défaut), `warning` | Détail du journal |
 
 ### Désinstallation
@@ -143,7 +144,8 @@ The regulation is **off by default**: the mod observes and the advisor works, bu
 |---|---|---|
 | `regulation_mode` | `off` (default), `dry_run`, `active` | `dry_run` logs the decisions without acting |
 | `regulation_profile` | `conservative`, `balanced` (default), `aggressive` | How cautious the regulation is |
-| `max_allowed_level` / `min_level` | integer, `-1` = no limit | Bounds of the levels aimed at |
+| `max_allowed_level` | integer, `0` (default) = no limit | Highest level aimed at |
+| `min_level` | integer, `0` by default | Lowest level aimed at |
 | `log_level` | `debug`, `info` (default), `warning` | Log detail |
 
 ### Uninstalling

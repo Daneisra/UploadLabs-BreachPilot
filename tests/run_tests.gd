@@ -771,6 +771,7 @@ func _test_guard() -> void:
 	loader.name = "ModLoader"
 	fake_root.add_child(loader)
 	_check(ApiGuard.former_install(fake_root) == "", "alone, the mod starts")
+	_check(ModMain.max_allowed_level(0) == -1 and ModMain.max_allowed_level(-1) == -1 and ModMain.max_allowed_level(40) == 40, "0, the lowest ModManager shows, means no limit")
 	var former := Node.new()
 	former.name = "Daneisra-SmartAutomation"
 	loader.add_child(former)
