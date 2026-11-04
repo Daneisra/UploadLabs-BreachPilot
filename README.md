@@ -44,16 +44,16 @@ Le mod n'étend aucun script du jeu. Au démarrage, il vérifie les fonctions du
 
 ### Installation
 
-**Depuis le Steam Workshop** (quand le mod y sera publié) : abonnez-vous, puis lancez le jeu.
+**Depuis le Steam Workshop, méthode recommandée :** abonnez-vous à [BreachPilot sur le Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3833859813), puis lancez le jeu. Steam installe le mod et ses mises à jour.
 
-**Depuis GitHub** :
+**Depuis GitHub, en alternative** :
 
 1. Téléchargez `Daneisra-BreachPilot-v<version>.zip` dans les [Releases](https://github.com/Daneisra/UploadLabs-BreachPilot/releases). Vous pouvez contrôler son empreinte SHA-256, indiquée à côté.
 2. Ouvrez le dossier du jeu : dans Steam, clic droit sur Upload Labs, *Gérer*, *Parcourir les fichiers locaux*.
 3. Créez un dossier `mods` à côté de `Upload Labs.exe` s'il n'existe pas, et copiez-y le zip **sans le décompresser**.
 4. Lancez le jeu.
 
-N'installez pas le mod deux fois : si vous passez au Workshop, supprimez le zip du dossier `mods`, et inversement.
+N'installez jamais deux copies du mod en même temps : si vous passez au Workshop, supprimez d'abord le zip du dossier `mods`, et si vous revenez à GitHub, désabonnez-vous d'abord.
 
 ### Activer la régulation
 
@@ -125,16 +125,16 @@ The mod extends no game script. At start-up it checks the game functions it reli
 
 ### Installation
 
-**From the Steam Workshop** (once published there): subscribe, then start the game.
+**From the Steam Workshop, recommended:** subscribe to [BreachPilot on the Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3833859813), then start the game. Steam installs the mod and its updates.
 
-**From GitHub**:
+**From GitHub, as an alternative**:
 
 1. Download `Daneisra-BreachPilot-v<version>.zip` from the [Releases](https://github.com/Daneisra/UploadLabs-BreachPilot/releases). Its SHA-256 checksum is listed next to it.
 2. Open the game folder: in Steam, right-click Upload Labs, *Manage*, *Browse local files*.
 3. Create a `mods` folder next to `Upload Labs.exe` if there is none, and copy the zip into it **without extracting it**.
 4. Start the game.
 
-Do not install the mod twice: if you switch to the Workshop, delete the zip from the `mods` folder, and the other way round.
+Never install two copies of the mod at once: if you switch to the Workshop, delete the zip from the `mods` folder first, and if you go back to GitHub, unsubscribe first.
 
 ### Turning the regulation on
 

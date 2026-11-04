@@ -32,7 +32,18 @@ Le dépôt doit être public pour que les joueurs voient la Release. Changer sa 
 
 **Élément BreachPilot : `3833859813`**, https://steamcommunity.com/sharedfiles/filedetails/?id=3833859813
 
-- **Création :** le 2026-11-04, en privé, par Daneisra avec SteamCMD, à partir du dossier d'envoi `D:\UploadLabs-Workshop\BreachPilot`.
+| | |
+|---|---|
+| Application | `3606890` (Upload Labs) |
+| Visibilité | publique depuis le 5 novembre 2026 |
+| Catégorie | `QOL` |
+| Version publiée | `v0.6.0` |
+| Contenu | `Daneisra-BreachPilot-v0.6.0.zip`, identique octet par octet à celui de la Release GitHub (SHA-256 `337064939011531a0cd7deb40f0582faea5d085c872068d1417c3bd1c86e5241`) |
+| Aperçu | vignette officielle vérifiée, `dadc925bd94292f14c50081852aadf6400f853fba8751dab674820e36e94e7d7`, 1024 × 1024 |
+| Captures | quatre, ajoutées par Daneisra sur la page |
+| Installation par abonnement | testée et validée le 2026-11-05 |
+
+- **Création :** le 2026-11-04, en privé, par Daneisra avec SteamCMD, à partir du dossier d'envoi `D:\UploadLabs-Workshop\BreachPilot`. Mise en public par Daneisra le 2026-11-05, après l'essai par abonnement.
 - **Mises à jour :** toutes passent par cet identifiant. `tools/workshop_vdf.py` le vise par défaut, et refuse `0` sans `--new-item`.
 - **Catégorie :** `tools/set_workshop_tags.py` pose `QOL` sur cet élément seul, à blanc par défaut.
 

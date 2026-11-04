@@ -15,7 +15,7 @@
 | Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Daneisra le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 | Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Daneisra le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
 | BreachPilot, `0.5.1` (première publication publique) | **Terminée**, validée en jeu par Daneisra le 2026-11-04, tag `v0.5.1` |
-| Interface bilingue, `0.6.0` | **Terminée**, validée en jeu par Daneisra le 2026-11-04 (français, anglais, français sans redémarrage, pause et régulation désactivée), tag `v0.6.0` |
+| Interface bilingue, `0.6.0` | **Terminée et publiée**, validée en jeu par Daneisra le 2026-11-04 (français, anglais, français sans redémarrage, pause et régulation désactivée), tag `v0.6.0`, Release GitHub `Latest` et Steam Workshop public depuis le 2026-11-05 |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -116,6 +116,11 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
   - ModManager a repris la configuration `user` : régulation `active`, profil équilibré, en français.
   - Régulation et conseiller normaux : 34 attaques réussies, aucun échec, aucun changement de niveau nécessaire, aucun arrêt, aucune erreur du mod.
 - **Catégorie `QOL` :** posée le 2026-11-05 par `tools/set_workshop_tags.py` (`ISteamUGC::SetItemTags`, tags seuls), avec le résultat `OK` de Steam. Les deux premiers envois, la veille, avaient reçu le code 3 (« pas de connexion ») tant que le client Steam n'était pas en ligne. L'élément est resté privé.
+- **Publication terminée, 2026-11-05 :** l'élément est rendu public par Daneisra, avec la catégorie `QOL`, la vignette officielle et quatre captures.
+  - Vérifié sans connexion par l'API publique de Steam et sur la page : visibilité publique, application `3606890`, 101 295 octets, description complète en anglais et en français avec les liens GitHub et Release v0.6.0, aucune dépendance Workshop.
+  - L'aperçu publié est la vignette officielle, octet par octet. Le contenu est inchangé depuis l'essai par abonnement (manifeste `3860899550807678473`).
+  - Steam affiche le titre avec un tiret simple au lieu du tiret long envoyé ; il est laissé tel quel.
+  - **BreachPilot v0.6.0 est clos.** Les améliorations futures restent à décider.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
