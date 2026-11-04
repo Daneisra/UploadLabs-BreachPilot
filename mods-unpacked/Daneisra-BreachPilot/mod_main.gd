@@ -1,8 +1,8 @@
 extends Node
 
-const MOD_ID := "Daneisra-SmartAutomation"
+const MOD_ID := "Daneisra-BreachPilot"
 ## Full version. The manifest only holds major.minor.patch, the format the mod loader documents.
-const BUILD := "0.5.0"
+const BUILD := "0.5.1"
 const ApiGuard := preload("core/api_guard.gd")
 const SaLog := preload("core/sa_log.gd")
 const ThreatObserver := preload("features/threat_manager/threat_observer.gd")
@@ -26,6 +26,10 @@ func _ready() -> void:
 	var settings := _read_settings()
 	_log = SaLog.new(settings.log_level)
 
+	var former := ApiGuard.former_install(get_tree().root)
+	if not former.is_empty():
+		_log.error("start result=refused reason=former_install_loaded mod=%s: remove its zip from the mods folder" % former)
+		return
 	var missing := ApiGuard.missing_autoload_api(get_tree().root)
 	if not missing.is_empty():
 		_log.error("api_check result=failed missing=%s" % ",".join(missing))
@@ -37,7 +41,7 @@ func _ready() -> void:
 	_observer.configure(_log, settings.starvation_ratio, settings.api_dump, {
 		"mode": settings.regulation_mode,
 		"profile": settings.regulation_profile,
-		"max_allowed_level": int(settings.max_allowed_level),
+		"max_allowed_level": max_allowed_level(settings.max_allowed_level),
 		"min_level": int(settings.min_level),
 	}, settings.gap_probe)
 	add_child(_observer)
@@ -84,6 +88,13 @@ func _log_inventory() -> void:
 	_log.info("advisor_inventory end")
 
 
+## 0 or less is no limit: a cap at level 0 means nothing, and option screens such as ModManager's
+## cannot go below 0, so a player touching the field would otherwise send every node down to 0.
+static func max_allowed_level(value: Variant) -> int:
+	var level := int(value)
+	return level if level > 0 else -1
+
+
 func _read_settings() -> Dictionary:
 	var settings := {
 		"threat_observer_enabled": true,
@@ -93,7 +104,7 @@ func _read_settings() -> Dictionary:
 		"debug_toggle_hotkey": false,
 		"regulation_mode": "off",
 		"regulation_profile": "balanced",
-		"max_allowed_level": -1,
+		"max_allowed_level": 0,
 		"min_level": 0,
 		"gap_probe": false,
 	}

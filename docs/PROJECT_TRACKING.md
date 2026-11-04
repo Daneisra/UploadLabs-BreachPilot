@@ -9,17 +9,18 @@
 | 3. Observateur (0.1.0) | **Terminée**, validée le 2026-10-31, tag `v0.1.0` |
 | Auto Threat Manager, `0.2.0-alpha.1` (mesures) | **Terminée**, tag `v0.2.0-alpha.1` |
 | Auto Threat Manager, `0.2.0-alpha.2` (simulation à blanc) | **Terminée**, validée le 2026-10-31, tag `v0.2.0-alpha.2`. Cette validation ne couvre pas la régulation automatique |
-| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Jérémy du 2026-11-01. Régulation permanente non encore disponible |
-| Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Jérémy le 2026-11-01, tag `v0.2.0` |
-| Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Jérémy, tag `v0.3.0` |
-| Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Jérémy le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
-| Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Jérémy le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
+| Auto Threat Manager, `0.2.0-beta.1` (premières actions) | **Terminée**, tag `v0.2.0-beta.1`, sur accord de principe de Daneisra du 2026-11-01. Régulation permanente non encore disponible |
+| Auto Threat Manager, `0.2.0` (régulation normale) | **Terminée**, validée par Daneisra le 2026-11-01, tag `v0.2.0` |
+| Smart Hacking Advisor, `0.3.0` (lecture seule) | **Terminée**, validée le 2026-11-01 selon la condition de Daneisra, tag `v0.3.0` |
+| Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Daneisra le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
+| Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Daneisra le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
+| BreachPilot, `0.5.1` (première publication publique) | **Terminée**, validée en jeu par Daneisra le 2026-11-04, tag `v0.5.1` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
 ## Smart Hacking Advisor : faisabilité
 
-Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule, sans branchement ni achat automatique.
+Décidé par Daneisra le 2026-11-01 : des conseils expliqués, en lecture seule, sans branchement ni achat automatique.
 
 | Besoin | Disponible | À vérifier en jeu |
 |---|---|---|
@@ -39,9 +40,9 @@ Décidé par Jérémy le 2026-11-01 : des conseils expliqués, en lecture seule,
 
 Ajouter de l'infection n'est jamais supposé rentable : chaque scénario compte ce qu'il retire au lanceur.
 
-**Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Jérémy, corrigés.
+**Première version du panneau, 2026-11-01, `0.3.0-dev.2` :** recommandation fausse. Elle ne comptait que les coups normaux et plafonnait Entreprises au niveau 8, alors que 9/4 a été mesuré à environ 4 900 XP/min, pour 3 072 annoncés au mieux. L'XP doublant à chaque niveau, un seul niveau d'écart change le classement. Les attaques sont maintenant tirées au hasard avec les critiques et le décalage réel de l'infection. Calcul comparé aux journaux : Entreprises 8 et Gouvernement 8 avec la moitié de l'infection à 50 % pour 48 et 47 % mesurés (40 attaques), Entreprises 9 avec toute l'infection à 90 % pour 98 % (461 attaques), Gouvernement 7 à 4,59 s pour 4,59 s (225 attaques). Le retard de l'infection (0,25 s) est ajusté sur ces mesures, pas expliqué. Fond transparent et texte illisible, signalés par Daneisra, corrigés.
 
-**Sortie de la `0.3.0`, décidée par Jérémy :** un achat normal en jeu, puis comparaison du résultat réel avec la prévision du panneau. Si c'est cohérent et sans problème fonctionnel important : tag `v0.3.0` et fusion dans `main`, sans autre campagne.
+**Sortie de la `0.3.0`, décidée par Daneisra :** un achat normal en jeu, puis comparaison du résultat réel avec la prévision du panneau. Si c'est cohérent et sans problème fonctionnel important : tag `v0.3.0` et fusion dans `main`, sans autre campagne.
 
 **Essai de sortie, 2026-11-01, build `0.3.0-dev.3` :** réussi. Critère fixé avant l'essai : les deux nœuds tiennent le niveau annoncé, et l'XP/min réelle reste à moins de 20 % de l'annonce. XP/min réelle calculée à 256 XP par attaque réussie au niveau 8.
 
@@ -56,7 +57,7 @@ Aucune erreur du mod. La seconde ligne n'était pas prévue au protocole : la ca
 
 **Nouveaux nœuds, mesurés le 2026-11-01 sur peu d'attaques :** `Charged Attack` double 1 coup sur 3 (76 à 152, 383 en critique), le jeu annonce +33 %. `Exécuter l'injection` prend sa part de puissance et multiplie les coups (59,3 à 72,8 avec 0,234). Sa vulnérabilité croît peu avec la puissance (0,226 à 92,4, 0,234 à 107,8) : la règle n'est pas établie, le conseiller la garde constante, et ne compare que garder ou retirer l'injection.
 
-**Architecture générique, décidée par Jérémy le 2026-11-01 après avis de Codex et ChatGPT :** hybride. Le mod lit à l'exécution le graphe et les tables du jeu, et compte sur les coups mesurés ; seul un petit nombre de règles mesurées restent écrites (partage égal de la puissance, délai de l'infection, prochain tir, effets lus par attribut). « Marcher pour tout le monde » veut dire : aucun nœud ni branchement ne fait échouer le mod, et « données insuffisantes » plutôt qu'un chiffre faux. Limites : les coups sont tirés sans leur ordre, donc une séquence régulière (1 coup sur 3) devient une proportion, et la puissance est supposée proportionnelle pour un scénario jamais joué.
+**Architecture générique, décidée par Daneisra le 2026-11-01 après avis de Codex et ChatGPT :** hybride. Le mod lit à l'exécution le graphe et les tables du jeu, et compte sur les coups mesurés ; seul un petit nombre de règles mesurées restent écrites (partage égal de la puissance, délai de l'infection, prochain tir, effets lus par attribut). « Marcher pour tout le monde » veut dire : aucun nœud ni branchement ne fait échouer le mod, et « données insuffisantes » plutôt qu'un chiffre faux. Limites : les coups sont tirés sans leur ordre, donc une séquence régulière (1 coup sur 3) devient une proportion, et la puissance est supposée proportionnelle pour un scénario jamais joué.
 
 **Essai de la `0.4.0-dev.3`, 2026-11-01, chaîne complète, 18 min :** aucune erreur, aucun arrêt. Bouton `Conseil` en place, tableau tenant à l'écran sur les captures. Montées et retours en arrière corrects avec l'injection.
 
@@ -71,7 +72,7 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Niveau 10 élite, à vérifier :** 2 306 de pare-feu et 9 224 d'infiltration sur Entreprises. Le panneau l'annonce à 99 %, puis le jeu annonce un gain très supérieur au niveau 11 (`get_experience_reward`). Aucune réussite réelle n'a encore confirmé ni la faisabilité ni cette récompense : si elle se confirme, monter au-delà d'un niveau élite pourrait faire perdre de l'XP.
 
-**Actualisation du panneau, 2026-11-01 :** une première version recalculait tout dès qu'un solde bougeait, et la recherche monte en continu : 93 recalculs en 3 min 30, saccades et conseils changeants, signalés par Jérémy. Le panneau ne se recalcule plus que sur un geste du joueur. Rouvert plus tard, il repart des coups mesurés entre-temps : ses chiffres peuvent bouger de quelques pour cent, et un niveau juste au seuil peut changer. Les chiffres sont affichés à 3 chiffres significatifs. Vérifié en jeu par Jérémy le 2026-11-01 sur la `0.4.0-dev.6` : jeu fluide, panneau stable, mise à jour après branchement et achat, courte pause au recalcul non gênante.
+**Actualisation du panneau, 2026-11-01 :** une première version recalculait tout dès qu'un solde bougeait, et la recherche monte en continu : 93 recalculs en 3 min 30, saccades et conseils changeants, signalés par Daneisra. Le panneau ne se recalcule plus que sur un geste du joueur. Rouvert plus tard, il repart des coups mesurés entre-temps : ses chiffres peuvent bouger de quelques pour cent, et un niveau juste au seuil peut changer. Les chiffres sont affichés à 3 chiffres significatifs. Vérifié en jeu par Daneisra le 2026-11-01 sur la `0.4.0-dev.6` : jeu fluide, panneau stable, mise à jour après branchement et achat, courte pause au recalcul non gênante.
 
 **Même session, journal de 23:13 à 00:01 :** 975 attaques réussies pour 12 échecs, aucune erreur ; la régulation est montée de 9 à 14 sur les deux cibles avec la puissance du joueur. Niveau 10 : 86 réussites sur 86. Niveau 11, d'abord : 11 échecs, et deux retours à 9 suivis d'une remontée. **Point ouvert :** le panneau annonce 101 000 XP/min au niveau 10 élite puis 42 500 au niveau 11, soit environ 10 150 XP par attaque contre 2 070. La régulation a donc quitté un niveau annoncé plus rentable. Le gain réel d'un niveau élite n'est toujours pas mesuré : le journal ne relève pas l'XP gagnée.
 
@@ -85,17 +86,19 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Récompense élite mesurée, `0.4.0-dev.10`, 2026-11-02 :** 1 493 attaques réussies, aucune erreur, aucune prévision contredite. Ce que la cible porte à chaque réussite est égal à `get_reward` du niveau : la récompense élite n'est pas qu'une annonce. Entreprises 30 (élite, 20 s) donne 61,4 M de données et 85,9 G d'XP par attaque, contre 9,2 M et 17,4 G au niveau 31. À puissance égale (1,42 M), en temps réel : 2,1 × 10⁸ données/min au niveau 30, 6,5 × 10⁷ au niveau 31, soit 3,3 fois plus ; 3,1 × 10¹¹ contre 1,2 × 10¹¹ XP/min. La régulation a pourtant quitté l'élite pour le niveau 31, et le -72 % du conseiller était juste. En contrepartie, le niveau maximal ne s'ouvre qu'en gagnant au plus haut niveau. Le passage en stock n'est pas observé à part.
 
-**Niveau le plus rentable, `0.4.0-dev.11`, décision de Jérémy du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
+**Niveau le plus rentable, `0.4.0-dev.11`, décision de Daneisra du 2026-11-02 :** la régulation vise le niveau qui rapporte le plus par minute pour l'objectif du panneau. Elle monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient. Chaque niveau est évalué avec les coups mesurés sur la chaîne et la récompense que le jeu annonce, à raison d'un niveau par tick (10 ms au plus). Un autre niveau que le plus haut n'est choisi qu'avec 5 % de gain ; l'équilibré exige un gain sur les données et sur l'XP. Rejoué sur les niveaux 30 à 34 d'Entreprises de cette session, les trois objectifs choisissent l'élite 30 dès 2,5 M de puissance. Aucune vérification en jeu pour l'instant.
 
 **Vérifié en jeu sur la `0.4.0-dev.11`, 2026-11-03 :** 408 attaques réussies, 10 échecs, aucune erreur ; 12 changements de niveau, tous vérifiés. Entreprises et Gouvernement restent sur l'élite 40 et montent une fois pour ouvrir 41 à 44, puis reviennent. En équilibré, Gouvernement finit sur 43 et non sur l'élite 40 : celle-ci donne 2,3 fois plus de données mais 1 % d'XP en moins, et l'équilibré exige un gain sur les deux.
 
-**Sortie de la `0.4.0`, 2026-11-03 :** à la demande de Jérémy, l'équilibré accepte de perdre au plus 5 % d'une ressource si l'autre gagne au moins 10 %. Rejouée sur les 31 tableaux de niveaux de la session dev.11, la règle garde les mêmes choix, sauf Gouvernement en fin de session : l'élite 40 au lieu de 43. Les objectifs XP et Données ne changent pas, ni les protections contre les allers-retours et les changements manuels. Restent à mesurer plus tard, sans bloquer la version : l'infection sur d'autres chaînes et une croissance d'infection achetée.
+**Sortie de la `0.4.0`, 2026-11-03 :** à la demande de Daneisra, l'équilibré accepte de perdre au plus 5 % d'une ressource si l'autre gagne au moins 10 %. Rejouée sur les 31 tableaux de niveaux de la session dev.11, la règle garde les mêmes choix, sauf Gouvernement en fin de session : l'élite 40 au lieu de 43. Les objectifs XP et Données ne changent pas, ni les protections contre les allers-retours et les changements manuels. Restent à mesurer plus tard, sans bloquer la version : l'infection sur d'autres chaînes et une croissance d'infection achetée.
 
 **Partie sur la `0.5.0-dev.3`, 2026-11-04, 01:41 à 02:28 :** la suppression d'Infiltrer Banque pendant la vérification de sa montée a arrêté la régulation de tous les nœuds jusqu'à la fin, 135 actions refusées. Anonymous, battu dans le tick même où son attaque commence, n'a jamais eu d'attaque jugée complète et restait au niveau 0. Les deux sont corrigés en `dev.4`.
 
-**Vérifié en jeu sur la `0.5.0-dev.4`, 2026-11-04, 15:15 à 17:51 :** 57 changements de niveau, tous vérifiés, aucun arrêt, aucun refus, aucune erreur. Anonymous remonte seul de 0 à 35 en moins d'une minute, puis reste sur son niveau rentable. En équilibré, Gouvernement et Entreprises gardent leur niveau et reviennent après chaque déblocage. La suppression d'un nœud n'a pas été refaite en jeu : elle reste couverte par les tests automatiques, à la demande de Jérémy.
+**Vérifié en jeu sur la `0.5.0-dev.4`, 2026-11-04, 15:15 à 17:51 :** 57 changements de niveau, tous vérifiés, aucun arrêt, aucun refus, aucune erreur. Anonymous remonte seul de 0 à 35 en moins d'une minute, puis reste sur son niveau rentable. En équilibré, Gouvernement et Entreprises gardent leur niveau et reviennent après chaque déblocage. La suppression d'un nœud n'a pas été refaite en jeu : elle reste couverte par les tests automatiques, à la demande de Daneisra.
 
-**Sortie de la `0.5.0`, 2026-11-04 :** Entreprises a perdu trois essais à 44 prévus à 40 %, toutes les vingt attaques environ, avant de réussir après un gain de puissance. À la demande de Jérémy, le conservateur et l'équilibré ne retentent un déblocage raté que lorsque la chance prévue a gagné au moins 10 points ; l'agressif garde ses essais périodiques. Restent pour plus tard : les achats combinés, les emplacements libres des nœuds déjà posés (« 1/3 », probablement via le champ `attribute`), et l'infection sur d'autres chaînes.
+**Sortie de la `0.5.0`, 2026-11-04 :** Entreprises a perdu trois essais à 44 prévus à 40 %, toutes les vingt attaques environ, avant de réussir après un gain de puissance. À la demande de Daneisra, le conservateur et l'équilibré ne retentent un déblocage raté que lorsque la chance prévue a gagné au moins 10 points ; l'agressif garde ses essais périodiques. Restent pour plus tard : les achats combinés, les emplacements libres des nœuds déjà posés (« 1/3 », probablement via le champ `attribute`), et l'infection sur d'autres chaînes.
+
+**BreachPilot `0.5.1`, 2026-11-04 :** le mod Smart Automation devient BreachPilot (identifiant `Daneisra-BreachPilot`, licence MIT). Trois corrections viennent d'une revue Codex : un nœud d'un autre mod qui imite une cible est écarté, la rentabilité est remesurée quand la chaîne change, et le panneau tient face à un nom de ressource vide. `max_allowed_level` à 0 veut dire « sans limite », comme -1, car ModManager ne descend pas sous 0. Essais en jeu, deux parties : chargement unique de BreachPilot, réglages repris par ModManager, 6 changements de niveau tous vérifiés, aucune erreur. Non vérifiés en jeu, couverts par les tests : un nœud d'un autre mod qui imite une cible, la remesure après un changement de chaîne, le refus de démarrer avec l'ancien mod, et l'enregistrement d'un plafond par ModManager.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
@@ -105,7 +108,7 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 4. Recommandations : ce qu'il faut modifier, pourquoi, le gain estimé et les inconvénients.
 5. Interface : à terme, consulter les recommandations directement dans le jeu, sans dépendre d'un raccourci ni des journaux.
 
-Jérémy choisit lui-même ses branchements et ses achats.
+Daneisra choisit lui-même ses branchements et ses achats.
 
 ## Décisions
 
@@ -114,12 +117,12 @@ Jérémy choisit lui-même ses branchements et ses achats.
 | Version 0.1.0 | Observation seule, aucune modification de la menace |
 | Intégration | Signaux et propriétés, sans extension de script ni hook |
 | Option native `auto_level_breach` | Journalisée en 0.1.0 ; la régulation refusera de s'activer tant qu'elle est active |
-| Périmètre (décision de Jérémy, 2026-11-01) | Ce mod est consacré au hacking. Les Data Labs et les autres idées relèveront éventuellement d'un mod indépendant |
+| Périmètre (décision de Daneisra, 2026-11-01) | Ce mod est consacré au hacking. Les Data Labs et les autres idées relèveront éventuellement d'un mod indépendant |
 | Analyse du jeu | Plus de décodage de scripts ; inspection à l'exécution uniquement |
 
 ## Décisions pour la régulation (0.2.0)
 
-Validées par Jérémy après revue, avant le développement de l'actionneur. Les profils et les seuils ont ensuite évolué : le [changelog](../CHANGELOG.md) fait foi pour le comportement de la `0.2.0`.
+Validées par Daneisra après revue, avant le développement de l'actionneur. Les profils et les seuils ont ensuite évolué : le [changelog](../CHANGELOG.md) fait foi pour le comportement de la `0.2.0`.
 
 | Sujet | Décision |
 |---|---|
@@ -151,7 +154,7 @@ Validées par Jérémy après revue, avant le développement de l'actionneur. Le
 
 **Protocole de mesure validé le 2026-10-31 :** instrumentation `gap_probe` en lecture seule, cas A à H, dont l'option native (à remettre à sa valeur initiale après l'essai) et deux nœuds du même type si le jeu le permet, sans contourner ses limites. Zéro fenêtre nulle sur 300 observations serait encourageant, mais ne démontrerait pas l'absence de risque.
 
-**Exigences pour la revue de l'actionneur, décidées par Jérémy le 2026-10-31.** Ce n'est pas une autorisation de le développer.
+**Exigences pour la revue de l'actionneur, décidées par Daneisra le 2026-10-31.** Ce n'est pas une autorisation de le développer.
 
 1. **Baisse :** jamais sur une prévision seule. Il faut une prévision fiable, des échecs réellement observés, une puissance stable et un seuil statistique suffisant. Les interruptions et les échecs de classement incertain sont exclus.
 2. **Anti-oscillation :** documenter les résultats du seuil de 0,1 % : inversions après correction, baisses injustifiées, temps passé au niveau optimal.
@@ -302,7 +305,7 @@ Avec une prévision fausse, le niveau réfuté est retenté une fois à chaque c
 
 ## Premier essai actif, autorisé le 2026-10-31
 
-Conditions fixées par Jérémy : sauvegarde de test avec copie de sécurité, emplacement secondaire de préférence, `breach_government` de 2 à 3, une seule montée, profil conservateur, vitesse normale, option native désactivée, arrêt de la régulation juste après.
+Conditions fixées par Daneisra : sauvegarde de test avec copie de sécurité, emplacement secondaire de préférence, `breach_government` de 2 à 3, une seule montée, profil conservateur, vitesse normale, option native désactivée, arrêt de la régulation juste après.
 
 Réussite : un seul appel natif, niveau final de 3, aucune attaque interrompue, aucune réinitialisation inattendue, aucun autre nœud modifié, changement identifié comme venant du mod, aucun plafond créé, attaques suivantes normales, arrêt automatique, aucune erreur du mod. En cas d'anomalie, aucune nouvelle action.
 
@@ -333,7 +336,7 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 
 **Non couvert :** baisse, fenêtre d'un tick, plusieurs actions, `Ctrl+Z` après une action du mod, Entreprises avec infection. Le marqueur `trial_used.json` reste en place. L'archive d'essai a été retirée du jeu.
 
-**Deuxième essai, autorisé le 2026-10-31 :** baisse de Gouvernement de 5 à 4, une seule action, profil conservateur, même protection qu'au premier essai, nouveau marqueur `trial_2_used.json`. Le niveau 4 n'est annoncé fiable que sans marge (5,0 s sur 6 s, pour une limite de 4,8 s avec 20 %), ce qui a été présenté à Jérémy avec les mesures.
+**Deuxième essai, autorisé le 2026-10-31 :** baisse de Gouvernement de 5 à 4, une seule action, profil conservateur, même protection qu'au premier essai, nouveau marqueur `trial_2_used.json`. Le niveau 4 n'est annoncé fiable que sans marge (5,0 s sur 6 s, pour une limite de 4,8 s avec 20 %), ce qui a été présenté à Daneisra avec les mesures.
 
 **Deuxième essai réel, 2026-10-31, build `0.2.0-beta.1-trial.2` : réussi.** Gouvernement passe de 5 à 4 à 23:51:48, 52 s après la liaison du nœud, à 35,31 dégâts.
 
@@ -361,10 +364,10 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 - **Reprise :** niveau inchangé. La première décision simulée arrive 61 s plus tard.
 - **Blocages :** option native et vitesse × 5 affichent `Auto : bloqué`, sans bouton, et se lèvent avec leur cause. La décision suivante repart de zéro.
 - **Cycle de vie :** pause conservée après le rechargement de la sauvegarde automatique, rangée unique après un redémarrage de l'observateur, après la suppression et la restauration du nœud, et après une relance du jeu.
-- **`Ctrl+Z` :** selon Jérémy, il ne fait pas remonter le niveau. Le journal montre toutefois une hausse `origin=player` de 2 à 3, 6 s après la baisse, dont l'origine exacte (clic ou `Ctrl+Z`) reste à confirmer à l'essai. La pause est restée dans tous les cas.
-- **Aspect :** taille du texte et de la rangée validée par Jérémy.
+- **`Ctrl+Z` :** selon Daneisra, il ne fait pas remonter le niveau. Le journal montre toutefois une hausse `origin=player` de 2 à 3, 6 s après la baisse, dont l'origine exacte (clic ou `Ctrl+Z`) reste à confirmer à l'essai. La pause est restée dans tous les cas.
+- **Aspect :** taille du texte et de la rangée validée par Daneisra.
 
-**Sauvegardes :** Jérémy a enregistré par erreur dans le Slot 1 local et le Slot 2 cloud pendant ce contrôle. Rien n'a été restauré. Il reste l'ancien Slot 1 dans `2026-10-31_23-48-53_avant-essai-actif-2`, le Slot 9 intact, et l'état proche du Slot 2 cloud d'origine (21:51:13) dans `savegame.dat` de `2026-10-31_22-39-50_avant-controle-essai-actif` (21:51:16).
+**Sauvegardes :** Daneisra a enregistré par erreur dans le Slot 1 local et le Slot 2 cloud pendant ce contrôle. Rien n'a été restauré. Il reste l'ancien Slot 1 dans `2026-10-31_23-48-53_avant-essai-actif-2`, le Slot 9 intact, et l'état proche du Slot 2 cloud d'origine (21:51:13) dans `savegame.dat` de `2026-10-31_22-39-50_avant-controle-essai-actif` (21:51:16).
 
 **Troisième essai, 2026-11-01, build `0.2.0-beta.1-trial.3` : réussi.** Gouvernement seul, de 0 à 4, 4 actions au plus, profil conservateur, 60 s au moins entre deux actions, vérification sur 3 attaques, marqueur `trial_3_used.json`, à 35,31 dégâts.
 
@@ -375,14 +378,14 @@ Le changement a survécu au redémarrage, ce qui montre qu'il est enregistré no
 | 01:00:00 | Montée 2→3 | 64 s après, vérifiée à 01:00:12 |
 | 01:00:20 | Maintien à 3 | `forecast_too_risky` : niveau 4 à 5,0 s, marge de 20 % non respectée. `Auto : actif`, plus de 3 min sans action |
 | 01:04:05 | Baisse à 2 par le joueur | `origin=player`, `automation_pause`, aucune remontée pendant 2 min 20 |
-| Entre les deux | `Ctrl+Z` | Selon Jérémy, niveau inchangé et pause conservée. Aucun événement de niveau au journal, ce qui concorde |
+| Entre les deux | `Ctrl+Z` | Selon Daneisra, niveau inchangé et pause conservée. Aucun événement de niveau au journal, ce qui concorde |
 | 01:06:25 | Reprise | Niveau inchangé, 2 attaques de stabilisation, puis 5 réussites |
 | 01:06:52 | Montée 2→3 | 27 s après la reprise, 4e et dernière action, vérifiée à 01:07:04 |
 | 01:06:52 | Arrêt | `regulation_stopped reason=action_limit_reached actions=4`, `Auto : bloqué` sur la capture |
 
 Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprises à 5 avant et après. 0 réinitialisation due à une action, 0 fenêtre manquée, 0 erreur du mod. Attaques suivantes conformes : niveau 1 à 1,0 s et 2 salves (31), niveaux 2 et 3 à 3,0 s et 4 salves (58 et 109).
 
-**Remarque de Jérémy :** les temps sont respectés, mais c'est trop lent quand le niveau suivant est certain. Le journal le confirme : 31 attaques au niveau 1 pour une prévision certaine dès la première.
+**Remarque de Daneisra :** les temps sont respectés, mais c'est trop lent quand le niveau suivant est certain. Le journal le confirme : 31 attaques au niveau 1 pour une prévision certaine dès la première.
 
 **Puissance :** l'Interface est montée à 42,37 dégâts par nœud à 01:13:39, pendant une pause. Le changement est bien détecté, sans action.
 
@@ -407,17 +410,17 @@ Toutes les actions : `moment=deferred`, `problem=none`, `origin=mod`, Entreprise
 - **Point mineur :** pendant une vérification, le régulateur repropose une montée, journalisée puis refusée. À clarifier dans le journal.
 - **Non couvert en jeu :** échecs réels en mode actif, baisse en profil équilibré, prévision certaine démentie, première montée après un changement de puissance, rechargement avec régulation active.
 
-**Session finale, première tentative, 2026-11-01, build `trial.5` : arrêtée à juste titre après 4 min.** Jérémy a ajouté un nœud `Payload critique` à 02:35. Dégâts annoncés : 87,39, coups réels : 52 à 53, et 132 environ une fois sur dix. Le mod a jugé le niveau 8 certain d'après la valeur annoncée (5,0 s au plus), l'a appliqué, puis la vérification a mesuré 5,25 s : `verification_failed:duration_out_of_range`, régulation arrêtée sur les deux types, aucune autre action. Le modèle a ensuite été corrigé. Le branchement de l'infection sur les deux nœuds a aussi été observé : infection divisée par 2, 4 échecs au niveau 8, sans baisse puisque la régulation était déjà arrêtée et la prévision incertaine.
+**Session finale, première tentative, 2026-11-01, build `trial.5` : arrêtée à juste titre après 4 min.** Daneisra a ajouté un nœud `Payload critique` à 02:35. Dégâts annoncés : 87,39, coups réels : 52 à 53, et 132 environ une fois sur dix. Le mod a jugé le niveau 8 certain d'après la valeur annoncée (5,0 s au plus), l'a appliqué, puis la vérification a mesuré 5,25 s : `verification_failed:duration_out_of_range`, régulation arrêtée sur les deux types, aucune autre action. Le modèle a ensuite été corrigé. Le branchement de l'infection sur les deux nœuds a aussi été observé : infection divisée par 2, 4 échecs au niveau 8, sans baisse puisque la régulation était déjà arrêtée et la prévision incertaine.
 
-**Session finale, deuxième tentative, 2026-11-01, build `trial.6`, 1 h 05 :** avec `Payload critique`, 0 action, aucun blocage, 1 026 + 677 attaques réussies. Rechargement avec pause validé : pause conservée, aucune action immédiate, reprise sans changement. **Défaut trouvé par Jérémy :** infection débranchée, 31 échecs au niveau 8 sans baisse. Le mod décidait bien de baisser dès le 2e échec, mais l'actionneur refusait (`target_forecast_not_reliable`, 27 fois), car le niveau 7 échouait aussi sans infection. Décision de Jérémy : 2 échecs d'affilée doivent suffire. Corrigé.
+**Session finale, deuxième tentative, 2026-11-01, build `trial.6`, 1 h 05 :** avec `Payload critique`, 0 action, aucun blocage, 1 026 + 677 attaques réussies. Rechargement avec pause validé : pause conservée, aucune action immédiate, reprise sans changement. **Défaut trouvé par Daneisra :** infection débranchée, 31 échecs au niveau 8 sans baisse. Le mod décidait bien de baisser dès le 2e échec, mais l'actionneur refusait (`target_forecast_not_reliable`, 27 fois), car le niveau 7 échouait aussi sans infection. Décision de Daneisra : 2 échecs d'affilée doivent suffire. Corrigé.
 
-**Test de baisse, 2026-11-01, build `trial.7`, 11 min :** réussi, 7 actions, 0 anomalie. Infection débranchée à 16:41:12 : Entreprises 8→7→6→5→4 en 88 s. Rebranchée à 16:45:14 : 4→5→6→7 en 51 s. Niveaux finaux 7/9 et 4/5. **Remarque de Jérémy :** fonctionnel, mais trop lent partout.
+**Test de baisse, 2026-11-01, build `trial.7`, 11 min :** réussi, 7 actions, 0 anomalie. Infection débranchée à 16:41:12 : Entreprises 8→7→6→5→4 en 88 s. Rebranchée à 16:45:14 : 4→5→6→7 en 51 s. Niveaux finaux 7/9 et 4/5. **Remarque de Daneisra :** fonctionnel, mais trop lent partout.
 
-**Régulation rapide, 2026-11-01, build `trial.8` puis `trial.9` :** saut direct, baisse dès le premier échec annoncé, essais de niveau, coups coupés par la barre ignorés. Essai final, 13 min : Gouvernement 2→4 et Entreprises 7→8→9 (niveau jamais atteint auparavant), adaptation à un gain de puissance (87,39 à 104,86), 3 actions, aucune anomalie. Validé par Jérémy.
+**Régulation rapide, 2026-11-01, build `trial.8` puis `trial.9` :** saut direct, baisse dès le premier échec annoncé, essais de niveau, coups coupés par la barre ignorés. Essai final, 13 min : Gouvernement 2→4 et Entreprises 7→8→9 (niveau jamais atteint auparavant), adaptation à un gain de puissance (87,39 à 104,86), 3 actions, aucune anomalie. Validé par Daneisra.
 
 **Limites connues de `v0.2.0-beta.1` :** une prévision certaine démentie n'est couverte qu'en simulation. Le mod compte sur le coup le plus faible observé : avec `Payload critique`, il peut rester sous un niveau qui réussit en pratique (7 au lieu de 8). Une anomalie arrête la régulation des deux types jusqu'au redémarrage. Plafonds et pauses : session uniquement. Vitesse × 5 : régulation suspendue. Toutes les mesures viennent d'une seule partie.
 
-**Avant la validation de la bêta, décidé par Jérémy le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
+**Avant la validation de la bêta, décidé par Daneisra le 2026-11-01 :** changement de puissance contrôlé, rechargement d'une sauvegarde avec régulation active, session d'au moins une heure en profil équilibré, incompatibilités éventuelles avec ses autres mods.
 
 Ensuite, si les essais réussissent : baisse automatique, ajustements successifs, anti-oscillation, deux nœuds, changements de puissance, session prolongée en profil équilibré. Aucun tag avant validation.
 

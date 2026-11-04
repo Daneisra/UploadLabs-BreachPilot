@@ -2,7 +2,7 @@ extends HFlowContainer
 ## The small row shown under a Breach node's level buttons. It only displays what it is given and
 ## reports its button: it knows nothing about the regulation. It is not part of the game's save data.
 
-const NODE_NAME := "SmartAutomationControl"
+const NODE_NAME := "BreachPilotControl"
 const FONT_SIZE := 16
 const BUTTON_HEIGHT := 36
 const COLORS := {

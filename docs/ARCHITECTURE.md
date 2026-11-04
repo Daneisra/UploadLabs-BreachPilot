@@ -11,7 +11,7 @@
 ## Structure
 
 ```
-mods-unpacked/Daneisra-SmartAutomation/
+mods-unpacked/Daneisra-BreachPilot/
 ├── manifest.json                 # métadonnées et schéma de configuration
 ├── mod_main.gd                   # point d'entrée du chargeur
 ├── core/

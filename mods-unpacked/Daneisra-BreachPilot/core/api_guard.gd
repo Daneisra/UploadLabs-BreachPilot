@@ -5,6 +5,27 @@ const BREACH_PROPERTIES := [
 	"window", "data", "time", "max_time", "detected", "firewall", "max_firewall",
 	"breached", "max_breach", "paused", "breach_damage", "infection_damage", "vulnerability",
 ]
+## The slots a target reads, and what the observer reads in each.
+const SLOT_FIELDS := {
+	"breach_damage": ["production", "variation"],
+	"infection_damage": ["count", "production", "variation"],
+	"vulnerability": ["count"],
+}
+
+
+## The mod's former identifier: both copies at once would regulate the same nodes twice.
+const FORMER_IDS := ["Daneisra-SmartAutomation"]
+
+
+## The former copy of this mod still loaded, or "". The Mod Loader names each mod's main node after its id.
+static func former_install(root: Node) -> String:
+	var loader := root.get_node_or_null("ModLoader")
+	if loader == null:
+		return ""
+	for id: String in FORMER_IDS:
+		if loader.get_node_or_null(NodePath(id)) != null:
+			return id
+	return ""
 
 
 static func missing_autoload_api(root: Node) -> PackedStringArray:
@@ -32,6 +53,18 @@ static func missing_breach_api(window: Node) -> PackedStringArray:
 	for property: String in BREACH_PROPERTIES:
 		if not property in window:
 			missing.append(property)
+	if not missing.is_empty():
+		return missing
+	# A node of another mod may look alike but hold nothing behind these names: it is left alone.
+	var data: Variant = window.get("data")
+	for key: String in ["level", "max_level"]:
+		if not (data is Dictionary or data is Object) or not key in data:
+			missing.append("data.%s" % key)
+	for slot_name: String in SLOT_FIELDS:
+		var slot: Variant = window.get(slot_name)
+		for field: String in SLOT_FIELDS[slot_name]:
+			if not is_instance_valid(slot) or not field in slot:
+				missing.append("%s.%s" % [slot_name, field])
 	return missing
 
 

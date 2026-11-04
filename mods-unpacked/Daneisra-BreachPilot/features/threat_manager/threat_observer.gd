@@ -172,6 +172,9 @@ func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulatio
 	_api_dump = api_dump
 	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
+	# 0 or less is no limit, whoever passes the value: a cap at level 0 would send every node down.
+	if int(_regulation.max_allowed_level) <= 0:
+		_regulation.max_allowed_level = -1
 	if not _regulation.mode in ["off", "dry_run", "active"]:
 		_regulation.mode = "off"
 
@@ -1029,7 +1032,8 @@ func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatR
 	if not measure.usable:
 		return {}
 	# The measure is kept as it was when it became enough: an attack must not pay for a new table.
-	var key := "%s|%s|%s" % [tracker.type, profile.signature, profile.interval]
+	# Another chain with the same announced power hits otherwise: its hits are in a table of their own.
+	var key := "%s|%s|%s|%s|%s" % [tracker.type, profile.signature, profile.interval, tracker.get("chain_key", ""), tracker.get("infection_key", "")]
 	var table: Dictionary = _profit_tables.get(tracker.type, {})
 	if table.get("key", "") != key:
 		table = {"key": key, "window": tracker.window, "profile": profile, "measure": measure, "levels": {}, "next": maxi(_regulation.min_level, 0), "top": event.max_level}
@@ -1215,7 +1219,8 @@ func _log_regulators() -> void:
 		_log.info("regulator_summary type=%s profile=%s repeats_suppressed=%d model_trust=%s unsafe=%s paused=%s" % [type, regulator.profile_name, regulator.suppressed_repeats, regulator.model_trust(), regulator.is_unsafe(), _state.is_paused(type)])
 
 
-## Looks for what could identify a save slot. Only names and simple values are read.
+## Looks for what could identify a save slot. Only names and types are logged: a value may hold a
+## profile name or a personal path, and logs are shared in bug reports.
 func _log_save_candidates() -> void:
 	var pattern := RegEx.create_from_string(SAVE_CANDIDATE)
 	var root := get_tree().root
@@ -1225,9 +1230,7 @@ func _log_save_candidates() -> void:
 		var found := PackedStringArray()
 		for property: Dictionary in node.get_property_list():
 			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and pattern.search(property.name) != null:
-				var value: Variant = node.get(property.name)
-				var shown: String = str(value).left(40) if value is String or value is int or value is float or value is bool else type_string(typeof(value))
-				found.append("%s=%s" % [property.name, shown])
+				found.append("%s=%s" % [property.name, type_string(typeof(node.get(property.name)))])
 		var methods := PackedStringArray()
 		for method: Dictionary in node.get_script().get_script_method_list():
 			if pattern.search(method.name) != null:

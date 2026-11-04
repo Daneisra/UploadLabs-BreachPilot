@@ -3,7 +3,7 @@ extends RefCounted
 ## between the launcher and the infection gave 127.11 and 57.78, Government level 7 took 4.59 s with
 ## half the infection, and critical hits were 2.5 normal hits.
 
-const ADVISOR := "res://mods-unpacked/Daneisra-SmartAutomation/features/hacking_advisor/"
+const ADVISOR := "res://mods-unpacked/Daneisra-BreachPilot/features/hacking_advisor/"
 const HackingModel := preload(ADVISOR + "hacking_model.gd")
 const HackingChain := preload(ADVISOR + "hacking_chain.gd")
 const HackingGraph := preload(ADVISOR + "hacking_graph.gd")
@@ -13,10 +13,10 @@ const HitLog := preload(ADVISOR + "hit_log.gd")
 const HackingAdvisor := preload(ADVISOR + "hacking_advisor.gd")
 const AdvisorPanel := preload(ADVISOR + "advisor_panel.gd")
 const AdvisorTrials := preload(ADVISOR + "advisor_trials.gd")
-const Observer := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_observer.gd")
-const Regulator := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/threat_regulator.gd")
-const SaLog := preload("res://mods-unpacked/Daneisra-SmartAutomation/core/sa_log.gd")
-const Classifier := preload("res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/breach_classifier.gd")
+const Observer := preload("res://mods-unpacked/Daneisra-BreachPilot/features/threat_manager/threat_observer.gd")
+const Regulator := preload("res://mods-unpacked/Daneisra-BreachPilot/features/threat_manager/threat_regulator.gd")
+const SaLog := preload("res://mods-unpacked/Daneisra-BreachPilot/core/sa_log.gd")
+const Classifier := preload("res://mods-unpacked/Daneisra-BreachPilot/features/threat_manager/breach_classifier.gd")
 
 var _check: Callable
 

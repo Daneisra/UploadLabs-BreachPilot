@@ -1,7 +1,7 @@
 extends RefCounted
 ## Forecast, regulator and pauses, tested without the game. Random sequences use fixed seeds.
 
-const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/"
+const MOD := "res://mods-unpacked/Daneisra-BreachPilot/features/threat_manager/"
 const Forecast := preload(MOD + "breach_forecast.gd")
 const PowerProfile := preload(MOD + "power_profile.gd")
 const Regulator := preload(MOD + "threat_regulator.gd")

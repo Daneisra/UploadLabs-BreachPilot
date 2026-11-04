@@ -2,7 +2,7 @@ extends RefCounted
 ## Gap measures, tested without the game. The scenarios are built from what the logs showed: the
 ## orders tested here are possibilities, and only the in-game measure tells which ones really happen.
 
-const MOD := "res://mods-unpacked/Daneisra-SmartAutomation/features/threat_manager/"
+const MOD := "res://mods-unpacked/Daneisra-BreachPilot/features/threat_manager/"
 const GapProbe := preload(MOD + "gap_probe.gd")
 const GapStats := preload(MOD + "gap_stats.gd")
 

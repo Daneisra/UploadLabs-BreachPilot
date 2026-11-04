@@ -1,6 +1,6 @@
 extends RefCounted
 
-const LOG_NAME := "Daneisra-SmartAutomation"
+const LOG_NAME := "Daneisra-BreachPilot"
 const LEVELS := {"debug": 0, "info": 1, "warning": 2}
 
 var _threshold := 1
