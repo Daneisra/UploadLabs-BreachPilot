@@ -771,6 +771,12 @@ func _test_guard() -> void:
 	loader.name = "ModLoader"
 	fake_root.add_child(loader)
 	_check(ApiGuard.former_install(fake_root) == "", "alone, the mod starts")
+	var capped := Observer.new()
+	capped.configure(SaLog.new("warning"), 0.25, false, {"max_allowed_level": 0})
+	_check(capped._regulation.max_allowed_level == -1, "the regulation reads 0 as no limit by itself")
+	capped.configure(SaLog.new("warning"), 0.25, false, {"max_allowed_level": 40})
+	_check(capped._regulation.max_allowed_level == 40, "and keeps a real cap")
+	capped.free()
 	_check(ModMain.max_allowed_level(0) == -1 and ModMain.max_allowed_level(-1) == -1 and ModMain.max_allowed_level(40) == 40, "0, the lowest ModManager shows, means no limit")
 	var former := Node.new()
 	former.name = "Daneisra-SmartAutomation"

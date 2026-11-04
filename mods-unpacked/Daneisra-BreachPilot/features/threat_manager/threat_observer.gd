@@ -172,6 +172,9 @@ func configure(logger: SaLog, starvation_ratio: float, api_dump: bool, regulatio
 	_api_dump = api_dump
 	_gap_probe = gap_probe
 	_regulation.merge(regulation, true)
+	# 0 or less is no limit, whoever passes the value: a cap at level 0 would send every node down.
+	if int(_regulation.max_allowed_level) <= 0:
+		_regulation.max_allowed_level = -1
 	if not _regulation.mode in ["off", "dry_run", "active"]:
 		_regulation.mode = "off"
 

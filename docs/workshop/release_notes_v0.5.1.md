@@ -16,6 +16,7 @@ Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans l
   - A look-alike node from another mod is left alone.
   - Profitability is measured again when the chain changes.
   - The panel no longer fails on an empty resource name.
+  - `max_allowed_level` at 0 means no limit, like -1, since option screens cannot go below 0.
   - Bilingual README and archive checks.
 
 **Install:** copy `Daneisra-BreachPilot-v0.5.1.zip`, without extracting it, into the `mods` folder next to `Upload Labs.exe`. To turn the regulation on, set `regulation_mode` to `active`, for example with ModManager. See the README for details and known limitations. The in-game interface is in French for now.
@@ -36,6 +37,7 @@ Unofficial mod, not affiliated with EnigmaDev Studios. *Mod non officiel, sans l
   - Un nœud d'un autre mod qui ressemble à une cible est écarté.
   - La rentabilité est remesurée quand la chaîne change.
   - Le panneau ne plante plus sur un nom de ressource vide.
+  - `max_allowed_level` à 0 veut dire « sans limite », comme -1, car les écrans d'options ne descendent pas sous 0.
   - README bilingue et vérification de l'archive.
 
 **Installation :** copiez `Daneisra-BreachPilot-v0.5.1.zip`, sans le décompresser, dans le dossier `mods` à côté de `Upload Labs.exe`. Pour activer la régulation, mettez `regulation_mode` sur `active`, par exemple avec ModManager. Le README détaille les options et les limites connues.
