@@ -1,0 +1,4 @@
+# Same bytes on every machine, so that the archive built from a tag is the one published.
+* text=auto eol=lf
+*.png binary
+*.zip binary
