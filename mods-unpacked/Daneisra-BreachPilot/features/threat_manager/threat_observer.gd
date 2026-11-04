@@ -4,6 +4,7 @@ extends Node
 
 const ApiGuard := preload("../../core/api_guard.gd")
 const SaLog := preload("../../core/sa_log.gd")
+const I18n := preload("../../core/i18n.gd")
 const BreachClassifier := preload("breach_classifier.gd")
 const BreachPrediction := preload("breach_prediction.gd")
 const BreachSimulator := preload("breach_simulator.gd")
@@ -54,13 +55,8 @@ const NATIVE_GETTERS: Array[String] = ["get_max_firewall", "get_max_breach", "ge
 const REWARD_GETTERS: Array[String] = ["get_reward", "get_experience_reward"]
 ## Only reported as present or absent: this version must never call them.
 const NATIVE_REPORTED: Array[String] = ["level_up", "level_down", "get_level", "get_max_level"]
-const BLOCK_TEXTS := {
-	"emergency_stop": "arrêt d'urgence, jusqu'au redémarrage du jeu",
-	"native_option": "option native de montée automatique active",
-	"speed": "vitesse de jeu différente de la normale",
-	"native_methods": "méthodes du jeu inutilisables",
-	"classifier": "trop de réinitialisations inexpliquées",
-}
+## Blocks with their own words, as block.<reason>; any other is an anomaly, named by its reason.
+const BLOCK_TEXTS: Array[String] = ["emergency_stop", "native_option", "speed", "native_methods", "classifier"]
 ## Far from what the game should use, so these hooks run first and last among the frame's _process.
 const HOOK_PRIORITY := 1000000
 const PROBE_REPORT_FRAMES := 18000
@@ -254,6 +250,13 @@ func stop() -> void:
 	_forecasts.clear()
 	_last_hold_reason.clear()
 	_log.info("observer state=stopped")
+
+
+## Godot tells every node when the game's language changes: the states under the nodes are written again,
+## even with nothing else happening. Nothing runs at each tick for this.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and not _trackers.is_empty():
+		_refresh_controls()
 
 
 func _exit_tree() -> void:
@@ -896,17 +899,17 @@ func _block_reason(type: String) -> String:
 ## What the node shows: a pause and a block are two separate things, and both can be true.
 func _automation_view(type: String) -> Dictionary:
 	if _actuator == null:
-		return {"kind": "disabled", "text": "Auto : désactivé", "button": "", "tooltip": ""}
+		return {"kind": "disabled", "text": I18n.t("state.disabled"), "button": "", "tooltip": ""}
 	var block := _block_reason(type)
-	var block_text: String = BLOCK_TEXTS.get(block, "anomalie détectée, redémarrez le jeu pour relancer la régulation (%s)" % block)
+	var block_text := I18n.t("block.%s" % block) if BLOCK_TEXTS.has(block) else I18n.t("block.anomaly", {"reason": block})
 	if _state.is_paused(type):
-		var note := "" if block.is_empty() else "Reste bloqué après la reprise : %s" % block_text
-		return {"kind": "pause", "text": "Pause manuelle", "button": "Reprendre l'automatisation", "tooltip": note}
+		var note := "" if block.is_empty() else I18n.t("state.blocked_after_resume", {"reason": block_text})
+		return {"kind": "pause", "text": I18n.t("state.paused"), "button": I18n.t("control.resume"), "tooltip": note}
 	if not block.is_empty():
-		return {"kind": "blocked", "text": "Auto : bloqué", "button": "", "tooltip": block_text}
+		return {"kind": "blocked", "text": I18n.t("state.blocked"), "button": "", "tooltip": block_text}
 	# Without the right to act, saying "active" would be false.
-	var text := "Auto : actif" if _actuator.is_armed() else "Auto : simulation"
-	return {"kind": "active", "text": text, "button": "Pause", "tooltip": ""}
+	var text := I18n.t("state.active" if _actuator.is_armed() else "state.simulation")
+	return {"kind": "active", "text": text, "button": I18n.t("control.pause"), "tooltip": ""}
 
 
 func _on_control_pressed(type: String) -> void:

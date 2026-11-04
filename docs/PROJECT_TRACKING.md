@@ -15,6 +15,7 @@
 | Conseiller générique et niveau le plus rentable, `0.4.0` | **Terminée**, `0.4.0-dev.11` validée par Daneisra le 2026-11-03, tolérance de l'équilibré ajoutée à sa demande, tag `v0.4.0` |
 | Recommandations et panneau, `0.5.0` | **Terminée**, `0.5.0-dev.4` validée par Daneisra le 2026-11-04, essais de déblocage espacés ajoutés à sa demande, tag `v0.5.0` |
 | BreachPilot, `0.5.1` (première publication publique) | **Terminée**, validée en jeu par Daneisra le 2026-11-04, tag `v0.5.1` |
+| Interface bilingue, `0.6.0` | **Terminée**, validée en jeu par Daneisra le 2026-11-04 (français, anglais, français sans redémarrage, pause et régulation désactivée), tag `v0.6.0` |
 
 **La version 0.1.0 observe uniquement et ne contient aucune régulation automatique.**
 
@@ -99,6 +100,8 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 **Sortie de la `0.5.0`, 2026-11-04 :** Entreprises a perdu trois essais à 44 prévus à 40 %, toutes les vingt attaques environ, avant de réussir après un gain de puissance. À la demande de Daneisra, le conservateur et l'équilibré ne retentent un déblocage raté que lorsque la chance prévue a gagné au moins 10 points ; l'agressif garde ses essais périodiques. Restent pour plus tard : les achats combinés, les emplacements libres des nœuds déjà posés (« 1/3 », probablement via le champ `attribute`), et l'infection sur d'autres chaînes.
 
 **BreachPilot `0.5.1`, 2026-11-04 :** le mod Smart Automation devient BreachPilot (identifiant `Daneisra-BreachPilot`, licence MIT). Trois corrections viennent d'une revue Codex : un nœud d'un autre mod qui imite une cible est écarté, la rentabilité est remesurée quand la chaîne change, et le panneau tient face à un nom de ressource vide. `max_allowed_level` à 0 veut dire « sans limite », comme -1, car ModManager ne descend pas sous 0. Essais en jeu, deux parties : chargement unique de BreachPilot, réglages repris par ModManager, 6 changements de niveau tous vérifiés, aucune erreur. Non vérifiés en jeu, couverts par les tests : un nœud d'un autre mod qui imite une cible, la remesure après un changement de chaîne, le refus de démarrer avec l'ancien mod, et l'enregistrement d'un plafond par ModManager.
+
+**Interface bilingue, `0.6.0`, 2026-11-04 :** les 112 textes du mod sont rangés par identifiant dans `core/strings_fr.gd` et `core/strings_en.gd`. La langue est celle que le jeu donne au `TranslationServer` de Godot : le journal a lu `fr`, la langue du jeu, et non `fr_FR`, celle de Windows. Essai en jeu : passage du français à l'anglais puis retour, sans redémarrage, panneau et contrôles des nœuds traduits, régulation normale, aucune erreur du mod. Le jeu, lui, garde certains de ses propres textes dans l'ancienne langue jusqu'à son redémarrage. Deux revues Codex, sans défaut bloquant ; leurs points importants sont corrigés.
 
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 

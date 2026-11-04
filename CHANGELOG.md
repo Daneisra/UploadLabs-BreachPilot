@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 – 2026-11-04 : interface bilingue
+
+### Ajouté
+
+- Interface en français et en anglais. Le mod suit la langue du jeu : français si le jeu est en français, anglais pour toute autre langue ou si la langue ne peut être lue. Un changement de langue dans les options du jeu s'applique aussitôt, sans redémarrage : panneau, boutons et états des nœuds, infobulles. Les noms des nœuds, des ressources et des achats restent ceux que le jeu traduit lui-même.
+- Nombres et pourcentages écrits à la manière de chaque langue : `26 113 829` et `99 %` en français, `26,113,829` et `99%` en anglais.
+- Le journal indique la langue retenue au démarrage.
+
+### Modifié
+
+- Les textes du mod sont rangés par identifiant dans `core/strings_fr.gd` et `core/strings_en.gd`. Ajouter une langue revient à ajouter une table.
+
 ## 0.5.1 – 2026-11-04 : BreachPilot, première publication publique
 
 ### Corrigé

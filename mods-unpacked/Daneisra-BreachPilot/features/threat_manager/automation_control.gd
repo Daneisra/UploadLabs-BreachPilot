@@ -2,6 +2,7 @@ extends HFlowContainer
 ## The small row shown under a Breach node's level buttons. It only displays what it is given and
 ## reports its button: it knows nothing about the regulation. It is not part of the game's save data.
 
+const I18n := preload("../../core/i18n.gd")
 const NODE_NAME := "BreachPilotControl"
 const FONT_SIZE := 16
 const BUTTON_HEIGHT := 36
@@ -34,7 +35,7 @@ func setup(source: Button, on_pressed: Callable, on_advice: Callable = Callable(
 	add_child(_label)
 	add_child(_button)
 	if on_advice.is_valid():
-		_advice_button.text = "Conseil"
+		_advice_button.text = I18n.t("control.advice")
 		_advice_button.theme_type_variation = source.theme_type_variation
 		_advice_button.custom_minimum_size.y = BUTTON_HEIGHT
 		_advice_button.add_theme_font_size_override("font_size", FONT_SIZE)
@@ -48,6 +49,8 @@ func show_state(view: Dictionary) -> void:
 	if view == _shown:
 		return
 	_shown = view
+	# The state's words change with the game's language, and the advice button's with them.
+	_advice_button.text = I18n.t("control.advice")
 	_label.text = view.text
 	_label.add_theme_color_override("font_color", COLORS[view.kind])
 	_label.tooltip_text = view.tooltip

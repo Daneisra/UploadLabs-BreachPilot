@@ -2,7 +2,7 @@
 
 Mod de confort consacré au hacking. Il garde chaque nœud d'infiltration sur son niveau de menace le plus rentable, et un conseiller en lecture seule propose le meilleur branchement de votre chaîne. Il respecte les règles du jeu : aucun dégât, aucune récompense ni ressource modifiés, rien de gratuit.
 
-[i]Mod non officiel, sans lien avec EnigmaDev Studios.[/i]
+[i]Mod non officiel, sans lien avec EnigmaDev Studios. L'interface suit la langue du jeu : français, ou anglais pour toute autre langue.[/i]
 
 [h2]Auto Threat Manager[/h2] (désactivé par défaut)
 [list]

@@ -3,21 +3,15 @@ extends RefCounted
 ## is bought, and a new purchase appears by itself. Effects are triples of an added value, an added
 ## multiplier and a factor. A purchase whose whole effect cannot be followed is listed without a figure.
 
-const COST_NAMES := {
-	"hack_points": ["point de piratage", "points de piratage"],
-	"optimization": ["point d'optimisation", "points d'optimisation"],
-	"token": ["jeton", "jetons"],
-}
-## How the comparison follows an effect, by attribute, and how to name a loss on it.
-const FOLLOWED := {
-	"breach_damage_multiplier": "Dégâts Payload",
-	"infection_damage_multiplier": "Dégâts d'infection",
-	"breach_speed_multiplier": "Vitesse d'intrusion",
-	"breach_time_multiplier": "Temps d'attaque",
-	"breach_critical_chance": "Chance de critique",
-	"breach_critical_multiplier": "Multiplicateur de critique",
-	"hack_specialization_multiplier": "Puissance de hack",
-}
+const I18n := preload("../../core/i18n.gd")
+
+## The currencies the mod has its own words for, as cost.<name>.one and cost.<name>.other.
+const COST_NAMES: Array[String] = ["hack_points", "optimization", "token"]
+## The effects the comparison follows, by attribute; a loss on one is named by effect.<attribute>.
+const FOLLOWED: Array[String] = [
+	"breach_damage_multiplier", "infection_damage_multiplier", "breach_speed_multiplier", "breach_time_multiplier",
+	"breach_critical_chance", "breach_critical_multiplier", "hack_specialization_multiplier",
+]
 ## An attribute with one of these names concerns hacking, even outside the game's hacking category.
 const HACKING_ATTRIBUTE := "(?i)^(breach|hack|infection|charged|government|corps)"
 const HACKING_CATEGORY := "hacking"
@@ -51,8 +45,10 @@ static func cost_text(cost: float, resource: String, data: Variant = null) -> St
 	var fallback := resource
 	if is_instance_valid(data) and data.get("currencies") is Dictionary and data.currencies.get(resource) is Dictionary:
 		fallback = data.tr(str(data.currencies[resource].get("name", resource)))
-	var names: Array = COST_NAMES.get(resource, [fallback, fallback])
-	return "%s %s" % [grouped(cost), names[0] if cost <= 1.0 else names[1]]
+	var name := fallback
+	if COST_NAMES.has(resource):
+		name = I18n.t("cost.%s.%s" % [resource, "one" if cost <= 1.0 else "other"])
+	return "%s %s" % [grouped(cost), name]
 
 
 ## 26113829114 reads 26 113 829 114. Costs can outgrow whole numbers: 4603854016022367232 reads 4.60e18.
@@ -63,12 +59,7 @@ static func grouped(value: float) -> String:
 		if absf(value) / pow(10.0, power) >= 9.995:
 			power += 1.0
 		return "%.2fe%d" % [value / pow(10.0, power), int(power)]
-	var digits := str(roundi(value))
-	var text := ""
-	while digits.length() > 3:
-		text = " " + digits.right(3) + text
-		digits = digits.left(digits.length() - 3)
-	return digits + text
+	return I18n.group_digits(str(roundi(value)))
 
 
 ## A copy of the chain with this purchase made.
@@ -98,9 +89,8 @@ static func can_follow_critical(multipliers: PackedFloat32Array, critical_multip
 static func downsides(changes: Dictionary) -> PackedStringArray:
 	var list := PackedStringArray()
 	for name: String in changes:
-		var label: String = FOLLOWED.get(name, "")
-		if label != "" and changes[name].ratio < 1.0:
-			list.append("%s %+d %%" % [label, roundi((changes[name].ratio - 1.0) * 100.0)])
+		if FOLLOWED.has(name) and changes[name].ratio < 1.0:
+			list.append("%s %s" % [I18n.t("effect.%s" % name), I18n.percent(roundi((changes[name].ratio - 1.0) * 100.0), true)])
 	return list
 
 

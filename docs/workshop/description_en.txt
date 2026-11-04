@@ -2,7 +2,7 @@
 
 A quality-of-life mod for hacking. It keeps each Breach node on its most profitable threat level, and a read-only advisor suggests the best wiring for your chain. It plays by the game's rules: no damage, reward or resource is changed, nothing is created for free.
 
-[i]Unofficial mod, not affiliated with EnigmaDev Studios. The in-game interface is in French for now.[/i]
+[i]Unofficial mod, not affiliated with EnigmaDev Studios. The interface follows the game's language: English, or French for a game in French.[/i]
 
 [h2]Auto Threat Manager[/h2] (off by default)
 [list]
@@ -16,9 +16,9 @@ A quality-of-life mod for hacking. It keeps each Breach node on its most profita
 
 [h2]Smart Hacking Advisor[/h2] (read-only)
 [list]
-[*]Open it with [b]Ctrl+Alt+F8[/b] or the [b]Conseil[/b] button on a Breach node.
+[*]Open it with [b]Ctrl+Alt+F8[/b] or the [b]Advice[/b] button on a Breach node.
 [*]The best wiring for your objective first, step by step, with the estimated gain, drawbacks and reliability, then the recommended purchase.
-[*]“À essayer” (things to try): nodes without power or damage, free outputs and inputs, unlocked nodes not placed yet.
+[*]“Things to try”: nodes without power or damage, free outputs and inputs, unlocked nodes not placed yet.
 [*]Detailed figures in a collapsible section. It never changes your wiring or buys anything.
 [/list]
 

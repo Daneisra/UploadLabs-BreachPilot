@@ -118,6 +118,7 @@ func run(check: Callable) -> void:
 	_test_chain_search()
 	_test_recommendation_card()
 	_test_trials()
+	_test_english()
 	_test_stealth()
 	_test_target_rules()
 	_test_infection_measure()
@@ -739,13 +740,81 @@ func _test_recommendation_card() -> void:
 	panel.show_advice(options, "xp", func(_key: String) -> void: pass, card, {"rows": [["a"], ["b"]], "kinds": ["header", ""]}, {"rows": [], "kinds": []}, "note")
 	_check.call(panel._card.get_child_count() == card.size() and not panel._details.visible, "the details start folded")
 	panel._on_toggle()
-	_check.call(panel._details.visible and panel._toggle.text == AdvisorPanel.HIDE_DETAILS, "a click unfolds them")
+	_check.call(panel._details.visible and panel._toggle.text == "Masquer le détail des calculs", "a click unfolds them")
 	panel.show_advice(options, "xp", func(_key: String) -> void: pass, card, {"rows": [["a"], ["b"]], "kinds": ["header", ""]}, {"rows": [], "kinds": []}, "note")
 	_check.call(panel._details.visible, "and they stay open on the next calculation")
 	panel.show_message("Calcul en cours…")
 	_check.call(not panel._toggle.visible and panel._summary.visible, "a message hides the card")
 	panel.free()
 	advisor.free()
+
+
+## The whole panel in English: no French word, no value left unfilled, no raw id, and the game's own names kept.
+func _test_english() -> void:
+	var I18n: GDScript = load("res://mods-unpacked/Daneisra-BreachPilot/core/i18n.gd")
+	I18n.forced = "en"
+	var texts := PackedStringArray()
+	var chain := _chain()
+	# The game in English gives its own names in English.
+	for key: String in chain.targets:
+		chain.targets[key].label = "Breach %s" % key.capitalize()
+		chain.targets[key].reward_name = "%s Data" % key.capitalize()
+	var advisor := HackingAdvisor.new()
+	advisor._chain = chain
+	advisor._model = HackingModel.new(chain)
+	for objective: String in [HackingAdvice.XP, HackingAdvice.BALANCED]:
+		advisor._objective = objective
+		advisor._rows.clear()
+		for scenario: Dictionary in advisor._model.scenarios():
+			advisor._rows.append(advisor._model.evaluate(scenario))
+		advisor._current = advisor._model.evaluate(chain.current)
+		var richer := advisor._current.duplicate(true)
+		richer.xp_rate *= 1.3
+		for target: Dictionary in richer.targets.values():
+			target.reward_rate *= 1.3
+		advisor._upgrade_rows = [
+			{"upgrade": {"name": "Payload Damage", "affordable": true, "resource": "points", "cost": 1.0, "cost_text": "1 hack point", "held": 4.0, "changes": {}}, "row": richer},
+			{"upgrade": {"name": "Breach Speed", "affordable": false, "resource": "points", "cost": 10.0, "cost_text": "10 hack points", "held": 4.0, "changes": {}}, "row": richer},
+		]
+		var desktop := _trial_desktop()
+		var data := TrialTable.new()
+		data.windows = _trial_windows()
+		data.windows.bank.description = "Gets Tokens when it wins."
+		data.windows.bank.name = "Breach Bank"
+		data.resources = {"vulnerability": {"name": "Vulnerability"}, "infection_damage": {"name": "Infection Damage"}, "payload_damage": {"name": "Payload Damage"}}
+		var globals := FakeGlobalsTable.new()
+		globals.unlocks = {"research.bank": true}
+		advisor._trials = AdvisorTrials.read(HackingGraph.snapshot(desktop), data, globals)
+		for line: Dictionary in advisor._card():
+			texts.append(line.text)
+		for table: Dictionary in [advisor._connections_table(), advisor._purchases_table()]:
+			for row: Array in table.rows:
+				texts.append(" | ".join(row))
+		texts.append(advisor._note())
+		globals.free()
+		data.free()
+		_free_desktop(desktop)
+	advisor._current.insufficient = PackedStringArray([HackingModel.REASON_HITS, HackingModel.REASON_UNMEASURED])
+	for line: Dictionary in advisor._card():
+		texts.append(line.text)
+	var panel := AdvisorPanel.new()
+	panel.show_message(I18n.t("panel.computing"))
+	texts.append_array([panel._title.text, panel._close.text, panel._toggle.text, panel._summary.text])
+	panel.free()
+	advisor.free()
+	var all := "\n".join(texts)
+	var french := RegEx.create_from_string("[éèàçêùôî«»]|\\b(de|du|des|le|la|les|vers|est|pas|vous|votre|aucun|aucune|Achat|Fiabilité|Gardez|Données|niv)\\b")
+	var hit := french.search(all)
+	_check.call(hit == null, "nothing French in the English panel: %s" % (all.substr(maxi(hit.get_start() - 200, 0), 400).c_escape() if hit != null else ""))
+	_check.call(not all.contains("{") and not all.contains("}"), "every value is filled in")
+	var raw := PackedStringArray()
+	for id: String in I18n.TABLES.en:
+		if all.contains(id):
+			raw.append(id)
+	_check.call(raw.is_empty(), "no raw id shows: %s" % ", ".join(raw))
+	_check.call(all.contains("Things to try") and all.contains("Reliability: ") and all.contains("Recommended purchase: Payload Damage") and all.contains("Not enough data to advise:"), "the English card reads as such")
+	_check.call(all.contains("Breach Bank is not placed yet: Gets Tokens when it wins"), "a node's name and description stay the game's")
+	I18n.forced = "fr"
 
 
 class FakeGlobalsTable extends Node:
@@ -870,7 +939,7 @@ func _test_refresh_state() -> void:
 	var measuring := _chain()
 	measuring.streams.P.multipliers = PackedFloat32Array([0.6])
 	_check.call(advisor._state_of(measuring, upgrades) != state, "a measure becoming sufficient recalculates")
-	_check.call(advisor._state_of({"error": "no_target"}, upgrades) == "no_target", "an error is a state too")
+	_check.call(advisor._state_of({"error": "no_target"}, upgrades).ends_with("|no_target") and advisor._state_of({"error": "no_target"}, upgrades).begins_with("fr:"), "an error is a state too, in its language")
 	advisor.free()
 
 

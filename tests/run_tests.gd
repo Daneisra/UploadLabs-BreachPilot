@@ -11,11 +11,13 @@ const Observer := preload(MOD + "features/threat_manager/threat_observer.gd")
 const ApiGuard := preload(MOD + "core/api_guard.gd")
 const SaLog := preload(MOD + "core/sa_log.gd")
 const ModMain := preload(MOD + "mod_main.gd")
+const I18n := preload(MOD + "core/i18n.gd")
 const RegulationTests := preload("regulation_tests.gd")
 const GapProbeTests := preload("gap_probe_tests.gd")
 const ActuatorTests := preload("actuator_tests.gd")
 const AdvisorInventoryTests := preload("advisor_inventory_tests.gd")
 const HackingAdvisorTests := preload("hacking_advisor_tests.gd")
+const I18nTests := preload("i18n_tests.gd")
 const Actuator := preload(MOD + "features/threat_manager/threat_actuator.gd")
 
 const TICK := 0.05
@@ -150,6 +152,8 @@ class FakeGetterless extends Node:
 
 
 func _initialize() -> void:
+	# The texts checked below are the French ones; i18n_tests.gd checks both languages.
+	I18n.forced = "fr"
 	# A runtime error ends _run before it can quit: fail instead of hanging.
 	create_timer(TIME_LIMIT).timeout.connect(_on_time_limit)
 	_run.call_deferred()
@@ -198,6 +202,7 @@ func _run() -> void:
 	ActuatorTests.new().run(_check)
 	AdvisorInventoryTests.new().run(_check)
 	HackingAdvisorTests.new().run(_check)
+	I18nTests.new().run(_check)
 	await _test_actions_in_observer()
 	await _test_regulation_in_observer()
 	await _test_automation_control()
@@ -1253,6 +1258,13 @@ func _test_regulation_in_observer() -> void:
 	game.Signals.tick.emit()
 	_check(_control_of(government).shown().text == "Auto : actif", "the node says it is active: %s" % str(_control_of(government).shown()))
 	_check(_control_of(corps).shown().text == "Auto : actif", "and so does the other one")
+	# The game's language changes with nothing else happening: the states follow at once, and come back.
+	I18n.forced = "en"
+	observer.notification(Node.NOTIFICATION_TRANSLATION_CHANGED)
+	_check(_control_of(government).shown().text == "Auto: on" and _control_of(government)._advice_button.text == "Advice", "a language change rewrites the node's state: %s" % str(_control_of(government).shown()))
+	I18n.forced = "fr"
+	observer.notification(Node.NOTIFICATION_TRANSLATION_CHANGED)
+	_check(_control_of(government).shown().text == "Auto : actif" and _control_of(government)._advice_button.text == "Conseil", "and back")
 
 	# Straight from 0 to 4 in one action, verified, then a deliberate hold.
 	var attacks_before := _count("event=success type=breach_government")
