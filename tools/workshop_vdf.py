@@ -26,6 +26,8 @@ APP_ID = "3606890"
 REPO = "Daneisra/UploadLabs-BreachPilot"
 TITLE = "BreachPilot – Hacking Automation & Advisor"
 FORBIDDEN_IDS = {"3833196182"}  # Research Freedom
+## BreachPilot's item, created on 2026-11-04: every update goes to it. A new item needs --new-item.
+ITEM_ID = "3833859813"
 DESCRIPTION_LIMIT = 8000
 PREVIEW_LIMIT = 1024 * 1024
 
@@ -51,7 +53,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
     parser.add_argument("--sha256", required=True)
-    parser.add_argument("--published-id", default="0")
+    parser.add_argument("--published-id", default=ITEM_ID)
+    parser.add_argument("--new-item", action="store_true", help="create another item instead of updating BreachPilot's")
     parser.add_argument("--visibility", default="2", choices=["0", "1", "2", "3"])
     parser.add_argument("--change-note", default="")
     parser.add_argument("--out", default=str(ROOT / "build" / "workshop"))
@@ -59,7 +62,9 @@ def main() -> int:
     if args.published_id in FORBIDDEN_IDS:
         fail(f"{args.published_id} is Research Freedom's item id")
     if not re.fullmatch(r"\d+", args.published_id):
-        fail("the published id must be a number, 0 for a new item")
+        fail("the published id must be a number")
+    if (args.published_id == "0") != args.new_item:
+        fail(f"BreachPilot's item is {ITEM_ID}: a new item needs both --published-id 0 and --new-item")
 
     name = f"{MOD_ID}-v{args.version}.zip"
     url = f"https://github.com/{REPO}/releases/download/v{args.version}/{name}"

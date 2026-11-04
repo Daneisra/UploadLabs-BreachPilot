@@ -30,6 +30,12 @@ Le dépôt doit être public pour que les joueurs voient la Release. Changer sa 
 
 ## Steam Workshop d'Upload Labs (app 3606890)
 
+**Élément BreachPilot : `3833859813`**, https://steamcommunity.com/sharedfiles/filedetails/?id=3833859813
+
+- **Création :** le 2026-11-04, en privé, par Daneisra avec SteamCMD, à partir du dossier d'envoi `D:\UploadLabs-Workshop\BreachPilot`.
+- **Mises à jour :** toutes passent par cet identifiant. `tools/workshop_vdf.py` le vise par défaut, et refuse `0` sans `--new-item`.
+- **Catégorie :** `tools/set_workshop_tags.py` pose `QOL` sur cet élément seul, à blanc par défaut.
+
 **Constaté sur l'installation de Daneisra, novembre 2026 :**
 
 - Un objet du Workshop contient un zip du Godot Mod Loader, au même format que notre archive : `steamapps/workshop/content/3606890/<id>/<Namespace-Mod>.zip`.

@@ -103,6 +103,14 @@ Essais au niveau 10 : tous en échec, 0 réussite sur 12, suivis d'un retour au 
 
 **Interface bilingue, `0.6.0`, 2026-11-04 :** les 112 textes du mod sont rangés par identifiant dans `core/strings_fr.gd` et `core/strings_en.gd`. La langue est celle que le jeu donne au `TranslationServer` de Godot : le journal a lu `fr`, la langue du jeu, et non `fr_FR`, celle de Windows. Essai en jeu : passage du français à l'anglais puis retour, sans redémarrage, panneau et contrôles des nœuds traduits, régulation normale, aucune erreur du mod. Le jeu, lui, garde certains de ses propres textes dans l'ancienne langue jusqu'à son redémarrage. Deux revues Codex, sans défaut bloquant ; leurs points importants sont corrigés.
 
+**Élément Steam Workshop, 2026-11-04 :** BreachPilot v0.6.0 est créé en privé par Daneisra avec SteamCMD (`Committing update...Success`). Identifiant **`3833859813`**, https://steamcommunity.com/sharedfiles/filedetails/?id=3833859813.
+- **Contenu :** le zip de la Release GitHub v0.6.0, retéléchargé et vérifié (SHA-256 `33706493…6e5241`), 101 295 octets, seul dans son dossier.
+- **Page :** l'aperçu est la vignette officielle (`dadc925b…94e7d7`, 1024 × 1024), et la description est bilingue, 7 494 caractères, sans guillemet droit.
+- **Vérifications :**
+  - SteamCMD a inscrit l'identifiant dans le VDF, et une copie du VDF de création est conservée à côté ;
+  - pour un visiteur non connecté, l'API publique de Steam ne trouve pas l'élément (code 9) : il est bien privé.
+- **Catégorie `QOL` :** pas encore posée. Deux envois par `ISteamUGC::SetItemTags` ont reçu de Steam le code 3, « pas de connexion », alors que l'essai à blanc était bon. Rien d'autre n'a été modifié.
+
 **Après la `0.3.0`, sans la retarder, toujours en lecture seule :**
 
 1. Branchements : comparer des configurations selon leurs conséquences sur toute la chaîne.
