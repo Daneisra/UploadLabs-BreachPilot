@@ -766,6 +766,12 @@ func _test_guard() -> void:
 	window.free()
 	var breach := FakeBreach.new()
 	_check(ApiGuard.missing_breach_api(breach).is_empty(), "complete window passes")
+	var hollow := FakeBreach.new()
+	hollow.data = {}
+	hollow.vulnerability = null
+	var gaps := ApiGuard.missing_breach_api(hollow)
+	_check(gaps.has("data.level") and gaps.has("vulnerability.count"), "a look-alike node holding nothing is refused: %s" % ", ".join(gaps))
+	hollow.free()
 	breach.free()
 
 

@@ -1,0 +1,49 @@
+[h1]Smart Automation – Régulation et conseil du hacking[/h1]
+
+Mod de confort consacré au hacking. Il garde chaque nœud d'infiltration sur son niveau de menace le plus rentable, et un conseiller en lecture seule propose le meilleur branchement de votre chaîne. Il respecte les règles du jeu : aucun dégât, aucune récompense ni ressource modifiés, rien de gratuit.
+
+[i]Mod non officiel, sans lien avec EnigmaDev Studios.[/i]
+
+[h2]Auto Threat Manager[/h2] (désactivé par défaut)
+[list]
+[*]Règle chaque nœud d'infiltration sur le niveau qui rapporte le plus par minute pour votre objectif : XP, données, renseignements ou équilibré. Niveaux élites compris.
+[*]Monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient.
+[*]Trois profils : conservateur, équilibré, agressif. Après un essai de déblocage raté, le conservateur et l'équilibré attendent que la chance de gagner ait nettement augmenté.
+[*]S'appuie sur les attaques observées sur votre chaîne : les nœuds inconnus ou venus d'autres mods ne gênent pas.
+[*]Boutons Pause et Reprendre sur chaque nœud. Changer un niveau vous-même met ce type de nœud en pause.
+[*]Protections : suspension en vitesse accélérée ou avec l'option native du jeu, vérification après chaque changement, arrêt sur anomalie, arrêt d'urgence [b]Ctrl+Alt+F10[/b].
+[/list]
+
+[h2]Smart Hacking Advisor[/h2] (lecture seule)
+[list]
+[*]S'ouvre avec [b]Ctrl+Alt+F8[/b] ou le bouton [b]Conseil[/b] d'un nœud d'infiltration.
+[*]D'abord le meilleur branchement pour votre objectif, étape par étape, avec le gain estimé, les inconvénients et la fiabilité, puis l'achat conseillé.
+[*]« À essayer » : nœuds sans puissance ou sans dégâts, sorties et entrées libres, nœuds débloqués pas encore posés.
+[*]Le détail des calculs est dans une section repliable. Il ne change jamais vos branchements et n'achète rien.
+[/list]
+
+[h2]Utilisation[/h2]
+[olist]
+[*]Abonnez-vous et lancez le jeu. Le conseiller fonctionne tout de suite.
+[*]Pour laisser le mod changer les niveaux de menace, mettez l'option [b]regulation_mode[/b] sur [b]active[/b], par exemple avec le mod ModManager.
+[*]Choisissez votre objectif en haut du panneau de conseil : la régulation le suit.
+[/olist]
+
+[h2]Compatibilité[/h2]
+[list]
+[*]Testé sur Upload Labs 3.0.12 avec le Godot Mod Loader 7.0.1 intégré, sous Windows.
+[*]Testé avec Smart GPU Manager, Smart Thread Manager, Better Splitters, Where Should I Connect?, Easy Tokens et ModManager.
+[*]N'écrit rien dans vos sauvegardes. Retirez-le quand vous voulez : vos niveaux restent des niveaux normaux du jeu.
+[*]Ne gardez pas en plus une copie dans le dossier [b]mods[/b] du jeu : une seule source.
+[/list]
+
+[h2]Limites connues[/h2]
+[list]
+[*]Une nouvelle chaîne ou un nouveau nœud demande quelques attaques avant d'être chiffré.
+[*]Une anomalie arrête la régulation jusqu'au redémarrage du jeu, par prudence.
+[*]Les achats sont comparés un par un.
+[*]Les emplacements libres d'un type de nœud déjà posé (« 1/3 ») ne sont pas encore lus.
+[*]Certaines mécaniques d'infection n'ont été mesurées que sur une chaîne.
+[/list]
+
+Code source, changelog et signalements : [url=https://github.com/Daneisra/UploadLabs-SmartAutomation]GitHub[/url]. Joignez les lignes [b]Daneisra-SmartAutomation[/b] de %APPDATA%\Upload Labs\logs\modloader.log.

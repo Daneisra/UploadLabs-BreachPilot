@@ -331,7 +331,8 @@ func _connections_table() -> Dictionary:
 		header.append(_chain.targets[key].label)
 	header.append("XP/min")
 	for key: String in keys:
-		header.append("%s/min" % _chain.targets[key].reward_name.split(" ", false)[0])
+		var words: PackedStringArray = str(_chain.targets[key].reward_name).split(" ", false)
+		header.append("%s/min" % (words[0] if not words.is_empty() else _chain.targets[key].label))
 	header.append("Fiabilité")
 	var rows: Array = [header]
 	var kinds: Array = ["header"]

@@ -1,0 +1,49 @@
+[h1]Smart Automation – Hacking regulation and advisor[/h1]
+
+A quality-of-life mod for hacking. It keeps each Breach node on its most profitable threat level, and a read-only advisor suggests the best wiring for your chain. It plays by the game's rules: no damage, reward or resource is changed, nothing is created for free.
+
+[i]Unofficial mod, not affiliated with EnigmaDev Studios. The in-game interface is in French for now.[/i]
+
+[h2]Auto Threat Manager[/h2] (off by default)
+[list]
+[*]Sets each Breach node to the level that pays most per minute for your objective: XP, data, intel or balanced. Elite levels included.
+[*]Climbs once to the highest unlocked level when it can be won, to open the next one, then comes back.
+[*]Three profiles: conservative, balanced, aggressive. After a failed unlock try, conservative and balanced wait for clearly better odds.
+[*]Works from the attacks it observes on your chain, so unknown nodes and nodes from other mods do not get in the way.
+[*]Pause and Resume buttons on each node. Changing a level yourself pauses that node type.
+[*]Safeguards: suspended at higher game speed or with the game's auto level option, checks after every change, stops on any anomaly, emergency stop on [b]Ctrl+Alt+F10[/b].
+[/list]
+
+[h2]Smart Hacking Advisor[/h2] (read-only)
+[list]
+[*]Open it with [b]Ctrl+Alt+F8[/b] or the [b]Conseil[/b] button on a Breach node.
+[*]The best wiring for your objective first, step by step, with the estimated gain, drawbacks and reliability, then the recommended purchase.
+[*]"Things to try": nodes without power or damage, free outputs and inputs, unlocked nodes not placed yet.
+[*]Detailed figures in a collapsible section. It never changes your wiring or buys anything.
+[/list]
+
+[h2]How to use[/h2]
+[olist]
+[*]Subscribe and start the game. The advisor works right away.
+[*]To let the mod change threat levels, set [b]regulation_mode[/b] to [b]active[/b] in the mod options, for example with the ModManager mod.
+[*]Pick your objective at the top of the advisor panel. The regulation follows it.
+[/olist]
+
+[h2]Compatibility[/h2]
+[list]
+[*]Tested on Upload Labs 3.0.12 with the bundled Godot Mod Loader 7.0.1, on Windows.
+[*]Tested alongside Smart GPU Manager, Smart Thread Manager, Better Splitters, Where Should I Connect?, Easy Tokens and ModManager.
+[*]Writes nothing into your saves. Remove it at any time: your levels stay ordinary game levels.
+[*]Do not keep a copy in the game's [b]mods[/b] folder as well: one source only.
+[/list]
+
+[h2]Known limitations[/h2]
+[list]
+[*]A new chain or node needs a few attacks before it gets figures.
+[*]An anomaly stops the regulation until the game is restarted, on purpose.
+[*]Purchases are compared one at a time.
+[*]Free slots of a node type already placed ("1/3") are not read yet.
+[*]Some infection mechanics were measured on one chain only.
+[/list]
+
+Source, changelog and bug reports: [url=https://github.com/Daneisra/UploadLabs-SmartAutomation]GitHub[/url]. Please include the [b]Daneisra-SmartAutomation[/b] lines of %APPDATA%\Upload Labs\logs\modloader.log.

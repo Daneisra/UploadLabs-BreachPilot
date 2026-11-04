@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.1 – en préparation : première publication publique
+
+### Corrigé
+
+- Un nœud d'un autre mod qui ressemble à une cible sans en avoir les données (niveau, dégâts, vulnérabilité) est écarté au branchement, au lieu de provoquer des erreurs à chaque tick.
+- La rentabilité d'un niveau est recalculée quand la chaîne change, même si la puissance annoncée reste la même : les coups d'une autre chaîne ne servent plus à choisir le niveau.
+- Le panneau ne plante plus sur une ressource au nom vide.
+
+### Modifié
+
+- Le manifeste décrit la régulation par rentabilité et le Smart Hacking Advisor.
+- README en français et en anglais, avec l'installation, la désinstallation, les options et les limites connues.
+- `tools/verify_zip.py` vérifie l'archive avant publication et écrit son empreinte SHA-256.
+
 ## 0.5.0 – 2026-11-04 : recommandations claires et pistes à essayer
 
 ### Ajouté

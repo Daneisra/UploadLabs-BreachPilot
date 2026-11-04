@@ -1,63 +1,179 @@
 # Upload Labs – Smart Automation
 
-Mod de confort consacré au hacking pour [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/), basé sur le Godot Mod Loader intégré au jeu.
+[Français](#français) · [English](#english)
 
-> **Version actuelle : 0.5.0.** Le mod règle chaque nœud d'infiltration sur le niveau qui rapporte le plus pour l'objectif choisi, niveaux élites compris, et monte au besoin pour débloquer les suivants. Le panneau de conseil commence par la meilleure recommandation et propose des pistes à essayer. Il est **désactivé par défaut** : réglez `regulation_mode` sur `active` dans les options.
+> Mod non officiel, sans lien avec EnigmaDev Studios. *Unofficial mod, not affiliated with EnigmaDev Studios.*
 
-## Objectif
+---
 
-Rendre le hacking plus confortable en respectant les mécaniques normales du jeu : pas de dégâts, de récompenses ou de ressources modifiés.
+## Français
 
-| Fonctionnalité | Version visée | État |
+Mod de confort consacré au **hacking** d'[Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). Il règle le niveau de menace de vos nœuds d'infiltration sur le niveau le plus rentable, et un panneau de conseil vous propose le meilleur branchement de votre chaîne. Le mod respecte les mécaniques du jeu : il ne modifie ni les dégâts, ni les récompenses, ni les ressources, et ne crée rien gratuitement.
+
+**Version actuelle : 0.5.1.** Interface en français.
+
+### Fonctionnalités
+
+**Auto Threat Manager : régulation de la menace** (désactivée par défaut)
+
+- Règle chaque nœud d'infiltration (Entreprises, Gouvernement, Anonymous, Banque…) sur le niveau qui rapporte le plus par minute pour l'objectif choisi dans le panneau : XP, données, renseignements ou équilibré. Les niveaux élites sont pris en compte.
+- Monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient au niveau rentable.
+- Trois profils : conservateur, équilibré (par défaut), agressif. Après un essai de déblocage raté, le conservateur et l'équilibré attendent que la chance de gagner ait nettement augmenté. L'agressif réessaie de temps en temps.
+- Les estimations viennent des attaques réellement observées sur votre chaîne : un nœud inconnu ou ajouté par un autre mod ne bloque rien. Tant que la mesure manque, la régulation vise le plus haut niveau qui tient.
+- Sous les boutons du nœud : état de l'automatisation, `Pause` et `Reprendre`. Changer le niveau vous-même met ce type de nœud en pause pour la session.
+- Protections : suspension à vitesse accélérée ou si l'option native du jeu est active, vérification après chaque changement de niveau, arrêt en cas d'anomalie, arrêt d'urgence `Ctrl+Alt+F10`.
+- Les changements passent par les boutons du jeu (`level_up` / `level_down`) et sont enregistrés normalement dans la partie.
+
+**Smart Hacking Advisor : conseiller en lecture seule**
+
+- `Ctrl+Alt+F8`, ou le bouton `Conseil` d'un nœud d'infiltration.
+- Affiche d'abord le meilleur branchement pour l'objectif choisi, étape par étape, avec le gain estimé, les inconvénients et la fiabilité, puis l'achat conseillé.
+- Section **« À essayer »** : nœuds sans puissance ou sans dégâts, sorties ou entrées libres, nœuds débloqués pas encore posés. Pas de chiffre tant que rien n'est mesuré.
+- Le détail des calculs (branchements comparés, achats, niveaux) est dans une section repliable.
+- Il ne fait qu'afficher : vous gardez la main sur vos branchements et vos achats.
+
+### Compatibilité
+
+| | Testé |
+|---|---|
+| Upload Labs | 3.0.12 (Steam, Windows) |
+| Godot Mod Loader | 7.0.1, intégré au jeu |
+| Autres mods | Smart GPU Manager, Smart Thread Manager, Better Splitters, Where Should I Connect?, Easy Tokens, ModManager |
+
+Le mod n'étend aucun script du jeu. Au démarrage, il vérifie les fonctions du jeu dont il a besoin et se désactive proprement s'il en manque une. Linux et macOS n'ont pas été testés.
+
+### Installation
+
+**Depuis le Steam Workshop** (quand le mod y sera publié) : abonnez-vous, puis lancez le jeu.
+
+**Depuis GitHub** :
+
+1. Téléchargez `Daneisra-SmartAutomation-<version>.zip` dans les [Releases](https://github.com/Daneisra/UploadLabs-SmartAutomation/releases). Vous pouvez contrôler son empreinte SHA-256, indiquée à côté.
+2. Ouvrez le dossier du jeu : dans Steam, clic droit sur Upload Labs, *Gérer*, *Parcourir les fichiers locaux*.
+3. Créez un dossier `mods` à côté de `Upload Labs.exe` s'il n'existe pas, et copiez-y le zip **sans le décompresser**.
+4. Lancez le jeu.
+
+N'installez pas le mod deux fois : si vous passez au Workshop, supprimez le zip du dossier `mods`, et inversement.
+
+### Activer la régulation
+
+La régulation est **désactivée par défaut** : le mod observe et le conseiller fonctionne, mais aucun niveau n'est changé. Pour l'activer, mettez l'option `regulation_mode` sur `active`, par exemple avec le mod **ModManager** du Workshop. Les autres options :
+
+| Option | Valeurs | Rôle |
 |---|---|---|
-| Observateur des infiltrations (lecture seule) | 0.1.0 | **Validé en jeu** |
-| Mesures pour la régulation (lecture seule) | 0.2.0-alpha.1 | Validé en jeu |
-| Simulation à blanc des décisions, aucune action | 0.2.0-alpha.2 | Validé en jeu |
-| Actionneur, pause sur le nœud, essais réels | 0.2.0-beta.1 | Validé en jeu |
-| Auto Threat Manager (régulation de la menace) | 0.2.0 | **Validé en jeu** |
-| Smart Hacking Advisor : branchements et achats comparés, en lecture seule (`Ctrl+Alt+F8`) | 0.3.0 | **Validé en jeu** |
-| Chaîne quelconque mesurée sans liste de nœuds, niveau le plus rentable | 0.4.0 | **Validé en jeu** |
-| Recommandation en tête du panneau, pistes « À essayer », calculs repliables | 0.5.0 | **Validé en jeu** |
+| `regulation_mode` | `off` (défaut), `dry_run`, `active` | `dry_run` journalise les décisions sans agir |
+| `regulation_profile` | `conservative`, `balanced` (défaut), `aggressive` | Prudence de la régulation |
+| `max_allowed_level` / `min_level` | entier, `-1` = sans limite | Bornes des niveaux visés |
+| `log_level` | `debug`, `info` (défaut), `warning` | Détail du journal |
 
-## Ce que fait le mod
+### Désinstallation
 
-- Règle chaque nœud d'infiltration sur le niveau qui rapporte le plus par minute pour l'objectif choisi dans le panneau (XP, données ou équilibré), niveaux élites compris, en une seule action. Il monte une fois au plus haut niveau débloqué quand il peut être gagné, pour ouvrir le suivant, puis revient.
-- Lit la chaîne de hacking telle qu'elle est branchée et mesure ce que font ses nœuds dans les attaques réelles : un nœud inconnu ou venu d'un autre mod n'est pas un obstacle. Tant qu'une mesure manque, le panneau affiche « données insuffisantes » et la régulation vise le plus haut niveau qui tient.
-- Trois profils : conservateur, équilibré, agressif. En équilibré et agressif, le mod essaie aussi un niveau qui peut réussir, et redescend si l'essai échoue. Après un essai de déblocage raté, le conservateur et l'équilibré attendent que la chance d'y gagner ait nettement augmenté ; l'agressif réessaie de temps en temps.
-- Sous les boutons du nœud : état de l'automatisation, boutons `Pause` et `Reprendre`. Un changement de niveau par le joueur met le type en pause pour la session.
-- Se suspend à vitesse × 5 ou si l'option native est active. `Ctrl+Alt+F10` arrête tout. Une anomalie arrête la régulation jusqu'au redémarrage du jeu.
-- Les changements de niveau passent par les méthodes du jeu et sont enregistrés normalement dans vos sauvegardes.
+Supprimez le zip du dossier `mods`, ou désabonnez-vous sur le Workshop. Vos parties restent intactes : le mod n'écrit rien dans les sauvegardes, et les niveaux qu'il a choisis restent des niveaux normaux du jeu. Ses réglages sont dans `%APPDATA%\Upload Labs\mod_configs\Daneisra-SmartAutomation`, que vous pouvez supprimer.
 
-`Ctrl+Alt+F8` ou le bouton `Conseil` du nœud ouvre le conseil hacking. Il affiche d'abord le meilleur branchement pour l'objectif choisi, étape par étape, avec le gain estimé, les inconvénients et la fiabilité, puis l'achat conseillé. La section « À essayer » signale, sans chiffre tant que rien n'est mesuré, les nœuds sans puissance ou sans dégâts, les sorties et entrées libres, et les nœuds débloqués pas encore posés. Le détail des calculs est dans une section repliable. Il ne fait qu'afficher : vous gardez la main sur vos branchements et vos achats.
+### Limites connues
 
-Limites et scénarios partiellement validés : voir le [suivi du projet](docs/PROJECT_TRACKING.md).
+- Interface en français uniquement pour l'instant.
+- Une nouvelle chaîne ou un nouveau nœud demande quelques attaques avant d'être chiffré : le panneau affiche alors « données insuffisantes ».
+- Une anomalie (niveau inattendu, état incohérent) arrête la régulation de tous les nœuds jusqu'au redémarrage du jeu. C'est voulu, par prudence.
+- Les achats sont comparés un par un : leurs gains ne s'additionnent pas.
+- Le mod ne sait pas encore lire les emplacements libres d'un type de nœud déjà posé (par exemple « 1/3 »).
+- Certaines mécaniques d'infection n'ont été mesurées que sur une chaîne : les estimations correspondantes sont moins sûres, et la fiabilité affichée le dit.
+- Après une mise à jour du jeu, le mod peut se désactiver si une fonction attendue a changé. Le journal le signale.
 
-## Compatibilité
+### Journal et signalement d'un problème
 
-Testé sur Upload Labs 3.0.12 et Godot Mod Loader 7.0.1, avec Smart GPU Manager, Smart Thread Manager, Better Splitters, Where Should I Connect?, Easy Tokens et ModManager.
+Le journal est `%APPDATA%\Upload Labs\logs\modloader.log`, lignes `Daneisra-SmartAutomation`. Pour signaler un problème, ouvrez une issue avec la version du jeu, la liste de vos mods et ces lignes du journal.
 
-Au démarrage, le mod vérifie les API du jeu qu'il utilise et se désactive proprement si l'une d'elles manque. Il n'étend aucun script du jeu et n'écrit rien dans les sauvegardes.
+---
 
-## Installation locale
+## English
 
-Le mod n'est pas publié. Pour le construire :
+A quality-of-life mod for **hacking** in [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/). It sets the threat level of your Breach nodes to the most profitable level, and an advisor panel suggests the best wiring for your chain. It plays by the game's rules: no damage, reward or resource is changed, and nothing is created for free.
 
-```powershell
-python tools/build_zip.py
-```
+**Current version: 0.5.1.** The in-game interface is in French for now.
 
-Copiez ensuite le zip de `build/` dans le dossier `mods` du jeu, à créer à côté de l'exécutable. Pour retirer le mod, supprimez ce zip.
+### Features
 
-## Journaux
+**Auto Threat Manager: threat regulation** (off by default)
 
-Les observations sont dans `%APPDATA%\Upload Labs\logs\modloader.log`, sur les lignes `Daneisra-SmartAutomation`.
+- Sets each Breach node (Corporations, Government, Anonymous, Bank…) to the level that pays most per minute for the objective chosen in the panel: XP, data, intel or balanced. Elite levels are taken into account.
+- Climbs once to the highest unlocked level when it can be won, to open the next one, then returns to the profitable level.
+- Three profiles: conservative, balanced (default), aggressive. After a failed unlock try, conservative and balanced wait until the chance of winning is clearly better. Aggressive retries from time to time.
+- Estimates come from the attacks actually observed on your chain, so an unknown node or one added by another mod does not get in the way. Until the measurement is there, the regulation aims at the highest level that holds.
+- Below the node's buttons: automation status, `Pause` and `Resume`. Changing a level yourself pauses that node type for the session.
+- Safeguards: suspended at higher game speed or while the game's own auto level option is on, a check after every level change, a stop on any anomaly, and an emergency stop on `Ctrl+Alt+F10`.
+- Changes go through the game's own level buttons (`level_up` / `level_down`) and are saved with your game as usual.
 
-## Documentation
+**Smart Hacking Advisor: read-only**
 
-- [Changelog](CHANGELOG.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Suivi du projet et tests](docs/PROJECT_TRACKING.md)
+- `Ctrl+Alt+F8`, or the `Conseil` button of a Breach node.
+- Shows the best wiring for the chosen objective first, step by step, with the estimated gain, the drawbacks and how reliable it is, then the recommended purchase.
+- **"À essayer"** (things to try): nodes without power or damage, free outputs or inputs, unlocked nodes not placed yet. No figure until something has been measured.
+- The detailed figures (wirings compared, purchases, levels) are in a collapsible section.
+- It only displays: your wiring and purchases stay in your hands.
 
-## Contenu du dépôt
+### Compatibility
 
-Ce dépôt ne contient aucun fichier extrait du jeu, aucune sauvegarde et aucun secret.
+| | Tested |
+|---|---|
+| Upload Labs | 3.0.12 (Steam, Windows) |
+| Godot Mod Loader | 7.0.1, bundled with the game |
+| Other mods | Smart GPU Manager, Smart Thread Manager, Better Splitters, Where Should I Connect?, Easy Tokens, ModManager |
+
+The mod extends no game script. At start-up it checks the game functions it relies on and disables itself cleanly if one is missing. Linux and macOS are untested.
+
+### Installation
+
+**From the Steam Workshop** (once published there): subscribe, then start the game.
+
+**From GitHub**:
+
+1. Download `Daneisra-SmartAutomation-<version>.zip` from the [Releases](https://github.com/Daneisra/UploadLabs-SmartAutomation/releases). Its SHA-256 checksum is listed next to it.
+2. Open the game folder: in Steam, right-click Upload Labs, *Manage*, *Browse local files*.
+3. Create a `mods` folder next to `Upload Labs.exe` if there is none, and copy the zip into it **without extracting it**.
+4. Start the game.
+
+Do not install the mod twice: if you switch to the Workshop, delete the zip from the `mods` folder, and the other way round.
+
+### Turning the regulation on
+
+The regulation is **off by default**: the mod observes and the advisor works, but no level is changed. To turn it on, set the `regulation_mode` option to `active`, for example with the **ModManager** mod from the Workshop. Other options:
+
+| Option | Values | Purpose |
+|---|---|---|
+| `regulation_mode` | `off` (default), `dry_run`, `active` | `dry_run` logs the decisions without acting |
+| `regulation_profile` | `conservative`, `balanced` (default), `aggressive` | How cautious the regulation is |
+| `max_allowed_level` / `min_level` | integer, `-1` = no limit | Bounds of the levels aimed at |
+| `log_level` | `debug`, `info` (default), `warning` | Log detail |
+
+### Uninstalling
+
+Delete the zip from the `mods` folder, or unsubscribe on the Workshop. Your saves stay intact: the mod writes nothing into them, and the levels it chose are ordinary game levels. Its settings live in `%APPDATA%\Upload Labs\mod_configs\Daneisra-SmartAutomation`, which you may delete.
+
+### Known limitations
+
+- The interface is in French only for now.
+- A new chain or node needs a few attacks before it gets figures; meanwhile the panel shows "données insuffisantes" (not enough data).
+- An anomaly (unexpected level, inconsistent state) stops the regulation of every node until the game is restarted. This is deliberate, out of caution.
+- Purchases are compared one at a time: their gains do not add up.
+- The mod cannot read the free slots of a node type already placed yet (for example "1/3").
+- Some infection mechanics were measured on one chain only: the related estimates are less certain, and the reliability shown says so.
+- After a game update, the mod may disable itself if a function it relies on changed. The log says so.
+
+### Log and bug reports
+
+The log is `%APPDATA%\Upload Labs\logs\modloader.log`, lines starting with `Daneisra-SmartAutomation`. To report a problem, open an issue with the game version, your mod list and those log lines.
+
+---
+
+## Développement · Development
+
+- Construire l'archive / build the archive: `python tools/build_zip.py`, puis / then `python tools/verify_zip.py`.
+- Tests: `godot --headless --path . --script tests/run_tests.gd`.
+- [Changelog](CHANGELOG.md) · [Architecture](docs/ARCHITECTURE.md) · [Suivi du projet](docs/PROJECT_TRACKING.md) · [Publication](docs/PUBLISHING.md)
+
+Ce dépôt ne contient aucun fichier du jeu, aucune sauvegarde et aucun secret. *This repository contains no game file, no save and no secret.*
+
+## Droits · Rights
+
+Upload Labs et ses contenus appartiennent à EnigmaDev Studios. Ce mod ne contient aucun code, asset ni donnée du jeu : il lit l'état du jeu pendant l'exécution. *Upload Labs and its content belong to EnigmaDev Studios. This mod contains no code, asset or data from the game: it reads the game's state while it runs.*

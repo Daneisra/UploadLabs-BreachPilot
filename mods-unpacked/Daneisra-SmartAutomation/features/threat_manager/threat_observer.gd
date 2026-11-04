@@ -1029,7 +1029,8 @@ func _profit_choice(tracker: Dictionary, profile: Dictionary, regulator: ThreatR
 	if not measure.usable:
 		return {}
 	# The measure is kept as it was when it became enough: an attack must not pay for a new table.
-	var key := "%s|%s|%s" % [tracker.type, profile.signature, profile.interval]
+	# Another chain with the same announced power hits otherwise: its hits are in a table of their own.
+	var key := "%s|%s|%s|%s|%s" % [tracker.type, profile.signature, profile.interval, tracker.get("chain_key", ""), tracker.get("infection_key", "")]
 	var table: Dictionary = _profit_tables.get(tracker.type, {})
 	if table.get("key", "") != key:
 		table = {"key": key, "window": tracker.window, "profile": profile, "measure": measure, "levels": {}, "next": maxi(_regulation.min_level, 0), "top": event.max_level}
