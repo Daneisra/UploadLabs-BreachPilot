@@ -60,8 +60,11 @@ def main() -> int:
         if set(files) != on_disk:
             fail(errors, "archive differs from the mod folder: missing %s, extra %s" % (sorted(on_disk - set(files)), sorted(set(files) - on_disk)))
 
-        if PREFIX + "LICENSE" in names and archive.read(PREFIX + "LICENSE") != (ROOT / "LICENSE").read_bytes():
-            fail(errors, "LICENSE differs from the repository's")
+        # Every entry holds exactly its source: an archive left over from before a fix is refused.
+        for name in sorted(set(files) & on_disk):
+            source = ROOT / "LICENSE" if name == PREFIX + "LICENSE" else ROOT / name
+            if archive.read(name) != source.read_bytes():
+                fail(errors, f"{name} differs from its source: rebuild the archive")
         manifest = json.loads(archive.read(PREFIX + "manifest.json").decode("utf-8"))
         main_gd = archive.read(PREFIX + "mod_main.gd").decode("utf-8")
         shipped_build = re.search(r'const BUILD := "([^"]+)"', main_gd).group(1)
